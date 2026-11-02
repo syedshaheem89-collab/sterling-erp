@@ -284,7 +284,7 @@ export default function StudentPopupModal({
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          width: '410px',
+          width: selectedStudent ? '450px' : '410px',
           maxWidth: '96vw',
           maxHeight: '90vh',
           background: '#0B0F1C',
@@ -962,67 +962,69 @@ export default function StudentPopupModal({
                       </button>
                     </div>
                   ) : (
-                    <table
-                      style={{
-                        width: '100%',
-                        tableLayout: 'fixed',
-                        borderCollapse: 'collapse',
-                        fontSize: '11px',
-                        textAlign: 'left',
-                        boxSizing: 'border-box',
-                      }}
-                    >
-                      <colgroup>
-                        <col style={{ width: '22px' }} />
-                        <col style={{ width: '115px' }} />
-                        <col style={{ width: '75px' }} />
-                        <col style={{ width: '75px' }} />
-                        <col style={{ width: '36px' }} />
-                      </colgroup>
-                      <thead>
-                        <tr
-                          style={{
-                            borderBottom: '1px solid rgba(148, 163, 225, 0.12)',
-                            color: '#8E9BB5',
-                            background: 'rgba(255, 255, 255, 0.02)',
-                          }}
-                        >
-                          <th style={{ padding: '8px 4px', textAlign: 'center', fontWeight: 700 }}>#</th>
-                          <th style={{ padding: '8px 4px', fontWeight: 700 }}>BANK</th>
-                          <th style={{ padding: '8px 4px', textAlign: 'right', fontWeight: 700 }}>AMOUNT</th>
-                          <th style={{ padding: '8px 4px', textAlign: 'right', fontWeight: 700 }}>DATE</th>
-                          <th style={{ padding: '8px 4px', textAlign: 'center', fontWeight: 700 }}>EDIT</th>
-                        </tr>
-                      </thead>
-                      <tbody>
+                    <div>
+                      {/* Grid Table Header */}
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: '24px 1fr 78px 84px 34px',
+                          gap: '6px',
+                          alignItems: 'center',
+                          padding: '9px 12px',
+                          borderBottom: '1px solid rgba(148, 163, 225, 0.12)',
+                          color: '#8E9BB5',
+                          background: 'rgba(255, 255, 255, 0.02)',
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          boxSizing: 'border-box',
+                        }}
+                      >
+                        <div style={{ textAlign: 'center' }}>#</div>
+                        <div>BANK</div>
+                        <div style={{ textAlign: 'right' }}>AMOUNT</div>
+                        <div style={{ textAlign: 'right' }}>DATE</div>
+                        <div style={{ textAlign: 'center' }}>EDIT</div>
+                      </div>
+
+                      {/* Grid Table Rows */}
+                      <div>
                         {paymentList.map((item) => (
-                          <tr
+                          <div
                             key={item.id || item.slot}
                             style={{
+                              display: 'grid',
+                              gridTemplateColumns: '24px 1fr 78px 84px 34px',
+                              gap: '6px',
+                              alignItems: 'center',
+                              padding: '8px 12px',
                               borderBottom: '1px solid rgba(148, 163, 225, 0.06)',
+                              fontSize: '11px',
+                              boxSizing: 'border-box',
                             }}
                           >
-                            <td style={{ padding: '7px 4px', textAlign: 'center', color: '#8E9BB5', fontWeight: 600 }}>
+                            {/* # (Slot) */}
+                            <div style={{ textAlign: 'center', color: '#8E9BB5', fontWeight: 600 }}>
                               {item.slot}
-                            </td>
+                            </div>
 
-                            <td
+                            {/* BANK: minWidth 0 prevents flex/grid item blowout and enables truncation */}
+                            <div
                               title={item.bank_name || 'STERLING STUDY ABROAD'}
                               style={{
-                                padding: '7px 4px',
-                                color: '#fff',
-                                fontWeight: 600,
+                                minWidth: 0,
                                 overflow: 'hidden',
                                 textOverflow: 'ellipsis',
                                 whiteSpace: 'nowrap',
+                                color: '#fff',
+                                fontWeight: 600,
                               }}
                             >
                               {item.bank_name || 'STERLING STUDY ABROAD'}
-                            </td>
+                            </div>
 
-                            <td
+                            {/* AMOUNT: bold green, guaranteed full visibility */}
+                            <div
                               style={{
-                                padding: '7px 4px',
                                 textAlign: 'right',
                                 color: '#00E5A0',
                                 fontWeight: 800,
@@ -1030,11 +1032,11 @@ export default function StudentPopupModal({
                               }}
                             >
                               {formatCompactINR(item.amount)}
-                            </td>
+                            </div>
 
-                            <td
+                            {/* DATE: formatted readable date */}
+                            <div
                               style={{
-                                padding: '7px 4px',
                                 textAlign: 'right',
                                 color: '#CBD5E1',
                                 fontSize: '10.5px',
@@ -1042,10 +1044,10 @@ export default function StudentPopupModal({
                               }}
                             >
                               {formatDate(item.payment_date || item.paid_date)}
-                            </td>
+                            </div>
 
-                            {/* Orange Edit Button Matching Screenshot */}
-                            <td style={{ padding: '7px 4px', textAlign: 'center' }}>
+                            {/* EDIT: orange pencil button */}
+                            <div style={{ textAlign: 'center' }}>
                               <button
                                 type="button"
                                 onClick={() => handleOpenEditPayment(item)}
@@ -1075,11 +1077,11 @@ export default function StudentPopupModal({
                               >
                                 ✏️
                               </button>
-                            </td>
-                          </tr>
+                            </div>
+                          </div>
                         ))}
-                      </tbody>
-                    </table>
+                      </div>
+                    </div>
                   )}
 
                   {paymentList.length > 0 && (
