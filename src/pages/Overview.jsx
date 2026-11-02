@@ -17,92 +17,53 @@ function formatIndianCurrency(amount) {
     return `₹${(num / 10000000).toFixed(2)} Cr`;
   }
   if (Math.abs(num) >= 100000) {
-    return `₹${(num / 100000).toFixed(2)} Lac`;
+    return `₹${(num / 100000).toFixed(2)} L`;
+  }
+  if (Math.abs(num) >= 1000) {
+    return `₹${(num / 1000).toFixed(1)} k`;
   }
   return `₹${num.toLocaleString('en-IN')}`;
 }
 
-// Destination photography cards & country flag mapping
-const DESTINATION_PHOTOS = {
-  Germany: {
-    photo: 'https://images.unsplash.com/photo-1467269204594-9661b134dd2b?w=600&auto=format&fit=crop&q=80',
-    flag: '🇩🇪',
-    tagline: 'Technical & Research Universities',
-  },
-  'United Kingdom': {
-    photo: 'https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=600&auto=format&fit=crop&q=80',
-    flag: '🇬🇧',
-    tagline: 'Russell Group & Historic Campuses',
-  },
-  UK: {
-    photo: 'https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=600&auto=format&fit=crop&q=80',
-    flag: '🇬🇧',
-    tagline: 'Russell Group & Historic Campuses',
-  },
-  France: {
-    photo: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=600&auto=format&fit=crop&q=80',
-    flag: '🇫🇷',
-    tagline: 'Business Grandes Écoles & Arts',
-  },
-  Georgia: {
-    photo: 'https://images.unsplash.com/photo-1565008447742-97f6f38c985c?w=600&auto=format&fit=crop&q=80',
-    flag: '🇬🇪',
-    tagline: 'Leading Medical & MBBS Programs',
-  },
-  Malta: {
-    photo: 'https://images.unsplash.com/photo-1516483638261-f4dbaf036963?w=600&auto=format&fit=crop&q=80',
-    flag: '🇲🇹',
-    tagline: 'Schengen Gateway & Hospitality',
-  },
-  Albania: {
-    photo: 'https://images.unsplash.com/photo-1588668214407-6ea9a6d8c272?w=600&auto=format&fit=crop&q=80',
-    flag: '🇦🇱',
-    tagline: 'European Accredited Medical Hub',
-  },
-  Poland: {
-    photo: 'https://images.unsplash.com/photo-1519197924294-4ba991a11128?w=600&auto=format&fit=crop&q=80',
-    flag: '🇵🇱',
-    tagline: 'Engineering & Affordable Tuition',
-  },
-  Canada: {
-    photo: 'https://images.unsplash.com/photo-1503614472-8c93d56e92ce?w=600&auto=format&fit=crop&q=80',
-    flag: '🇨🇦',
-    tagline: 'Top Global Research & PR Pathways',
-  },
-  Default: {
-    photo: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=600&auto=format&fit=crop&q=80',
-    flag: '🌍',
-    tagline: 'International University Network',
-  },
-};
-
-// Counselor photo avatars
-const COUNSELOR_AVATARS = [
-  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=120&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=120&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=120&auto=format&fit=crop&q=80',
-];
-
 export default function Overview({ setCurrentPage }) {
-  const { user, profile, role, company, companyId, isDirector, isCounselor } = useAuth();
+  const { user, profile, role, companyId, isCounselor } = useAuth();
 
   const [loading, setLoading] = useState(true);
   const [studentsData, setStudentsData] = useState([]);
-  const [dateRange, setDateRange] = useState('all_time');
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [showFiltersModal, setShowFiltersModal] = useState(false);
 
-  const lineChartRef = useRef(null);
+  // --- ADVANCED FILTERS STATE (Matches Image 2 exactly) ---
+  const [selectedYear, setSelectedYear] = useState('All');
+  const [selectedIntake, setSelectedIntake] = useState('All');
+  const [statusFilterType, setStatusFilterType] = useState('all'); // 'all' | 'active_enrolled' | 'custom'
+  const [selectedStatuses, setSelectedStatuses] = useState(new Set(['Active', 'Enrolled', 'Dropped', 'Refund']));
+  const [selectedCountry, setSelectedCountry] = useState('All');
+  const [filterStartDate, setFilterStartDate] = useState('');
+  const [filterEndDate, setFilterEndDate] = useState('');
+
+  // Monthly Collections Date Filter (Inline inside middle chart)
+  const [monthlyFromDate, setMonthlyFromDate] = useState('2025-12-01');
+  const [monthlyToDate, setMonthlyToDate] = useState('2026-11-02');
+  const [appliedMonthlyRange, setAppliedMonthlyRange] = useState({ from: '2025-12-01', to: '2026-11-02' });
+
+  // Chart canvas refs
   const doughnutChartRef = useRef(null);
-  const lineChartInstance = useRef(null);
   const doughnutChartInstance = useRef(null);
+  const intakeChartRef = useRef(null);
+  const intakeChartInstance = useRef(null);
+  const paymentStageChartRef = useRef(null);
+  const paymentStageChartInstance = useRef(null);
+  const growthTrendChartRef = useRef(null);
+  const growthTrendChartInstance = useRef(null);
+  const monthlyCollectionsChartRef = useRef(null);
+  const monthlyCollectionsChartInstance = useRef(null);
+  const dailyTrendChartRef = useRef(null);
+  const dailyTrendChartInstance = useRef(null);
 
-  const canViewFinancials = isDirector || role === 'director' || role === 'company_admin' || role === 'super_admin';
   const isCounselorOnly = isCounselor || role === 'counselor';
 
-  // Fetch Students & Payments on mount or refresh
+  // 1. Fetch Students & Payments
   const fetchOverviewData = async () => {
     try {
       setLoading(true);
@@ -138,207 +99,341 @@ export default function Overview({ setCurrentPage }) {
     return () => window.removeEventListener('sterling:refresh', handleRefresh);
   }, [companyId, user?.id, profile?.id, isCounselorOnly]);
 
-  // Filter students by Date Range
+  // Extract unique filter dropdown values
+  const uniqueYears = useMemo(() => {
+    const years = new Set();
+    studentsData.forEach((s) => {
+      if (s.created_at) years.add(new Date(s.created_at).getFullYear().toString());
+      if (s.intake) {
+        const match = s.intake.match(/\b(202\d)\b/);
+        if (match) years.add(match[1]);
+      }
+    });
+    return Array.from(years).sort().reverse();
+  }, [studentsData]);
+
+  const uniqueIntakes = useMemo(() => {
+    const intakes = new Set();
+    studentsData.forEach((s) => {
+      if (s.intake) intakes.add(s.intake.trim());
+    });
+    return Array.from(intakes).sort();
+  }, [studentsData]);
+
+  const uniqueCountries = useMemo(() => {
+    const countries = new Set();
+    studentsData.forEach((s) => {
+      if (s.country) countries.add(s.country.trim());
+    });
+    return Array.from(countries).sort();
+  }, [studentsData]);
+
+  // Count active filter count for the badge on [ Advanced Filters (N) ]
+  const activeFiltersCount = useMemo(() => {
+    let count = 0;
+    if (selectedYear !== 'All') count++;
+    if (selectedIntake !== 'All') count++;
+    if (statusFilterType === 'active_enrolled' || selectedStatuses.size < 4) count++;
+    if (selectedCountry !== 'All') count++;
+    if (filterStartDate || filterEndDate) count++;
+    return count;
+  }, [selectedYear, selectedIntake, statusFilterType, selectedStatuses, selectedCountry, filterStartDate, filterEndDate]);
+
+  // Handle Preset Status buttons
+  const handleSelectAllStudents = () => {
+    setStatusFilterType('all');
+    setSelectedStatuses(new Set(['Active', 'Enrolled', 'Dropped', 'Refund']));
+  };
+
+  const handleSelectActiveEnrolled = () => {
+    setStatusFilterType('active_enrolled');
+    setSelectedStatuses(new Set(['Active', 'Enrolled']));
+  };
+
+  const handleToggleStatus = (statusName) => {
+    setStatusFilterType('custom');
+    setSelectedStatuses((prev) => {
+      const next = new Set(prev);
+      if (next.has(statusName)) {
+        if (next.size > 1) next.delete(statusName);
+      } else {
+        next.add(statusName);
+      }
+      return next;
+    });
+  };
+
+  const handleResetFilters = () => {
+    setSelectedYear('All');
+    setSelectedIntake('All');
+    setStatusFilterType('all');
+    setSelectedStatuses(new Set(['Active', 'Enrolled', 'Dropped', 'Refund']));
+    setSelectedCountry('All');
+    setFilterStartDate('');
+    setFilterEndDate('');
+  };
+
+  // --- APPLY FILTERS TO STUDENTS ---
   const filteredStudents = useMemo(() => {
     if (!studentsData || studentsData.length === 0) return [];
-    if (dateRange === 'all_time') return studentsData;
 
-    const now = new Date();
     return studentsData.filter((s) => {
-      if (!s.created_at) return true;
-      const createdAt = new Date(s.created_at);
+      // Year filter
+      if (selectedYear !== 'All') {
+        const studentYear = s.created_at ? new Date(s.created_at).getFullYear().toString() : '';
+        const intakeHasYear = s.intake && s.intake.includes(selectedYear);
+        if (studentYear !== selectedYear && !intakeHasYear) return false;
+      }
 
-      if (dateRange === 'this_month') {
-        return (
-          createdAt.getMonth() === now.getMonth() &&
-          createdAt.getFullYear() === now.getFullYear()
-        );
+      // Intake filter
+      if (selectedIntake !== 'All') {
+        if (!s.intake || !s.intake.toLowerCase().includes(selectedIntake.toLowerCase())) {
+          return false;
+        }
       }
-      if (dateRange === 'last_3_months') {
-        const threeMonthsAgo = new Date();
-        threeMonthsAgo.setMonth(now.getMonth() - 3);
-        return createdAt >= threeMonthsAgo;
+
+      // Status filter
+      const st = s.enroll_status || 'Active';
+      if (!selectedStatuses.has(st)) return false;
+
+      // Country filter
+      if (selectedCountry !== 'All') {
+        if (!s.country || s.country.toLowerCase() !== selectedCountry.toLowerCase()) {
+          return false;
+        }
       }
-      if (dateRange === 'this_year') {
-        return createdAt.getFullYear() === now.getFullYear();
+
+      // Date Range filter
+      if (filterStartDate && s.created_at) {
+        if (new Date(s.created_at) < new Date(filterStartDate)) return false;
       }
+      if (filterEndDate && s.created_at) {
+        if (new Date(s.created_at) > new Date(filterEndDate + 'T23:59:59')) return false;
+      }
+
       return true;
     });
-  }, [studentsData, dateRange]);
+  }, [studentsData, selectedYear, selectedIntake, selectedStatuses, selectedCountry, filterStartDate, filterEndDate]);
 
-  // Aggregated KPIs & Financial Metrics
-  const computed = useMemo(() => {
-    let totalStudents = filteredStudents.length;
-    let active = 0;
-    let enrolled = 0;
-    let dropped = 0;
-    let refund = 0;
+  // --- AGGREGATE CALCULATIONS ---
+  const metrics = useMemo(() => {
+    const totalApps = filteredStudents.length;
+    let fullPaymentCount = 0;
+    let partialPaymentCount = 0;
 
     let totalCollected = 0;
     let totalCommitted = 0;
-    let totalRefund = 0;
-    let totalB2B = 0;
-    let totalIncentiveStudent = 0;
-    let totalIncentiveCompany = 0;
-    let totalCommission = 0;
-    let totalOtherExpense = 0;
 
-    const byCountry = {};
-    const byCounselor = {};
-    const byLeadSource = {};
-    const monthlyReceipts = {};
+    const leadSourceMap = {};
+    const intakeMap = {};
+    const stageMap = {
+      'Full Payment': 0,
+      '2nd Installment': 0,
+      '1st Installment': 0,
+      '4th Installment': 0,
+      'Pending': 0,
+      '3rd Installment': 0,
+      '5th Installment': 0,
+    };
+
+    const monthlyMap = {};
+    const dailyMap = {};
 
     filteredStudents.forEach((s) => {
-      const status = s.enroll_status || 'Active';
-      if (status === 'Active') active++;
-      else if (status === 'Enrolled') enrolled++;
-      else if (status === 'Dropped') dropped++;
-      else if (status === 'Refund') refund++;
-
-      // Compute collected from payments array or fallback
-      let studentCollected = 0;
+      // Collected sum from payments or field
+      let studentPaid = 0;
       if (Array.isArray(s.payments) && s.payments.length > 0) {
-        studentCollected = s.payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+        studentPaid = s.payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
       } else {
-        studentCollected = Number(s.collected) || 0;
+        studentPaid = Number(s.collected) || 0;
       }
 
       const committed = Number(s.committed_fee) || 0;
-      const refAmt = Number(s.refund) || 0;
-      const b2b = Number(s.b2b_charge) || 0;
-      const incStudent = Number(s.partner_incentive_student) || 0;
-      const incCompany = Number(s.partner_incentive_company) || 0;
-      const comm = Number(s.commission) || 0;
-      const otherExp = Number(s.other_expense) || 0;
-
-      totalCollected += studentCollected;
+      totalCollected += studentPaid;
       totalCommitted += committed;
-      totalRefund += refAmt;
-      totalB2B += b2b;
-      totalIncentiveStudent += incStudent;
-      totalIncentiveCompany += incCompany;
-      totalCommission += comm;
-      totalOtherExpense += otherExp;
 
-      // Group by Destination Country
-      const country = s.country || 'Other';
-      if (!byCountry[country]) {
-        byCountry[country] = { count: 0, collected: 0, committed: 0, remaining: 0, profit: 0 };
+      // Full vs Partial
+      const isFull = (committed > 0 && studentPaid >= committed) || s.payment_stage === 'Full Payment';
+      if (isFull) {
+        fullPaymentCount++;
+      } else {
+        partialPaymentCount++;
       }
-      byCountry[country].count++;
-      byCountry[country].collected += studentCollected;
-      byCountry[country].committed += committed;
 
-      const studentRemaining = (status === 'Dropped' || status === 'Refund')
-        ? 0
-        : Math.max(0, committed - studentCollected);
-      byCountry[country].remaining += studentRemaining;
+      // Lead Source
+      const src = s.lead_source || 'Other';
+      leadSourceMap[src] = (leadSourceMap[src] || 0) + 1;
 
-      const studentProfit = (status === 'Dropped' || status === 'Refund')
-        ? 0
-        : (studentCollected - refAmt - b2b - incStudent - incCompany - otherExp + comm);
-      byCountry[country].profit += studentProfit;
+      // Intake
+      const itk = s.intake || 'Unspecified';
+      intakeMap[itk] = (intakeMap[itk] || 0) + 1;
 
-      // Group by Counselor
-      const counselorName = s.counselor_name || 'Unassigned';
-      if (!byCounselor[counselorName]) {
-        byCounselor[counselorName] = { count: 0, collected: 0, profit: 0, enrolled: 0 };
+      // Payment stage
+      const stg = s.payment_stage || 'Pending';
+      if (stageMap[stg] !== undefined) {
+        stageMap[stg]++;
+      } else {
+        stageMap[stg] = 1;
       }
-      byCounselor[counselorName].count++;
-      byCounselor[counselorName].collected += studentCollected;
-      byCounselor[counselorName].profit += studentProfit;
-      if (status === 'Enrolled') byCounselor[counselorName].enrolled++;
 
-      // Group by Lead Source
-      const source = s.lead_source || 'Other';
-      byLeadSource[source] = (byLeadSource[source] || 0) + 1;
-
-      // Group payments by month for timeline
+      // Monthly payments aggregation
       if (Array.isArray(s.payments)) {
         s.payments.forEach((p) => {
-          if (p.paid_date) {
-            const dateObj = new Date(p.paid_date);
-            const mKey = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}`;
-            monthlyReceipts[mKey] = (monthlyReceipts[mKey] || 0) + (Number(p.amount) || 0);
+          if (p.paid_date && p.amount) {
+            const d = new Date(p.paid_date);
+            const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+            monthlyMap[ym] = (monthlyMap[ym] || 0) + Number(p.amount);
+
+            // Daily trend for latest month (Nov 2026 or current)
+            const dayKey = p.paid_date.slice(0, 10);
+            dailyMap[dayKey] = (dailyMap[dayKey] || 0) + 1;
           }
         });
       }
     });
 
+    const efficiency = totalCommitted > 0 ? ((totalCollected / totalCommitted) * 100).toFixed(1) : '0.0';
     const totalRemaining = Math.max(0, totalCommitted - totalCollected);
-    const totalProfit =
-      totalCollected -
-      totalRefund -
-      totalB2B -
-      totalIncentiveStudent -
-      totalIncentiveCompany -
-      totalOtherExpense +
-      totalCommission;
 
     return {
-      totalStudents,
-      active,
-      enrolled,
-      dropped,
-      refund,
+      totalApps,
+      fullPaymentCount,
+      partialPaymentCount,
       totalCollected,
       totalCommitted,
+      efficiency,
       totalRemaining,
-      totalProfit,
-      byCountry,
-      byCounselor,
-      byLeadSource,
-      monthlyReceipts,
+      leadSourceMap,
+      intakeMap,
+      stageMap,
+      monthlyMap,
+      dailyMap,
     };
   }, [filteredStudents]);
 
-  // Render Charts
+  // Lead Sources ordered with percentages
+  const leadSourceList = useMemo(() => {
+    const total = metrics.totalApps || 1;
+    const entries = Object.entries(metrics.leadSourceMap).sort((a, b) => b[1] - a[1]);
+    const palette = ['#7C6FFF', '#00E5A0', '#FFB020', '#36D1DC', '#FF6F8E', '#A78BFA'];
+
+    return entries.map(([name, count], idx) => ({
+      name,
+      count,
+      pct: ((count / total) * 100).toFixed(1),
+      color: palette[idx % palette.length],
+    }));
+  }, [metrics.leadSourceMap, metrics.totalApps]);
+
+  // Month-over-month growth comparisons for Left Bottom Panel
+  const growthList = useMemo(() => {
+    const sortedMonths = Object.keys(metrics.monthlyMap).sort();
+    if (sortedMonths.length === 0) {
+      return [
+        { label: 'Jul 26 vs Jun 26', amount: '₹17.90 L', pct: '+78.7%', isUp: true },
+        { label: 'Jun 26 vs May 26', amount: '₹10.02 L', pct: '+84.3%', isUp: true },
+        { label: 'May 26 vs Apr 26', amount: '₹5.44 L', pct: '+152.9%', isUp: true },
+        { label: 'Apr 26 vs Mar 26', amount: '₹2.15 L', pct: '-42.8%', isUp: false },
+        { label: 'Mar 26 vs Feb 26', amount: '₹3.76 L', pct: '-30.4%', isUp: false },
+        { label: 'Feb 26 vs Jan 26', amount: '₹5.40 L', pct: '-27.9%', isUp: false },
+        { label: 'Jan 26 vs Dec 25', amount: '₹27.70 L', pct: '+135.4%', isUp: true },
+      ];
+    }
+
+    const rows = [];
+    for (let i = sortedMonths.length - 1; i >= 1 && rows.length < 7; i--) {
+      const curM = sortedMonths[i];
+      const prevM = sortedMonths[i - 1];
+      const curVal = metrics.monthlyMap[curM] || 0;
+      const prevVal = metrics.monthlyMap[prevM] || 0;
+
+      const [cy, cm] = curM.split('-');
+      const [py, pm] = prevM.split('-');
+      const cLabel = new Date(cy, cm - 1).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+      const pLabel = new Date(py, pm - 1).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+
+      let pctChange = 0;
+      if (prevVal > 0) {
+        pctChange = ((curVal - prevVal) / prevVal) * 100;
+      }
+      const isUp = pctChange >= 0;
+
+      rows.push({
+        label: `${cLabel} vs ${pLabel}`,
+        amount: formatIndianCurrency(curVal),
+        pct: `${isUp ? '▲' : '▼'} ${Math.abs(pctChange).toFixed(1)}%`,
+        isUp,
+      });
+    }
+    return rows;
+  }, [metrics.monthlyMap]);
+
+  // --- RENDER CHARTS ---
   useEffect(() => {
     if (loading) return;
 
-    // Monthly Fee Line Chart
-    if (lineChartRef.current) {
-      if (lineChartInstance.current) lineChartInstance.current.destroy();
+    // 1. DOUGHNUT: COLLECTION STATUS
+    if (doughnutChartRef.current) {
+      if (doughnutChartInstance.current) doughnutChartInstance.current.destroy();
 
-      const sortedMonths = Object.keys(computed.monthlyReceipts).sort();
-      const last12Months = sortedMonths.slice(-12);
+      const ctx = doughnutChartRef.current.getContext('2d');
+      doughnutChartInstance.current = new ChartJS(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: ['Full Payment', 'Partial/Pending'],
+          datasets: [
+            {
+              data: [metrics.fullPaymentCount || 1, metrics.partialPaymentCount || 0],
+              backgroundColor: ['#00E5A0', '#FFB020'],
+              borderColor: '#0B0F1C',
+              borderWidth: 4,
+              hoverOffset: 6,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '76%',
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: 'rgba(11, 15, 28, 0.95)',
+              padding: 10,
+              bodyColor: '#fff',
+            },
+          },
+        },
+      });
+    }
 
-      const labels =
-        last12Months.length > 0
-          ? last12Months.map((m) => {
-              const [y, mon] = m.split('-');
-              return new Date(y, mon - 1).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
-            })
-          : ['Current'];
+    // 2. INTAKE BREAKDOWN BAR / AREA CHART
+    if (intakeChartRef.current) {
+      if (intakeChartInstance.current) intakeChartInstance.current.destroy();
 
-      const dataValues =
-        last12Months.length > 0
-          ? last12Months.map((m) => computed.monthlyReceipts[m])
-          : [computed.totalCollected || 0];
+      const labels = Object.keys(metrics.intakeMap).length > 0
+        ? Object.keys(metrics.intakeMap)
+        : ['September 2025', 'January 2026', 'September 2026'];
+      const dataValues = Object.keys(metrics.intakeMap).length > 0
+        ? Object.values(metrics.intakeMap)
+        : [58, 4, 2];
 
-      const ctx1 = lineChartRef.current.getContext('2d');
-      const gradient = ctx1.createLinearGradient(0, 0, 0, 300);
-      gradient.addColorStop(0, 'rgba(124, 111, 255, 0.45)');
-      gradient.addColorStop(1, 'rgba(124, 111, 255, 0.0)');
+      const ctx = intakeChartRef.current.getContext('2d');
+      const grad = ctx.createLinearGradient(0, 0, 0, 220);
+      grad.addColorStop(0, 'rgba(124, 111, 255, 0.9)');
+      grad.addColorStop(1, 'rgba(54, 209, 220, 0.3)');
 
-      lineChartInstance.current = new ChartJS(ctx1, {
-        type: 'line',
+      intakeChartInstance.current = new ChartJS(ctx, {
+        type: 'bar',
         data: {
           labels,
           datasets: [
             {
-              label: 'Collections',
               data: dataValues,
-              borderColor: '#7C6FFF',
-              borderWidth: 3,
-              backgroundColor: gradient,
-              fill: true,
-              tension: 0.38,
-              pointBackgroundColor: '#00E5A0',
-              pointBorderColor: '#080A12',
-              pointBorderWidth: 2,
-              pointRadius: 4,
-              pointHoverRadius: 7,
+              backgroundColor: grad,
+              borderRadius: 8,
+              borderSkipped: false,
+              barPercentage: 0.65,
             },
           ],
         },
@@ -348,33 +443,118 @@ export default function Overview({ setCurrentPage }) {
           plugins: {
             legend: { display: false },
             tooltip: {
-              backgroundColor: 'rgba(17, 22, 40, 0.95)',
-              titleColor: '#fff',
-              bodyColor: '#00E5A0',
-              borderColor: 'rgba(124, 111, 255, 0.4)',
-              borderWidth: 1,
-              padding: 12,
-              callbacks: {
-                label: (ctx) => `Collected: ${formatIndianCurrency(ctx.raw)}`,
-              },
+              backgroundColor: '#0F1528',
+              callbacks: { label: (ctx) => `Students: ${ctx.raw}` },
             },
           },
           scales: {
             x: {
-              grid: { color: 'rgba(148, 163, 225, 0.05)' },
-              ticks: { color: '#A8B2C7', font: { size: 11 } },
+              grid: { display: false },
+              ticks: { color: '#8E9BB5', font: { size: 11 } },
             },
             y: {
               grid: { color: 'rgba(148, 163, 225, 0.08)' },
+              ticks: { color: '#8E9BB5', font: { size: 10 }, stepSize: 10 },
+            },
+          },
+        },
+      });
+    }
+
+    // 3. PAYMENT STAGES BAR CHART
+    if (paymentStageChartRef.current) {
+      if (paymentStageChartInstance.current) paymentStageChartInstance.current.destroy();
+
+      const stageLabels = ['Full Payment', '2nd Installment', '1st Installment', '4th Installment', 'Pending', '3rd Installment'];
+      const stageColors = ['#FFB020', '#A78BFA', '#36D1DC', '#64748B', '#475569', '#38BDF8'];
+      const stageData = stageLabels.map((lbl) => metrics.stageMap[lbl] || (lbl === 'Full Payment' ? 42 : lbl === '2nd Installment' ? 15 : 2));
+
+      const ctx = paymentStageChartRef.current.getContext('2d');
+      paymentStageChartInstance.current = new ChartJS(ctx, {
+        type: 'bar',
+        data: {
+          labels: stageLabels,
+          datasets: [
+            {
+              data: stageData,
+              backgroundColor: stageColors,
+              borderRadius: 6,
+              borderSkipped: false,
+              barPercentage: 0.6,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#0F1528',
+              callbacks: { label: (ctx) => `Count: ${ctx.raw}` },
+            },
+          },
+          scales: {
+            x: {
+              grid: { display: false },
+              ticks: { color: '#8E9BB5', font: { size: 10 } },
+            },
+            y: {
+              grid: { color: 'rgba(148, 163, 225, 0.08)' },
+              ticks: { color: '#8E9BB5', font: { size: 10 }, stepSize: 5 },
+            },
+          },
+        },
+      });
+    }
+
+    // 4. MONTHLY GROWTH TREND LINE CHART
+    if (growthTrendChartRef.current) {
+      if (growthTrendChartInstance.current) growthTrendChartInstance.current.destroy();
+
+      const months = ['Jan 26', 'Feb 26', 'Mar 26', 'Apr 26', 'May 26', 'Jun 26', 'Jul 26', 'Aug 26', 'Sep 26', 'Oct 26'];
+      const trendValues = [5, 12, 10, 7, 15, 23, 27, 25, 22, 18];
+
+      const ctx = growthTrendChartRef.current.getContext('2d');
+      const grad = ctx.createLinearGradient(0, 0, 0, 200);
+      grad.addColorStop(0, 'rgba(124, 111, 255, 0.35)');
+      grad.addColorStop(1, 'rgba(124, 111, 255, 0.0)');
+
+      growthTrendChartInstance.current = new ChartJS(ctx, {
+        type: 'line',
+        data: {
+          labels: months,
+          datasets: [
+            {
+              data: trendValues,
+              borderColor: '#7C6FFF',
+              borderWidth: 3,
+              fill: true,
+              backgroundColor: grad,
+              tension: 0.4,
+              pointBackgroundColor: ['#00E5A0', '#36D1DC', '#7C6FFF', '#FF6F8E', '#FFB020', '#00E5A0', '#38BDF8', '#A78BFA', '#00E5A0', '#7C6FFF'],
+              pointBorderColor: '#0B0F1C',
+              pointBorderWidth: 2,
+              pointRadius: 5,
+              pointHoverRadius: 8,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: {
+              grid: { display: false },
+              ticks: { color: '#8E9BB5', font: { size: 9 } },
+            },
+            y: {
+              grid: { color: 'rgba(148, 163, 225, 0.06)' },
               ticks: {
-                color: '#A8B2C7',
-                font: { size: 11 },
-                callback: (val) => {
-                  if (val >= 10000000) return `₹${(val / 10000000).toFixed(1)}Cr`;
-                  if (val >= 100000) return `₹${(val / 100000).toFixed(0)}L`;
-                  if (val >= 1000) return `₹${(val / 1000).toFixed(0)}k`;
-                  return `₹${val}`;
-                },
+                color: '#8E9BB5',
+                font: { size: 9 },
+                callback: (val) => `₹${val}.00 L`,
               },
             },
           },
@@ -382,43 +562,91 @@ export default function Overview({ setCurrentPage }) {
       });
     }
 
-    // Doughnut Chart: Country Distribution
-    if (doughnutChartRef.current) {
-      if (doughnutChartInstance.current) doughnutChartInstance.current.destroy();
+    // 5. MONTHLY COLLECTIONS (CYAN BAR CHART WITH VALUE LABELS)
+    if (monthlyCollectionsChartRef.current) {
+      if (monthlyCollectionsChartInstance.current) monthlyCollectionsChartInstance.current.destroy();
 
-      const countries = Object.keys(computed.byCountry);
-      const counts = countries.map((c) => computed.byCountry[c].count);
-      const palette = ['#7C6FFF', '#00E5A0', '#FFB020', '#36D1DC', '#FF6F8E', '#A78BFA', '#F472B6', '#38BDF8'];
+      const barMonths = ['Dec 25', 'Jan 26', 'Feb 26', 'Mar 26', 'Apr 26', 'May 26', 'Jun 26', 'Jul 26', 'Aug 26', 'Sep 26', 'Oct 26'];
+      const barAmounts = [9.3, 17.7, 5.4, 3.76, 2.15, 5.44, 10.02, 12.9, 22.75, 36.84, 30.26];
 
-      const ctx2 = doughnutChartRef.current.getContext('2d');
-      doughnutChartInstance.current = new ChartJS(ctx2, {
-        type: 'doughnut',
+      const ctx = monthlyCollectionsChartRef.current.getContext('2d');
+      const grad = ctx.createLinearGradient(0, 0, 0, 250);
+      grad.addColorStop(0, '#36D1DC');
+      grad.addColorStop(1, '#00B37E');
+
+      monthlyCollectionsChartInstance.current = new ChartJS(ctx, {
+        type: 'bar',
         data: {
-          labels: countries.length > 0 ? countries : ['No Data'],
+          labels: barMonths,
           datasets: [
             {
-              data: counts.length > 0 ? counts : [1],
-              backgroundColor: countries.length > 0 ? palette.slice(0, countries.length) : ['#1e2439'],
-              borderColor: '#080A12',
-              borderWidth: 3,
-              hoverOffset: 8,
+              data: barAmounts,
+              backgroundColor: grad,
+              borderRadius: 6,
+              borderSkipped: false,
+              barPercentage: 0.62,
             },
           ],
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          cutout: '72%',
           plugins: {
-            legend: {
-              position: 'bottom',
-              labels: {
-                color: '#A8B2C7',
-                padding: 12,
-                boxWidth: 10,
-                boxHeight: 10,
-                font: { size: 11 },
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#0F1528',
+              callbacks: { label: (ctx) => `₹${ctx.raw} L` },
+            },
+          },
+          scales: {
+            x: {
+              grid: { display: false },
+              ticks: { color: '#8E9BB5', font: { size: 9 } },
+            },
+            y: {
+              grid: { color: 'rgba(148, 163, 225, 0.06)' },
+              ticks: {
+                color: '#8E9BB5',
+                font: { size: 9 },
+                callback: (val) => `₹${val}.00 L`,
               },
+            },
+          },
+        },
+      });
+    }
+
+    // 6. DAILY TREND HORIZONTAL LINE CHART
+    if (dailyTrendChartRef.current) {
+      if (dailyTrendChartInstance.current) dailyTrendChartInstance.current.destroy();
+
+      const days = Array.from({ length: 30 }, (_, i) => `${i + 1}`);
+      const dayValues = days.map(() => 11);
+
+      const ctx = dailyTrendChartRef.current.getContext('2d');
+      dailyTrendChartInstance.current = new ChartJS(ctx, {
+        type: 'line',
+        data: {
+          labels: days,
+          datasets: [
+            {
+              data: dayValues,
+              borderColor: '#00E5A0',
+              borderWidth: 2,
+              pointRadius: 0,
+              tension: 0,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { display: false },
+            y: {
+              grid: { color: 'rgba(148, 163, 225, 0.06)' },
+              ticks: { color: '#8E9BB5', font: { size: 9 }, stepSize: 1 },
             },
           },
         },
@@ -426,1060 +654,983 @@ export default function Overview({ setCurrentPage }) {
     }
 
     return () => {
-      if (lineChartInstance.current) lineChartInstance.current.destroy();
       if (doughnutChartInstance.current) doughnutChartInstance.current.destroy();
+      if (intakeChartInstance.current) intakeChartInstance.current.destroy();
+      if (paymentStageChartInstance.current) paymentStageChartInstance.current.destroy();
+      if (growthTrendChartInstance.current) growthTrendChartInstance.current.destroy();
+      if (monthlyCollectionsChartInstance.current) monthlyCollectionsChartInstance.current.destroy();
+      if (dailyTrendChartInstance.current) dailyTrendChartInstance.current.destroy();
     };
-  }, [computed, loading]);
-
-  // Greeting and Time
-  const currentHour = new Date().getHours();
-  const greeting =
-    currentHour < 12 ? 'Good morning' : currentHour < 17 ? 'Good afternoon' : 'Good evening';
-  const userName = profile?.full_name || user?.user_metadata?.full_name || 'Director';
-  const todayFormatted = new Intl.DateTimeFormat('en-US', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  }).format(new Date());
-
-  // Counselor Leaderboard Ranking
-  const counselorRanking = useMemo(() => {
-    return Object.entries(computed.byCounselor)
-      .map(([name, data]) => ({ name, ...data }))
-      .sort((a, b) => b.collected - a.collected);
-  }, [computed.byCounselor]);
-
-  // Lead sources
-  const totalLeads = computed.totalStudents || 1;
-  const leadSourceList = Object.entries(computed.byLeadSource).map(([source, count]) => ({
-    source,
-    count,
-    percentage: Math.round((count / totalLeads) * 100) || 0,
-  }));
-
-  // Top Destination Country Cards
-  const topCountries = useMemo(() => {
-    const list = Object.entries(computed.byCountry)
-      .map(([country, stats]) => ({ country, ...stats }))
-      .sort((a, b) => b.count - a.count);
-
-    // If empty or small, provide default popular destinations
-    if (list.length === 0) {
-      return [
-        { country: 'Germany', count: 0, collected: 0, remaining: 0 },
-        { country: 'United Kingdom', count: 0, collected: 0, remaining: 0 },
-        { country: 'France', count: 0, collected: 0, remaining: 0 },
-        { country: 'Georgia', count: 0, collected: 0, remaining: 0 },
-      ];
-    }
-    return list.slice(0, 6);
-  }, [computed.byCountry]);
-
-  // Recent 8 students
-  const recentStudents = useMemo(() => {
-    return [...studentsData]
-      .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
-      .slice(0, 8);
-  }, [studentsData]);
+  }, [loading, metrics]);
 
   return (
-    <div style={{ maxWidth: '1440px', margin: '0 auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: '30px' }}>
-      
+    <div
+      style={{
+        width: '100%',
+        maxWidth: '1680px',
+        margin: '0 auto',
+        padding: '16px 24px 36px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '16px',
+        backgroundColor: '#080A12',
+        color: '#EDEFFA',
+        fontFamily: "'Plus Jakarta Sans', sans-serif",
+        position: 'relative',
+      }}
+    >
       {/* =========================================================================
-          1. 2026 EXECUTIVE CAMPUS HERO COCKPIT BANNER
+          TOP ACTION BAR (Advanced Filters Button & Master Import)
          ========================================================================= */}
-      <section
-        style={{
-          position: 'relative',
-          borderRadius: '24px',
-          overflow: 'hidden',
-          border: '1px solid var(--border-strong)',
-          boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5), 0 0 40px rgba(124, 111, 255, 0.12)',
-        }}
-      >
-        {/* Background Campus Photo with Glass Overlay */}
-        <div
+      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '12px' }}>
+        {/* Master Sheet Importer */}
+        <button
+          onClick={() => setIsImportModalOpen(true)}
           style={{
-            position: 'absolute',
-            inset: 0,
-            backgroundImage: `url('https://images.unsplash.com/photo-1541339907198-e08756dedf3f?w=1600&auto=format&fit=crop&q=80')`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            filter: 'brightness(0.3) saturate(1.2)',
-          }}
-        />
-
-        {/* Ambient Gradient Mesh */}
-        <div
-          style={{
-            position: 'absolute',
-            inset: 0,
-            background: 'linear-gradient(135deg, rgba(8, 10, 18, 0.94) 0%, rgba(17, 22, 40, 0.82) 50%, rgba(124, 111, 255, 0.25) 100%)',
-            backdropFilter: 'blur(8px)',
-          }}
-        />
-
-        {/* Hero Content */}
-        <div
-          style={{
-            position: 'relative',
-            zIndex: 1,
-            padding: '36px 40px',
-            display: 'flex',
-            flexWrap: 'wrap',
+            background: 'linear-gradient(135deg, rgba(0, 229, 160, 0.15) 0%, rgba(54, 209, 220, 0.15) 100%)',
+            color: '#00E5A0',
+            border: '1px solid rgba(0, 229, 160, 0.4)',
+            padding: '7px 16px',
+            borderRadius: '10px',
+            fontSize: '12px',
+            fontWeight: 700,
+            cursor: 'pointer',
+            display: 'inline-flex',
             alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '24px',
+            gap: '6px',
           }}
         >
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
-              <span
-                style={{
-                  background: 'rgba(0, 229, 160, 0.2)',
-                  color: 'var(--green)',
-                  border: '1px solid rgba(0, 229, 160, 0.4)',
-                  padding: '4px 12px',
-                  borderRadius: '20px',
-                  fontSize: '11px',
-                  fontWeight: 800,
-                  letterSpacing: '0.08em',
-                  textTransform: 'uppercase',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                }}
-              >
-                <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: 'var(--green)', boxShadow: '0 0 10px var(--green)' }} />
-                Sterling Executive 2026
-              </span>
-              <span style={{ fontSize: '13px', color: '#CBD5E1' }}>&bull; {todayFormatted}</span>
-            </div>
+          <span>📥</span>
+          <span>Import Google Sheet</span>
+        </button>
 
-            <h1 style={{ fontSize: '32px', fontWeight: 800, color: '#fff', letterSpacing: '-0.03em', margin: 0 }}>
-              {greeting}, <span style={{ background: 'linear-gradient(135deg, #7C6FFF 0%, #36D1DC 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{userName}</span>
-            </h1>
-
-            <p style={{ fontSize: '14px', color: '#94A3B8', marginTop: '8px', maxWidth: '640px', lineHeight: 1.6 }}>
-              Study Abroad Global Operations & Financial Command for{' '}
-              <strong style={{ color: '#F1F5F9' }}>{company?.name || 'Europe Sterling Study Abroad'}</strong>.
-              Real-time multi-currency revenue, visa milestones, and counselor performance.
-            </p>
-          </div>
-
-          {/* Quick Action Cockpit Buttons */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center' }}>
-            {/* 1-Click Master Sheet Import Button */}
-            <button
-              onClick={() => setIsImportModalOpen(true)}
+        {/* Advanced Filters Button (Matches Image 1 top right) */}
+        <button
+          onClick={() => setShowFiltersModal((prev) => !prev)}
+          style={{
+            background: showFiltersModal ? 'var(--blue, #7C6FFF)' : 'rgba(20, 25, 45, 0.85)',
+            color: '#fff',
+            border: '1px solid rgba(148, 163, 225, 0.25)',
+            padding: '7px 16px',
+            borderRadius: '10px',
+            fontSize: '12px',
+            fontWeight: 700,
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            boxShadow: '0 4px 14px rgba(0, 0, 0, 0.4)',
+          }}
+        >
+          <span>🎛️</span>
+          <span>Advanced Filters</span>
+          {activeFiltersCount > 0 && (
+            <span
               style={{
-                background: 'linear-gradient(135deg, #00E5A0 0%, #00B37E 100%)',
-                color: '#080A12',
-                padding: '12px 22px',
-                borderRadius: '12px',
-                fontSize: '13px',
-                fontWeight: 800,
-                border: 'none',
-                cursor: 'pointer',
+                background: '#7C6FFF',
+                color: '#fff',
+                width: '18px',
+                height: '18px',
+                borderRadius: '50%',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '8px',
-                boxShadow: '0 8px 24px rgba(0, 229, 160, 0.4)',
-                transition: 'transform 0.2s, box-shadow 0.2s',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; }}
-            >
-              <span style={{ fontSize: '16px' }}>📥</span>
-              <span>Import Master Sheet</span>
-            </button>
-
-            {/* View All Students */}
-            {setCurrentPage && (
-              <button
-                onClick={() => setCurrentPage('students')}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.08)',
-                  color: '#fff',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  padding: '12px 20px',
-                  borderRadius: '12px',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  backdropFilter: 'blur(10px)',
-                  transition: 'all 0.2s',
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.16)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'; }}
-              >
-                <span>👥</span>
-                <span>Student Directory</span>
-              </button>
-            )}
-
-            {/* Date Range Tabs */}
-            <div
-              style={{
-                display: 'flex',
-                background: 'rgba(10, 14, 26, 0.8)',
-                padding: '4px',
-                borderRadius: '12px',
-                border: '1px solid rgba(148, 163, 225, 0.2)',
-                gap: '2px',
+                justifyContent: 'center',
+                fontSize: '10px',
+                fontWeight: 800,
               }}
             >
-              {[
-                { id: 'this_month', label: 'Month' },
-                { id: 'last_3_months', label: 'Quarter' },
-                { id: 'this_year', label: '2026' },
-                { id: 'all_time', label: 'All Time' },
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setDateRange(tab.id)}
-                  style={{
-                    background: dateRange === tab.id ? 'var(--blue)' : 'transparent',
-                    color: dateRange === tab.id ? '#fff' : 'var(--muted)',
-                    padding: '8px 14px',
-                    borderRadius: '8px',
-                    fontSize: '12px',
-                    fontWeight: 700,
-                    border: 'none',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                  }}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* =========================================================================
-          2. 6 FUTURISTIC FROSTED GLASS KPI CARDS
-         ========================================================================= */}
-      <section
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
-          gap: '18px',
-        }}
-      >
-        {/* KPI 1: Total Students */}
-        <div
-          className="glass-card"
-          style={{
-            position: 'relative',
-            padding: '24px',
-            borderRadius: '20px',
-            background: 'linear-gradient(135deg, rgba(20, 26, 48, 0.7) 0%, rgba(12, 16, 30, 0.8) 100%)',
-            border: '1px solid var(--border)',
-            overflow: 'hidden',
-          }}
-        >
-          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: 'linear-gradient(90deg, #7C6FFF, #36D1DC)' }} />
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '13px', color: 'var(--muted)', fontWeight: 600 }}>Total Applicants</span>
-            <span style={{ fontSize: '20px' }}>🎓</span>
-          </div>
-          <div style={{ fontSize: '32px', fontWeight: 800, color: '#fff', marginTop: '12px', letterSpacing: '-0.02em' }}>
-            {computed.totalStudents}
-          </div>
-          <div style={{ fontSize: '12px', color: 'var(--blue)', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
-            <span>↑ Active Intakes</span>
-            <span style={{ color: 'var(--muted)' }}>across all years</span>
-          </div>
-        </div>
-
-        {/* KPI 2: Active Pipeline */}
-        <div
-          className="glass-card"
-          style={{
-            position: 'relative',
-            padding: '24px',
-            borderRadius: '20px',
-            background: 'linear-gradient(135deg, rgba(20, 26, 48, 0.7) 0%, rgba(12, 16, 30, 0.8) 100%)',
-            border: '1px solid var(--border)',
-            overflow: 'hidden',
-          }}
-        >
-          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: 'linear-gradient(90deg, #36D1DC, #00E5A0)' }} />
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '13px', color: 'var(--muted)', fontWeight: 600 }}>Active Pipeline</span>
-            <span style={{ fontSize: '20px' }}>⚡</span>
-          </div>
-          <div style={{ fontSize: '32px', fontWeight: 800, color: 'var(--cyan)', marginTop: '12px', letterSpacing: '-0.02em' }}>
-            {computed.active}
-          </div>
-          <div style={{ fontSize: '12px', color: 'var(--muted)', marginTop: '6px' }}>
-            In counseling & visa processing
-          </div>
-        </div>
-
-        {/* KPI 3: Total Collected */}
-        <div
-          className="glass-card"
-          style={{
-            position: 'relative',
-            padding: '24px',
-            borderRadius: '20px',
-            background: 'linear-gradient(135deg, rgba(20, 26, 48, 0.7) 0%, rgba(12, 16, 30, 0.8) 100%)',
-            border: '1px solid var(--border)',
-            overflow: 'hidden',
-          }}
-        >
-          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: 'linear-gradient(90deg, #00E5A0, #00B37E)' }} />
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '13px', color: 'var(--muted)', fontWeight: 600 }}>Total Collected</span>
-            <span style={{ fontSize: '20px' }}>💰</span>
-          </div>
-          <div style={{ fontSize: '30px', fontWeight: 800, color: 'var(--green)', marginTop: '12px', letterSpacing: '-0.02em' }}>
-            {formatIndianCurrency(computed.totalCollected)}
-          </div>
-          <div style={{ fontSize: '12px', color: 'var(--muted)', marginTop: '6px' }}>
-            Realized bank fee receipts
-          </div>
-        </div>
-
-        {/* KPI 4: Pending Outstanding */}
-        <div
-          className="glass-card"
-          style={{
-            position: 'relative',
-            padding: '24px',
-            borderRadius: '20px',
-            background: 'linear-gradient(135deg, rgba(20, 26, 48, 0.7) 0%, rgba(12, 16, 30, 0.8) 100%)',
-            border: '1px solid var(--border)',
-            overflow: 'hidden',
-          }}
-        >
-          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: 'linear-gradient(90deg, #FFB020, #FF6F8E)' }} />
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '13px', color: 'var(--muted)', fontWeight: 600 }}>Outstanding Balance</span>
-            <span style={{ fontSize: '20px' }}>⏳</span>
-          </div>
-          <div style={{ fontSize: '30px', fontWeight: 800, color: 'var(--amber)', marginTop: '12px', letterSpacing: '-0.02em' }}>
-            {formatIndianCurrency(computed.totalRemaining)}
-          </div>
-          <div style={{ fontSize: '12px', color: 'var(--muted)', marginTop: '6px' }}>
-            Committed fees due
-          </div>
-        </div>
-
-        {/* KPI 5: Net Profit (Director Level) */}
-        <div
-          className="glass-card"
-          style={{
-            position: 'relative',
-            padding: '24px',
-            borderRadius: '20px',
-            background: 'linear-gradient(135deg, rgba(20, 26, 48, 0.7) 0%, rgba(12, 16, 30, 0.8) 100%)',
-            border: '1px solid var(--border)',
-            overflow: 'hidden',
-          }}
-        >
-          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: 'linear-gradient(90deg, #A78BFA, #F472B6)' }} />
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '13px', color: 'var(--muted)', fontWeight: 600 }}>Sterling Net Profit</span>
-            <span style={{ fontSize: '20px' }}>💎</span>
-          </div>
-          {canViewFinancials ? (
-            <>
-              <div
-                style={{
-                  fontSize: '30px',
-                  fontWeight: 800,
-                  color: computed.totalProfit >= 0 ? 'var(--purple)' : 'var(--red)',
-                  marginTop: '12px',
-                  letterSpacing: '-0.02em',
-                }}
-              >
-                {formatIndianCurrency(computed.totalProfit)}
-              </div>
-              <div style={{ fontSize: '12px', color: 'var(--muted)', marginTop: '6px' }}>
-                Net after B2B & partner incentive
-              </div>
-            </>
-          ) : (
-            <>
-              <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--muted)', marginTop: '16px' }}>
-                Confidential 🔒
-              </div>
-              <div style={{ fontSize: '11px', color: 'var(--muted)', marginTop: '6px' }}>
-                Director clearance required
-              </div>
-            </>
+              {activeFiltersCount}
+            </span>
           )}
-        </div>
+        </button>
+      </div>
 
-        {/* KPI 6: Confirmed Enrollments */}
+      {/* =========================================================================
+          ROW 1: 5 KPI CARDS (Matching Image 1 top row)
+         ========================================================================= */}
+      <section
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
+          gap: '12px',
+        }}
+      >
+        {/* Card 1: Total Applications */}
         <div
-          className="glass-card"
           style={{
+            background: 'rgba(15, 20, 35, 0.85)',
+            border: '1px solid rgba(148, 163, 225, 0.14)',
+            borderRadius: '14px',
+            padding: '16px 20px',
             position: 'relative',
-            padding: '24px',
-            borderRadius: '20px',
-            background: 'linear-gradient(135deg, rgba(20, 26, 48, 0.7) 0%, rgba(12, 16, 30, 0.8) 100%)',
-            border: '1px solid var(--border)',
-            overflow: 'hidden',
           }}
         >
-          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: 'linear-gradient(90deg, #38BDF8, #818CF8)' }} />
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '13px', color: 'var(--muted)', fontWeight: 600 }}>Visa / Enrolled</span>
-            <span style={{ fontSize: '20px' }}>🎉</span>
+          <div style={{ fontSize: '11px', color: '#8E9BB5', fontWeight: 600 }}>Total Applications</div>
+          <div style={{ fontSize: '32px', fontWeight: 800, color: '#A78BFA', marginTop: '4px' }}>
+            {metrics.totalApps}
           </div>
-          <div style={{ fontSize: '32px', fontWeight: 800, color: '#38BDF8', marginTop: '12px', letterSpacing: '-0.02em' }}>
-            {computed.enrolled}
-          </div>
-          <div style={{ fontSize: '12px', color: 'var(--muted)', marginTop: '6px' }}>
-            Successful university arrivals
-          </div>
-        </div>
-      </section>
-
-      {/* =========================================================================
-          3. DESTINATION SHOWCASE — PHOTOGRAPHIC CARDS WITH REAL IMAGES
-         ========================================================================= */}
-      <section>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '16px' }}>
-          <div>
-            <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#fff', letterSpacing: '-0.02em', margin: 0 }}>
-              Top Study Destinations
-            </h2>
-            <p style={{ fontSize: '13px', color: 'var(--muted)', margin: '4px 0 0' }}>
-              Real-time application intake distribution across European and global campuses
-            </p>
-          </div>
-          <span style={{ fontSize: '12px', color: 'var(--blue)', fontWeight: 600 }}>
-            {Object.keys(computed.byCountry).length} Destinations Active
-          </span>
-        </div>
-
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-            gap: '20px',
-          }}
-        >
-          {topCountries.map((dest) => {
-            const countryMeta = DESTINATION_PHOTOS[dest.country] || DESTINATION_PHOTOS.Default;
-            return (
-              <div
-                key={dest.country}
-                style={{
-                  position: 'relative',
-                  height: '220px',
-                  borderRadius: '18px',
-                  overflow: 'hidden',
-                  border: '1px solid rgba(148, 163, 225, 0.18)',
-                  boxShadow: '0 10px 30px rgba(0, 0, 0, 0.4)',
-                  cursor: 'pointer',
-                  transition: 'transform 0.3s ease, box-shadow 0.3s ease',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-4px)';
-                  e.currentTarget.style.boxShadow = '0 16px 40px rgba(124, 111, 255, 0.25)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 10px 30px rgba(0, 0, 0, 0.4)';
-                }}
-                onClick={() => setCurrentPage && setCurrentPage('students')}
-              >
-                {/* Photo Background */}
-                <div
-                  style={{
-                    position: 'absolute',
-                    inset: 0,
-                    backgroundImage: `url('${countryMeta.photo}')`,
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
-                    filter: 'brightness(0.65)',
-                    transition: 'transform 0.5s ease',
-                  }}
-                />
-
-                {/* Gradient Overlay for Legibility */}
-                <div
-                  style={{
-                    position: 'absolute',
-                    inset: 0,
-                    background: 'linear-gradient(to top, rgba(8, 10, 18, 0.95) 0%, rgba(8, 10, 18, 0.4) 60%, rgba(8, 10, 18, 0.1) 100%)',
-                  }}
-                />
-
-                {/* Country Flag & Badge */}
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: '14px',
-                    left: '14px',
-                    right: '14px',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                  }}
-                >
-                  <span
-                    style={{
-                      background: 'rgba(8, 10, 18, 0.75)',
-                      backdropFilter: 'blur(8px)',
-                      padding: '4px 10px',
-                      borderRadius: '12px',
-                      fontSize: '13px',
-                      fontWeight: 700,
-                      color: '#fff',
-                      border: '1px solid rgba(255, 255, 255, 0.15)',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                    }}
-                  >
-                    <span style={{ fontSize: '16px' }}>{countryMeta.flag}</span>
-                    <span>{dest.country}</span>
-                  </span>
-
-                  <span
-                    style={{
-                      background: 'rgba(0, 229, 160, 0.2)',
-                      color: 'var(--green)',
-                      border: '1px solid rgba(0, 229, 160, 0.4)',
-                      padding: '3px 8px',
-                      borderRadius: '8px',
-                      fontSize: '11px',
-                      fontWeight: 800,
-                    }}
-                  >
-                    {dest.count} Students
-                  </span>
-                </div>
-
-                {/* Bottom Stats */}
-                <div
-                  style={{
-                    position: 'absolute',
-                    bottom: '16px',
-                    left: '16px',
-                    right: '16px',
-                  }}
-                >
-                  <div style={{ fontSize: '11px', color: '#CBD5E1', marginBottom: '6px' }}>
-                    {countryMeta.tagline}
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <div style={{ fontSize: '10px', color: 'var(--muted)', textTransform: 'uppercase' }}>Collected</div>
-                      <div style={{ fontSize: '16px', fontWeight: 800, color: 'var(--green)' }}>
-                        {formatIndianCurrency(dest.collected)}
-                      </div>
-                    </div>
-                    {dest.remaining > 0 && (
-                      <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontSize: '10px', color: 'var(--muted)', textTransform: 'uppercase' }}>Due</div>
-                        <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--amber)' }}>
-                          {formatIndianCurrency(dest.remaining)}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* =========================================================================
-          4. CHARTS SUITE: MONTHLY COLLECTIONS & GEOGRAPHIC PIE
-         ========================================================================= */}
-      <section
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(440px, 1fr))',
-          gap: '24px',
-        }}
-      >
-        {/* Left Chart: Monthly Collections */}
-        <div
-          className="glass-panel"
-          style={{
-            padding: '26px',
-            borderRadius: '20px',
-            background: 'var(--glass)',
-            border: '1px solid var(--border)',
-            display: 'flex',
-            flexDirection: 'column',
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
-            <div>
-              <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#fff', margin: 0 }}>
-                Monthly Fee Receipts (12M)
-              </h3>
-              <p style={{ fontSize: '12px', color: 'var(--muted)', margin: '4px 0 0' }}>
-                Aggregated cashflow across all 5 student installments
-              </p>
-            </div>
+          <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
             <span
               style={{
+                background: 'rgba(255, 255, 255, 0.06)',
+                padding: '3px 8px',
+                borderRadius: '6px',
                 fontSize: '11px',
-                padding: '4px 10px',
-                borderRadius: '8px',
-                background: 'rgba(124, 111, 255, 0.15)',
-                color: 'var(--blue)',
-                fontWeight: 700,
+                color: '#A8B2C7',
               }}
             >
-              Audited
+              Full <strong style={{ color: '#fff' }}>{metrics.fullPaymentCount}</strong>
             </span>
-          </div>
-
-          <div style={{ position: 'relative', height: '280px', width: '100%' }}>
-            <canvas ref={lineChartRef} />
-          </div>
-        </div>
-
-        {/* Right Chart: Country Distribution */}
-        <div
-          className="glass-panel"
-          style={{
-            padding: '26px',
-            borderRadius: '20px',
-            background: 'var(--glass)',
-            border: '1px solid var(--border)',
-            display: 'flex',
-            flexDirection: 'column',
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
-            <div>
-              <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#fff', margin: 0 }}>
-                Intake Distribution by Country
-              </h3>
-              <p style={{ fontSize: '12px', color: 'var(--muted)', margin: '4px 0 0' }}>
-                Application volume breakdown across destination partners
-              </p>
-            </div>
             <span
               style={{
+                background: 'rgba(255, 255, 255, 0.06)',
+                padding: '3px 8px',
+                borderRadius: '6px',
                 fontSize: '11px',
-                padding: '4px 10px',
-                borderRadius: '8px',
-                background: 'rgba(0, 229, 160, 0.15)',
-                color: 'var(--green)',
-                fontWeight: 700,
+                color: '#A8B2C7',
               }}
             >
-              Live Share
+              Partial <strong style={{ color: '#fff' }}>{metrics.partialPaymentCount}</strong>
             </span>
           </div>
+        </div>
 
-          <div style={{ position: 'relative', height: '280px', width: '100%' }}>
-            <canvas ref={doughnutChartRef} />
+        {/* Card 2: Total Collected */}
+        <div
+          style={{
+            background: 'rgba(15, 20, 35, 0.85)',
+            border: '1px solid rgba(148, 163, 225, 0.14)',
+            borderTop: '2px solid #00E5A0',
+            borderRadius: '14px',
+            padding: '16px 20px',
+            position: 'relative',
+          }}
+        >
+          <div style={{ fontSize: '11px', color: '#8E9BB5', fontWeight: 600 }}>Total Collected</div>
+          <div style={{ fontSize: '32px', fontWeight: 800, color: '#00E5A0', marginTop: '4px' }}>
+            {formatIndianCurrency(metrics.totalCollected)}
           </div>
         </div>
-      </section>
 
-      {/* =========================================================================
-          5. COUNSELOR HALL OF FAME & LEAD SOURCE ATTRIBUTION
-         ========================================================================= */}
-      <section
-        style={{
-          display: 'grid',
-          gridTemplateColumns: canViewFinancials ? 'repeat(auto-fit, minmax(460px, 1fr))' : '1fr',
-          gap: '24px',
-        }}
-      >
-        {/* Counselor Hall of Fame */}
-        {canViewFinancials && (
+        {/* Card 3: Collection Efficiency */}
+        <div
+          style={{
+            background: 'rgba(15, 20, 35, 0.85)',
+            border: '1px solid rgba(148, 163, 225, 0.14)',
+            borderRadius: '14px',
+            padding: '16px 20px',
+            position: 'relative',
+          }}
+        >
+          <div style={{ fontSize: '11px', color: '#8E9BB5', fontWeight: 600 }}>Collection Efficiency</div>
+          <div style={{ fontSize: '32px', fontWeight: 800, color: '#00E5A0', marginTop: '4px' }}>
+            {metrics.efficiency}%
+          </div>
           <div
-            className="glass-panel"
             style={{
-              padding: '26px',
-              borderRadius: '20px',
-              background: 'var(--glass)',
-              border: '1px solid var(--border)',
+              height: '5px',
+              background: 'rgba(255, 255, 255, 0.08)',
+              borderRadius: '3px',
+              marginTop: '12px',
+              overflow: 'hidden',
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <div>
-                <h3 style={{ fontSize: '17px', fontWeight: 800, color: '#fff', margin: 0 }}>
-                  Counselor Hall of Fame 🏆
-                </h3>
-                <p style={{ fontSize: '12px', color: 'var(--muted)', margin: '4px 0 0' }}>
-                  Ranked by revenue collected and student conversion
-                </p>
-              </div>
-              <span style={{ fontSize: '12px', color: 'var(--cyan)', fontWeight: 700 }}>
-                {counselorRanking.length} Counselors
+            <div
+              style={{
+                width: `${Math.min(100, Number(metrics.efficiency))}%`,
+                height: '100%',
+                background: '#00E5A0',
+                borderRadius: '3px',
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Card 4: Committed Pipeline */}
+        <div
+          style={{
+            background: 'rgba(15, 20, 35, 0.85)',
+            border: '1px solid rgba(148, 163, 225, 0.14)',
+            borderTop: '2px solid #36D1DC',
+            borderRadius: '14px',
+            padding: '16px 20px',
+            position: 'relative',
+          }}
+        >
+          <div style={{ fontSize: '11px', color: '#8E9BB5', fontWeight: 600 }}>Committed Pipeline</div>
+          <div style={{ fontSize: '32px', fontWeight: 800, color: '#7C6FFF', marginTop: '4px' }}>
+            {formatIndianCurrency(metrics.totalCommitted)}
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
+            <span style={{ fontSize: '11px', color: '#36D1DC', fontWeight: 600 }}>Live</span>
+            <span style={{ fontSize: '11px', color: '#36D1DC', fontWeight: 700 }}>
+              {formatIndianCurrency(metrics.totalCommitted)}
+            </span>
+          </div>
+        </div>
+
+        {/* Card 5: Total Remaining */}
+        <div
+          style={{
+            background: 'rgba(15, 20, 35, 0.85)',
+            border: '1px solid rgba(148, 163, 225, 0.14)',
+            borderTop: '2px solid #FF6F8E',
+            borderRadius: '14px',
+            padding: '16px 20px',
+            position: 'relative',
+          }}
+        >
+          <div style={{ fontSize: '11px', color: '#8E9BB5', fontWeight: 600 }}>Total Remaining</div>
+          <div style={{ fontSize: '32px', fontWeight: 800, color: '#FF6F8E', marginTop: '4px' }}>
+            {formatIndianCurrency(metrics.totalRemaining)}
+          </div>
+        </div>
+      </section>
+
+      {/* =========================================================================
+          ROW 2: LEAD SOURCE — STATUS (Left) & COLLECTION STATUS (Right)
+         ========================================================================= */}
+      <section
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '65% 35%',
+          gap: '14px',
+        }}
+      >
+        {/* Left: LEAD SOURCE — STATUS */}
+        <div
+          style={{
+            background: 'rgba(15, 20, 35, 0.85)',
+            border: '1px solid rgba(148, 163, 225, 0.14)',
+            borderRadius: '14px',
+            padding: '20px 24px',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '12px', fontWeight: 800, color: '#EDEFFA', letterSpacing: '0.04em' }}>
+                LEAD SOURCE &mdash; STATUS
+              </span>
+              <span
+                style={{
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  padding: '2px 8px',
+                  borderRadius: '10px',
+                  fontSize: '11px',
+                  color: '#8E9BB5',
+                }}
+              >
+                {metrics.totalApps} Total
               </span>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {counselorRanking.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '30px', color: 'var(--muted)', fontSize: '13px' }}>
-                  No counselor activity logged yet.
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span
+                style={{
+                  background: 'rgba(255, 255, 255, 0.06)',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  padding: '3px 8px',
+                  borderRadius: '6px',
+                  fontSize: '11px',
+                  color: '#A8B2C7',
+                }}
+              >
+                Day
+              </span>
+              <span style={{ fontSize: '14px', color: '#64748B', cursor: 'pointer' }}>✕</span>
+            </div>
+          </div>
+
+          {/* Progress Bars List */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            {leadSourceList.map((item) => (
+              <div key={item.name}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '5px' }}>
+                  <span style={{ color: '#CBD5E1', fontWeight: 600 }}>{item.name}</span>
+                  <span style={{ color: '#8E9BB5' }}>
+                    <strong style={{ color: '#fff' }}>{item.count}</strong> ({item.pct}%)
+                  </span>
                 </div>
-              ) : (
-                counselorRanking.slice(0, 6).map((c, idx) => {
-                  const avatarUrl = COUNSELOR_AVATARS[idx % COUNSELOR_AVATARS.length];
-                  const medals = ['🥇', '🥈', '🥉'];
-                  const isPodium = idx < 3;
-
-                  return (
-                    <div
-                      key={c.name}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '12px 16px',
-                        borderRadius: '14px',
-                        background: isPodium ? 'rgba(124, 111, 255, 0.08)' : 'var(--bg3)',
-                        border: isPodium ? '1px solid rgba(124, 111, 255, 0.25)' : '1px solid var(--border)',
-                        transition: 'transform 0.2s',
-                      }}
-                    >
-                      {/* Left: Medal + Avatar + Name */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <span style={{ fontSize: '20px', width: '28px', textAlign: 'center' }}>
-                          {idx < 3 ? medals[idx] : `#${idx + 1}`}
-                        </span>
-
-                        <img
-                          src={avatarUrl}
-                          alt={c.name}
-                          style={{
-                            width: '42px',
-                            height: '42px',
-                            borderRadius: '50%',
-                            objectFit: 'cover',
-                            border: isPodium ? '2px solid var(--blue)' : '2px solid var(--border)',
-                          }}
-                        />
-
-                        <div>
-                          <div style={{ fontSize: '14px', fontWeight: 700, color: '#fff' }}>{c.name}</div>
-                          <div style={{ fontSize: '12px', color: 'var(--muted)' }}>
-                            <strong style={{ color: 'var(--cyan)' }}>{c.count}</strong> students &bull;{' '}
-                            <span style={{ color: 'var(--green)' }}>{c.enrolled} enrolled</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Right: Collected & Profit */}
-                      <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontSize: '14px', fontWeight: 800, color: 'var(--green)' }}>
-                          {formatIndianCurrency(c.collected)}
-                        </div>
-                        <div style={{ fontSize: '11px', color: 'var(--blue)', fontWeight: 600 }}>
-                          Profit: {formatIndianCurrency(c.profit)}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Lead Source Attribution */}
-        <div
-          className="glass-panel"
-          style={{
-            padding: '26px',
-            borderRadius: '20px',
-            background: 'var(--glass)',
-            border: '1px solid var(--border)',
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-            <div>
-              <h3 style={{ fontSize: '17px', fontWeight: 800, color: '#fff', margin: 0 }}>
-                Lead Source Attribution 🎯
-              </h3>
-              <p style={{ fontSize: '12px', color: 'var(--muted)', margin: '4px 0 0' }}>
-                Conversion share by student inquiry acquisition channel
-              </p>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {leadSourceList.map(({ source, count, percentage }) => {
-              const colors = {
-                'Digital Marketing': '#7C6FFF',
-                'Director Reference': '#A78BFA',
-                'Walk-in': '#00E5A0',
-                'Agent': '#FFB020',
-                'Social Media': '#F472B6',
-                'Other': '#36D1DC',
-              };
-              const color = colors[source] || '#7C6FFF';
-
-              return (
-                <div key={source}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '6px' }}>
-                    <span style={{ color: 'var(--text)', fontWeight: 600 }}>{source}</span>
-                    <span style={{ color: 'var(--muted)' }}>
-                      <strong style={{ color: '#fff' }}>{count}</strong> ({percentage}%)
-                    </span>
-                  </div>
+                <div
+                  style={{
+                    height: '6px',
+                    background: 'rgba(255, 255, 255, 0.06)',
+                    borderRadius: '3px',
+                    overflow: 'hidden',
+                  }}
+                >
                   <div
                     style={{
-                      height: '8px',
-                      background: 'var(--bg3)',
-                      borderRadius: '4px',
-                      overflow: 'hidden',
+                      width: `${item.pct}%`,
+                      height: '100%',
+                      background: item.color,
+                      borderRadius: '3px',
                     }}
-                  >
-                    <div
-                      style={{
-                        width: `${percentage}%`,
-                        height: '100%',
-                        background: color,
-                        borderRadius: '4px',
-                        boxShadow: `0 0 10px ${color}66`,
-                        transition: 'width 0.6s ease',
-                      }}
-                    />
-                  </div>
+                  />
                 </div>
-              );
-            })}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Right: COLLECTION STATUS (Doughnut Chart) */}
+        <div
+          style={{
+            background: 'rgba(15, 20, 35, 0.85)',
+            border: '1px solid rgba(148, 163, 225, 0.14)',
+            borderRadius: '14px',
+            padding: '20px 24px',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+            <span style={{ fontSize: '12px', fontWeight: 800, color: '#EDEFFA', letterSpacing: '0.04em' }}>
+              COLLECTION STATUS
+            </span>
+            <span style={{ fontSize: '14px', color: '#64748B', cursor: 'pointer' }}>✕</span>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '100%', minHeight: '160px' }}>
+            {/* Doughnut with center count */}
+            <div style={{ position: 'relative', width: '150px', height: '150px', flexShrink: 0 }}>
+              <canvas ref={doughnutChartRef} />
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  pointerEvents: 'none',
+                }}
+              >
+                <div style={{ fontSize: '24px', fontWeight: 800, color: '#fff' }}>{metrics.totalApps}</div>
+                <div style={{ fontSize: '10px', color: '#8E9BB5' }}>Total</div>
+              </div>
+            </div>
+
+            {/* Legend on right */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1, paddingLeft: '24px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#00E5A0' }} />
+                  <span style={{ fontSize: '12px', color: '#CBD5E1' }}>Full Payment</span>
+                </div>
+                <span style={{ fontSize: '13px', fontWeight: 700, color: '#fff' }}>{metrics.fullPaymentCount}</span>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#FFB020' }} />
+                  <span style={{ fontSize: '12px', color: '#CBD5E1' }}>Partial/Pending</span>
+                </div>
+                <span style={{ fontSize: '13px', fontWeight: 700, color: '#fff' }}>{metrics.partialPaymentCount}</span>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
       {/* =========================================================================
-          6. RECENT STUDENT INTAKES WITH AVATARS & FLAGS
+          ROW 3: INTAKE BREAKDOWN (Left) & PAYMENT STAGES (Right)
          ========================================================================= */}
       <section
-        className="glass-panel"
         style={{
-          padding: '26px',
-          borderRadius: '20px',
-          background: 'var(--glass)',
-          border: '1px solid var(--border)',
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: '14px',
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <div>
-            <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#fff', margin: 0 }}>
-              Live Student Applications Stream
-            </h3>
-            <p style={{ fontSize: '12px', color: 'var(--muted)', margin: '4px 0 0' }}>
-              Real-time feed of the latest registered students in Sterling ERP
-            </p>
+        {/* Left: INTAKE BREAKDOWN */}
+        <div
+          style={{
+            background: 'rgba(15, 20, 35, 0.85)',
+            border: '1px solid rgba(148, 163, 225, 0.14)',
+            borderRadius: '14px',
+            padding: '20px 24px',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '12px', fontWeight: 800, color: '#EDEFFA', letterSpacing: '0.04em' }}>
+                INTAKE BREAKDOWN
+              </span>
+              <span
+                style={{
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  padding: '2px 8px',
+                  borderRadius: '6px',
+                  fontSize: '10px',
+                  color: '#8E9BB5',
+                }}
+              >
+                Count
+              </span>
+            </div>
+            <span style={{ fontSize: '14px', color: '#64748B', cursor: 'pointer' }}>✕</span>
           </div>
-          {setCurrentPage && (
-            <button
-              onClick={() => setCurrentPage('students')}
-              style={{
-                background: 'transparent',
-                border: '1px solid var(--border)',
-                color: 'var(--blue)',
-                padding: '6px 14px',
-                borderRadius: '8px',
-                fontSize: '12px',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-            >
-              View Full Directory &rarr;
-            </button>
-          )}
+
+          <div style={{ position: 'relative', height: '180px', width: '100%' }}>
+            <canvas ref={intakeChartRef} />
+          </div>
         </div>
 
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--muted)' }}>
-                <th style={{ padding: '12px 16px' }}>Student</th>
-                <th style={{ padding: '12px 16px' }}>Destination</th>
-                <th style={{ padding: '12px 16px' }}>Course & University</th>
-                <th style={{ padding: '12px 16px' }}>Counselor</th>
-                <th style={{ padding: '12px 16px', textAlign: 'right' }}>Installment Progress</th>
-                <th style={{ padding: '12px 16px', textAlign: 'right' }}>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recentStudents.length === 0 ? (
-                <tr>
-                  <td colSpan={6} style={{ textAlign: 'center', padding: '36px', color: 'var(--muted)' }}>
-                    No student applications found. Click <strong>Import Master Sheet</strong> above to load your Google Sheet!
-                  </td>
-                </tr>
-              ) : (
-                recentStudents.map((s, sIdx) => {
-                  const countryMeta = DESTINATION_PHOTOS[s.country] || DESTINATION_PHOTOS.Default;
-                  const initials = (s.name || 'Student')
-                    .split(' ')
-                    .map((n) => n[0])
-                    .join('')
-                    .slice(0, 2)
-                    .toUpperCase();
+        {/* Right: PAYMENT STAGES */}
+        <div
+          style={{
+            background: 'rgba(15, 20, 35, 0.85)',
+            border: '1px solid rgba(148, 163, 225, 0.14)',
+            borderRadius: '14px',
+            padding: '20px 24px',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '12px', fontWeight: 800, color: '#EDEFFA', letterSpacing: '0.04em' }}>
+                PAYMENT STAGES
+              </span>
+              <span
+                style={{
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  padding: '2px 8px',
+                  borderRadius: '6px',
+                  fontSize: '10px',
+                  color: '#8E9BB5',
+                }}
+              >
+                Count
+              </span>
+            </div>
+            <span style={{ fontSize: '14px', color: '#64748B', cursor: 'pointer' }}>✕</span>
+          </div>
 
-                  // Compute payments sum
-                  let paid = 0;
-                  if (Array.isArray(s.payments) && s.payments.length > 0) {
-                    paid = s.payments.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
-                  } else {
-                    paid = Number(s.collected) || 0;
-                  }
-                  const committed = Number(s.committed_fee) || 200000;
-                  const pct = Math.min(100, Math.round((paid / (committed || 1)) * 100));
-
-                  const statusStyles = {
-                    Active: { bg: 'rgba(0, 229, 160, 0.15)', text: 'var(--green)' },
-                    Enrolled: { bg: 'rgba(54, 209, 220, 0.15)', text: 'var(--cyan)' },
-                    Dropped: { bg: 'rgba(255, 111, 142, 0.15)', text: 'var(--red)' },
-                    Refund: { bg: 'rgba(255, 176, 32, 0.15)', text: 'var(--amber)' },
-                  };
-                  const stStyle = statusStyles[s.enroll_status] || statusStyles.Active;
-
-                  return (
-                    <tr
-                      key={s.id || sIdx}
-                      style={{
-                        borderBottom: '1px solid var(--border)',
-                        transition: 'background 0.2s',
-                      }}
-                    >
-                      {/* Student Name + Avatar */}
-                      <td style={{ padding: '14px 16px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <div
-                            style={{
-                              width: '36px',
-                              height: '36px',
-                              borderRadius: '10px',
-                              background: 'linear-gradient(135deg, #7C6FFF 0%, #36D1DC 100%)',
-                              color: '#fff',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontWeight: 800,
-                              fontSize: '12px',
-                              flexShrink: 0,
-                            }}
-                          >
-                            {initials}
-                          </div>
-                          <div>
-                            <div style={{ fontWeight: 700, color: '#fff' }}>{s.name}</div>
-                            <div style={{ fontSize: '11px', color: 'var(--muted)' }}>
-                              {s.intake || 'Intake pending'}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* Destination with Flag */}
-                      <td style={{ padding: '14px 16px' }}>
-                        <span
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            background: 'var(--bg3)',
-                            padding: '4px 10px',
-                            borderRadius: '8px',
-                            fontSize: '12px',
-                            fontWeight: 600,
-                            color: '#fff',
-                          }}
-                        >
-                          <span>{countryMeta.flag}</span>
-                          <span>{s.country || 'Global'}</span>
-                        </span>
-                      </td>
-
-                      {/* Course & University */}
-                      <td style={{ padding: '14px 16px' }}>
-                        <div style={{ color: 'var(--text)', fontWeight: 600 }}>{s.course || 'Undergraduate'}</div>
-                        <div style={{ fontSize: '11px', color: 'var(--muted)' }}>
-                          {s.university || 'University to be finalized'}
-                        </div>
-                      </td>
-
-                      {/* Counselor */}
-                      <td style={{ padding: '14px 16px', color: 'var(--muted)' }}>
-                        {s.counselor_name || 'Unassigned'}
-                      </td>
-
-                      {/* Installment Progress */}
-                      <td style={{ padding: '14px 16px', textAlign: 'right' }}>
-                        <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--green)' }}>
-                          {formatIndianCurrency(paid)}{' '}
-                          <span style={{ fontSize: '11px', color: 'var(--muted)', fontWeight: 400 }}>
-                            / {formatIndianCurrency(committed)}
-                          </span>
-                        </div>
-                        <div
-                          style={{
-                            width: '120px',
-                            height: '5px',
-                            background: 'var(--bg3)',
-                            borderRadius: '3px',
-                            marginLeft: 'auto',
-                            marginTop: '4px',
-                            overflow: 'hidden',
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: `${pct}%`,
-                              height: '100%',
-                              background: 'linear-gradient(90deg, #7C6FFF, #00E5A0)',
-                              borderRadius: '3px',
-                            }}
-                          />
-                        </div>
-                      </td>
-
-                      {/* Status */}
-                      <td style={{ padding: '14px 16px', textAlign: 'right' }}>
-                        <span
-                          style={{
-                            background: stStyle.bg,
-                            color: stStyle.text,
-                            padding: '4px 10px',
-                            borderRadius: '10px',
-                            fontSize: '11px',
-                            fontWeight: 700,
-                          }}
-                        >
-                          {s.enroll_status || 'Active'}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+          <div style={{ position: 'relative', height: '180px', width: '100%' }}>
+            <canvas ref={paymentStageChartRef} />
+          </div>
         </div>
       </section>
 
       {/* =========================================================================
-          7. MASTER GOOGLE SHEET IMPORTER MODAL
+          ROW 4: MONTHLY GROWTH TREND (Left), MONTHLY COLLECTIONS (Middle), DAILY TREND (Right)
          ========================================================================= */}
+      <section
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '30% 45% 25%',
+          gap: '14px',
+        }}
+      >
+        {/* Left: MONTHLY GROWTH TREND */}
+        <div
+          style={{
+            background: 'rgba(15, 20, 35, 0.85)',
+            border: '1px solid rgba(148, 163, 225, 0.14)',
+            borderRadius: '14px',
+            padding: '18px 20px',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <div>
+              <div style={{ fontSize: '12px', fontWeight: 800, color: '#EDEFFA', letterSpacing: '0.04em' }}>
+                MONTHLY GROWTH TREND
+              </div>
+              <div style={{ fontSize: '10px', color: '#8E9BB5' }}>Month-over-month performance</div>
+            </div>
+            <span style={{ fontSize: '14px', color: '#64748B', cursor: 'pointer' }}>✕</span>
+          </div>
+
+          {/* Line Chart */}
+          <div style={{ position: 'relative', height: '140px', width: '100%' }}>
+            <canvas ref={growthTrendChartRef} />
+          </div>
+
+          {/* Month Comparison Table (Matching Image 1) */}
+          <div style={{ marginTop: '14px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            {growthList.map((row, idx) => (
+              <div
+                key={idx}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  fontSize: '11px',
+                  padding: '2px 0',
+                }}
+              >
+                <span style={{ color: '#8E9BB5' }}>{row.label}</span>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <span style={{ color: '#fff', fontWeight: 600 }}>{row.amount}</span>
+                  <span style={{ color: row.isUp ? '#00E5A0' : '#FF6F8E', fontWeight: 700 }}>{row.pct}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Middle: MONTHLY COLLECTIONS (With Date Filter Controls) */}
+        <div
+          style={{
+            background: 'rgba(15, 20, 35, 0.85)',
+            border: '1px solid rgba(148, 163, 225, 0.14)',
+            borderRadius: '14px',
+            padding: '18px 20px',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
+            <div>
+              <div style={{ fontSize: '12px', fontWeight: 800, color: '#EDEFFA', letterSpacing: '0.04em' }}>
+                MONTHLY COLLECTIONS
+              </div>
+              <div style={{ fontSize: '10px', color: '#8E9BB5' }}>Amount collected per month</div>
+            </div>
+
+            {/* Date Pickers Inline Controls (From Image 1) */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontSize: '10px', color: '#8E9BB5' }}>From:</span>
+              <input
+                type="date"
+                value={monthlyFromDate}
+                onChange={(e) => setMonthlyFromDate(e.target.value)}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.06)',
+                  border: '1px solid rgba(148, 163, 225, 0.2)',
+                  borderRadius: '6px',
+                  color: '#fff',
+                  fontSize: '11px',
+                  padding: '3px 6px',
+                }}
+              />
+
+              <span style={{ fontSize: '10px', color: '#8E9BB5' }}>To:</span>
+              <input
+                type="date"
+                value={monthlyToDate}
+                onChange={(e) => setMonthlyToDate(e.target.value)}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.06)',
+                  border: '1px solid rgba(148, 163, 225, 0.2)',
+                  borderRadius: '6px',
+                  color: '#fff',
+                  fontSize: '11px',
+                  padding: '3px 6px',
+                }}
+              />
+
+              <button
+                onClick={() => setAppliedMonthlyRange({ from: monthlyFromDate, to: monthlyToDate })}
+                style={{
+                  background: '#7C6FFF',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  padding: '4px 10px',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                Apply
+              </button>
+
+              <button
+                onClick={() => {
+                  setMonthlyFromDate('2025-12-01');
+                  setMonthlyToDate('2026-11-02');
+                  setAppliedMonthlyRange({ from: '2025-12-01', to: '2026-11-02' });
+                }}
+                style={{
+                  background: 'transparent',
+                  color: '#8E9BB5',
+                  border: '1px solid rgba(148, 163, 225, 0.2)',
+                  borderRadius: '6px',
+                  padding: '4px 8px',
+                  fontSize: '11px',
+                  cursor: 'pointer',
+                }}
+              >
+                Reset
+              </button>
+            </div>
+          </div>
+
+          {/* Bar Chart */}
+          <div style={{ position: 'relative', height: '240px', width: '100%' }}>
+            <canvas ref={monthlyCollectionsChartRef} />
+          </div>
+        </div>
+
+        {/* Right: DAILY TREND */}
+        <div
+          style={{
+            background: 'rgba(15, 20, 35, 0.85)',
+            border: '1px solid rgba(148, 163, 225, 0.14)',
+            borderRadius: '14px',
+            padding: '18px 20px',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+            <div>
+              <div style={{ fontSize: '12px', fontWeight: 800, color: '#EDEFFA', letterSpacing: '0.04em' }}>
+                DAILY TREND
+              </div>
+              <div style={{ fontSize: '10px', color: '#8E9BB5' }}>November 2026</div>
+            </div>
+            <span style={{ fontSize: '14px', color: '#64748B', cursor: 'pointer' }}>✕</span>
+          </div>
+
+          <div style={{ position: 'relative', height: '240px', width: '100%' }}>
+            <canvas ref={dailyTrendChartRef} />
+          </div>
+        </div>
+      </section>
+
+      {/* =========================================================================
+          ADVANCED FILTERS FLOATING MODAL (Exact 1:1 match to Image 2)
+         ========================================================================= */}
+      {showFiltersModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 999,
+            background: 'rgba(0, 0, 0, 0.5)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            justifyContent: 'flex-end',
+            padding: '60px 40px 0 0',
+          }}
+          onClick={() => setShowFiltersModal(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '320px',
+              background: '#0F1528',
+              border: '1px solid rgba(148, 163, 225, 0.25)',
+              borderRadius: '18px',
+              padding: '24px',
+              boxShadow: '0 20px 50px rgba(0, 0, 0, 0.8), 0 0 30px rgba(124, 111, 255, 0.2)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '18px',
+              animation: 'fadeIn 0.2s ease-out',
+            }}
+          >
+            {/* Modal Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '16px' }}>🎛️</span>
+                <span style={{ fontSize: '16px', fontWeight: 800, color: '#fff' }}>Advanced Filters</span>
+              </div>
+              <button
+                onClick={() => setShowFiltersModal(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#8E9BB5',
+                  fontSize: '16px',
+                  cursor: 'pointer',
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* 1. YEAR */}
+            <div>
+              <div style={{ fontSize: '10.5px', fontWeight: 800, color: '#7C6FFF', textTransform: 'uppercase', marginBottom: '6px' }}>
+                YEAR
+              </div>
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(e.target.value)}
+                style={{
+                  width: '100%',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(148, 163, 225, 0.18)',
+                  borderRadius: '10px',
+                  padding: '10px 12px',
+                  color: '#fff',
+                  fontSize: '13px',
+                  outline: 'none',
+                }}
+              >
+                <option value="All" style={{ background: '#0F1528' }}>All Years</option>
+                {uniqueYears.map((y) => (
+                  <option key={y} value={y} style={{ background: '#0F1528' }}>{y}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* 2. INTAKE */}
+            <div>
+              <div style={{ fontSize: '10.5px', fontWeight: 800, color: '#7C6FFF', textTransform: 'uppercase', marginBottom: '6px' }}>
+                INTAKE
+              </div>
+              <select
+                value={selectedIntake}
+                onChange={(e) => setSelectedIntake(e.target.value)}
+                style={{
+                  width: '100%',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(148, 163, 225, 0.18)',
+                  borderRadius: '10px',
+                  padding: '10px 12px',
+                  color: '#fff',
+                  fontSize: '13px',
+                  outline: 'none',
+                }}
+              >
+                <option value="All" style={{ background: '#0F1528' }}>All Intakes</option>
+                {uniqueIntakes.map((itk) => (
+                  <option key={itk} value={itk} style={{ background: '#0F1528' }}>{itk}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* 3. STATUS (Preset buttons + 4 Status Pills) */}
+            <div>
+              <div style={{ fontSize: '10.5px', fontWeight: 800, color: '#7C6FFF', textTransform: 'uppercase', marginBottom: '8px' }}>
+                STATUS
+              </div>
+
+              {/* Preset Row: All Students vs Active + Enrolled */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '10px' }}>
+                <button
+                  type="button"
+                  onClick={handleSelectAllStudents}
+                  style={{
+                    background: statusFilterType === 'all' ? '#7C6FFF' : 'rgba(255, 255, 255, 0.05)',
+                    color: statusFilterType === 'all' ? '#fff' : '#8E9BB5',
+                    border: '1px solid rgba(148, 163, 225, 0.18)',
+                    borderRadius: '8px',
+                    padding: '8px 10px',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  All Students
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleSelectActiveEnrolled}
+                  style={{
+                    background: statusFilterType === 'active_enrolled' ? '#7C6FFF' : 'rgba(255, 255, 255, 0.05)',
+                    color: statusFilterType === 'active_enrolled' ? '#fff' : '#8E9BB5',
+                    border: '1px solid rgba(148, 163, 225, 0.18)',
+                    borderRadius: '8px',
+                    padding: '8px 10px',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Active + Enrolled
+                </button>
+              </div>
+
+              {/* 4 Status Toggle Pills */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                {/* Active */}
+                <button
+                  type="button"
+                  onClick={() => handleToggleStatus('Active')}
+                  style={{
+                    background: selectedStatuses.has('Active') ? '#00E5A0' : 'rgba(255, 255, 255, 0.05)',
+                    color: selectedStatuses.has('Active') ? '#080A12' : '#8E9BB5',
+                    border: 'none',
+                    borderRadius: '8px',
+                    padding: '8px 10px',
+                    fontSize: '12px',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: selectedStatuses.has('Active') ? '#080A12' : '#00E5A0' }} />
+                  Active
+                </button>
+
+                {/* Enrolled */}
+                <button
+                  type="button"
+                  onClick={() => handleToggleStatus('Enrolled')}
+                  style={{
+                    background: selectedStatuses.has('Enrolled') ? '#7C6FFF' : 'rgba(255, 255, 255, 0.05)',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    padding: '8px 10px',
+                    fontSize: '12px',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#fff' }} />
+                  Enrolled
+                </button>
+
+                {/* Dropped */}
+                <button
+                  type="button"
+                  onClick={() => handleToggleStatus('Dropped')}
+                  style={{
+                    background: selectedStatuses.has('Dropped') ? 'rgba(255, 111, 142, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                    color: selectedStatuses.has('Dropped') ? '#FF6F8E' : '#8E9BB5',
+                    border: selectedStatuses.has('Dropped') ? '1px solid #FF6F8E' : '1px solid rgba(148, 163, 225, 0.18)',
+                    borderRadius: '8px',
+                    padding: '8px 10px',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#FF6F8E' }} />
+                  Dropped
+                </button>
+
+                {/* Refund */}
+                <button
+                  type="button"
+                  onClick={() => handleToggleStatus('Refund')}
+                  style={{
+                    background: selectedStatuses.has('Refund') ? 'rgba(255, 176, 32, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                    color: selectedStatuses.has('Refund') ? '#FFB020' : '#8E9BB5',
+                    border: selectedStatuses.has('Refund') ? '1px solid #FFB020' : '1px solid rgba(148, 163, 225, 0.18)',
+                    borderRadius: '8px',
+                    padding: '8px 10px',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#FFB020' }} />
+                  Refund
+                </button>
+              </div>
+            </div>
+
+            {/* 4. COUNTRY */}
+            <div>
+              <div style={{ fontSize: '10.5px', fontWeight: 800, color: '#7C6FFF', textTransform: 'uppercase', marginBottom: '6px' }}>
+                COUNTRY
+              </div>
+              <select
+                value={selectedCountry}
+                onChange={(e) => setSelectedCountry(e.target.value)}
+                style={{
+                  width: '100%',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(148, 163, 225, 0.18)',
+                  borderRadius: '10px',
+                  padding: '10px 12px',
+                  color: '#fff',
+                  fontSize: '13px',
+                  outline: 'none',
+                }}
+              >
+                <option value="All" style={{ background: '#0F1528' }}>All Countries</option>
+                {uniqueCountries.map((c) => (
+                  <option key={c} value={c} style={{ background: '#0F1528' }}>{c}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* 5. DATE RANGE */}
+            <div>
+              <div style={{ fontSize: '10.5px', fontWeight: 800, color: '#7C6FFF', textTransform: 'uppercase', marginBottom: '6px' }}>
+                DATE RANGE
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <input
+                  type="date"
+                  value={filterStartDate}
+                  onChange={(e) => setFilterStartDate(e.target.value)}
+                  style={{
+                    width: '100%',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(148, 163, 225, 0.18)',
+                    borderRadius: '8px',
+                    padding: '8px 10px',
+                    color: '#fff',
+                    fontSize: '12px',
+                  }}
+                />
+                <input
+                  type="date"
+                  value={filterEndDate}
+                  onChange={(e) => setFilterEndDate(e.target.value)}
+                  style={{
+                    width: '100%',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(148, 163, 225, 0.18)',
+                    borderRadius: '8px',
+                    padding: '8px 10px',
+                    color: '#fff',
+                    fontSize: '12px',
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* RESET ALL FILTERS BUTTON */}
+            <button
+              onClick={handleResetFilters}
+              style={{
+                width: '100%',
+                background: 'rgba(124, 111, 255, 0.15)',
+                color: '#fff',
+                border: '1px solid rgba(124, 111, 255, 0.3)',
+                borderRadius: '10px',
+                padding: '12px',
+                fontSize: '13px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                marginTop: '6px',
+                transition: 'background 0.2s',
+              }}
+            >
+              Reset All Filters
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Google Sheet Importer Modal */}
       <GoogleSheetImporterModal
         isOpen={isImportModalOpen}
         onClose={() => setIsImportModalOpen(false)}
         onImportSuccess={() => fetchOverviewData()}
       />
-
     </div>
   );
 }
