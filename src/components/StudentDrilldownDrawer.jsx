@@ -42,10 +42,9 @@ export default function StudentDrilldownDrawer({
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
 
-  if (!isOpen) return null;
-
   // Filter students by local search & status
   const displayedStudents = useMemo(() => {
+    if (!students || students.length === 0) return [];
     return students.filter((s) => {
       if (statusFilter !== 'All' && s.enroll_status !== statusFilter) return false;
       if (!search.trim()) return true;
@@ -87,6 +86,8 @@ export default function StudentDrilldownDrawer({
 
     return { totalCollected, totalCommitted, totalRemaining, efficiency };
   }, [displayedStudents]);
+
+  if (!isOpen) return null;
 
   // Export current drilldown list to Excel
   const handleExportExcel = () => {

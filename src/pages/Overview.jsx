@@ -1907,23 +1907,27 @@ export default function Overview({ setCurrentPage }) {
       {/* =========================================================================
           2026 INTERACTIVE STUDENT DRILLDOWN DRAWER
          ========================================================================= */}
-      <StudentDrilldownDrawer
-        isOpen={drilldownState.isOpen}
-        onClose={() => setDrilldownState((prev) => ({ ...prev, isOpen: false }))}
-        title={drilldownState.title}
-        subtitle={drilldownState.subtitle}
-        badgeText={drilldownState.badgeText}
-        badgeColor={drilldownState.badgeColor}
-        students={drilldownState.students}
-        setCurrentPage={setCurrentPage}
-      />
+      {drilldownState.isOpen && (
+        <StudentDrilldownDrawer
+          isOpen={drilldownState.isOpen}
+          onClose={() => setDrilldownState((prev) => ({ ...prev, isOpen: false }))}
+          title={drilldownState.title}
+          subtitle={drilldownState.subtitle}
+          badgeText={drilldownState.badgeText}
+          badgeColor={drilldownState.badgeColor}
+          students={drilldownState.students}
+          setCurrentPage={setCurrentPage}
+        />
+      )}
 
       {/* Google Sheet Importer Modal */}
-      <GoogleSheetImporterModal
-        isOpen={isImportModalOpen}
-        onClose={() => setIsImportModalOpen(false)}
-        onImportSuccess={() => fetchOverviewData()}
-      />
+      {isImportModalOpen && (
+        <GoogleSheetImporterModal
+          isOpen={isImportModalOpen}
+          onClose={() => setIsImportModalOpen(false)}
+          onImportSuccess={() => fetchOverviewData()}
+        />
+      )}
     </div>
   );
 }
