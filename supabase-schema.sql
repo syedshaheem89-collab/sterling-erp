@@ -109,12 +109,12 @@ CREATE TABLE public.students (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
 );
 
--- 5) Payments Table (5 installments / slots)
+-- 5) Payments Table (unbounded installment slots: 1, 2, 3... 6, 7+)
 CREATE TABLE public.payments (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     student_id UUID NOT NULL REFERENCES public.students(id) ON DELETE CASCADE,
     company_id UUID NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
-    slot INTEGER NOT NULL CHECK (slot BETWEEN 1 AND 5),
+    slot INTEGER NOT NULL CHECK (slot >= 1),
     bank_name TEXT NOT NULL DEFAULT '',
     amount NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
     payment_date DATE NOT NULL DEFAULT CURRENT_DATE,
@@ -125,6 +125,10 @@ CREATE TABLE public.payments (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
     CONSTRAINT uq_student_slot UNIQUE (student_id, slot)
 );
+
+-- NOTE: If updating an existing database that previously had CHECK (slot BETWEEN 1 AND 5), execute:
+-- ALTER TABLE public.payments DROP CONSTRAINT IF EXISTS payments_slot_check;
+-- ALTER TABLE public.payments ADD CONSTRAINT payments_slot_check CHECK (slot >= 1);
 
 -- 6) Ledger Entries Table
 CREATE TABLE public.ledger_entries (

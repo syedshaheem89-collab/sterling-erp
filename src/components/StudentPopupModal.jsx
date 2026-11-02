@@ -51,21 +51,13 @@ export default function StudentPopupModal({
     });
   }, [students, search]);
 
-  // Build all 5 installment slots for the selected student
-  const paymentSlots = useMemo(() => {
+  // Payment List: ONLY actual recorded payments, sorted by slot ascending
+  const paymentList = useMemo(() => {
     if (!selectedStudent) return [];
-    const existingPayments = Array.isArray(selectedStudent.payments) ? selectedStudent.payments : [];
-
-    return [1, 2, 3, 4, 5].map((slotNum) => {
-      const found = existingPayments.find((p) => Number(p.slot) === slotNum);
-      return {
-        slot: slotNum,
-        payment: found || null,
-        bank: found?.bank_name || 'STERLING STUDY ABROAD',
-        amount: found ? Number(found.amount || 0) : 0,
-        date: found?.payment_date || found?.paid_date || null,
-      };
-    });
+    const existing = Array.isArray(selectedStudent.payments) ? selectedStudent.payments : [];
+    return [...existing]
+      .filter((p) => Number(p.amount) > 0 || p.bank_name || p.payment_date || p.paid_date)
+      .sort((a, b) => Number(a.slot || 0) - Number(b.slot || 0));
   }, [selectedStudent]);
 
   // Export list to Excel
@@ -89,14 +81,82 @@ export default function StudentPopupModal({
     XLSX.writeFile(wb, `${title.replace(/[^a-zA-Z0-9]/g, '_')}.xlsx`);
   };
 
-  // Open Edit Modal for a Payment Slot
-  const handleOpenEditPayment = (slotItem) => {
+  // Open Edit Modal for an existing Payment
+  const handleOpenEditPayment = (item) => {
     setEditingPayment({
-      slot: slotItem.slot,
-      bank: slotItem.bank || 'STERLING STUDY ABROAD',
-      amount: slotItem.amount > 0 ? String(slotItem.amount) : '',
-      date: slotItem.date ? String(slotItem.date).slice(0, 10) : new Date().toISOString().split('T')[0],
+      isNew: false,
+      slot: Number(item.slot || 1),
+      bank: item.bank_name || 'STERLING STUDY ABROAD',
+      amount: Number(item.amount || 0) > 0 ? String(item.amount) : '',
+      date: item.payment_date || item.paid_date ? String(item.payment_date || item.paid_date).slice(0, 10) : new Date().toISOString().split('T')[0],
     });
+  };
+
+  // Open Modal to Add a New Installment (dynamically assigns next available slot)
+  const handleOpenAddInstallment = () => {
+    const existingSlots = paymentList.map((p) => Number(p.slot || 0));
+    let nextSlot = 1;
+    while (existingSlots.includes(nextSlot)) {
+      nextSlot++;
+    }
+    setEditingPayment({
+      isNew: true,
+      slot: nextSlot,
+      bank: 'STERLING STUDY ABROAD',
+      amount: '',
+      date: new Date().toISOString().split('T')[0],
+    });
+  };
+
+  // Delete an installment
+  const handleDeletePayment = async (slotToDelete) => {
+    if (!window.confirm(`Are you sure you want to delete Installment #${slotToDelete}? This cannot be undone.`)) return;
+    setIsSavingPayment(true);
+    const toastId = toast.loading(`Deleting Installment #${slotToDelete}...`);
+
+    try {
+      await supabase
+        .from('payments')
+        .delete()
+        .eq('student_id', selectedStudent.id)
+        .eq('slot', slotToDelete);
+
+      // Re-fetch payments for this student
+      const { data: updatedPayments } = await supabase
+        .from('payments')
+        .select('*')
+        .eq('student_id', selectedStudent.id)
+        .order('slot', { ascending: true });
+
+      const newPayments = updatedPayments || [];
+      const newCollected = newPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+      const committed = Number(selectedStudent.committed || 0);
+      const newRemaining = selectedStudent.enroll_status === 'Active' ? Math.max(0, committed - newCollected) : 0;
+
+      await supabase
+        .from('students')
+        .update({
+          collected: newCollected,
+          remaining: newRemaining,
+        })
+        .eq('id', selectedStudent.id);
+
+      setSelectedStudent((prev) => ({
+        ...prev,
+        payments: newPayments,
+        collected: newCollected,
+        remaining: newRemaining,
+      }));
+
+      toast.success(`Installment #${slotToDelete} deleted`, { id: toastId });
+      setEditingPayment(null);
+      if (onStudentUpdated) onStudentUpdated();
+    } catch (err) {
+      console.error(err);
+      toast.error(err.message || 'Failed to delete payment', { id: toastId });
+    } finally {
+      setIsSavingPayment(false);
+    }
   };
 
   // Save Payment Slot
@@ -107,8 +167,8 @@ export default function StudentPopupModal({
 
     try {
       const amt = parseFloat(editingPayment.amount) || 0;
-      const slot = editingPayment.slot;
-      const bnk = editingPayment.bank.trim() || 'STERLING STUDY ABROAD';
+      const slot = parseInt(editingPayment.slot, 10) || 1;
+      const bnk = (editingPayment.bank || 'STERLING STUDY ABROAD').trim();
       const dt = editingPayment.date || new Date().toISOString().split('T')[0];
 
       if (amt <= 0) {
@@ -133,7 +193,12 @@ export default function StudentPopupModal({
             onConflict: 'student_id,slot',
           });
 
-        if (upsertErr) throw upsertErr;
+        if (upsertErr) {
+          if (upsertErr.message && upsertErr.message.toLowerCase().includes('check')) {
+            throw new Error(`Database check constraint: If adding slot > 5, please execute: ALTER TABLE payments DROP CONSTRAINT IF EXISTS payments_slot_check; in Supabase SQL editor.`);
+          }
+          throw upsertErr;
+        }
       }
 
       // Re-fetch payments for this student
@@ -148,6 +213,14 @@ export default function StudentPopupModal({
       const committed = Number(selectedStudent.committed || 0);
       const newRemaining = selectedStudent.enroll_status === 'Active' ? Math.max(0, committed - newCollected) : 0;
 
+      await supabase
+        .from('students')
+        .update({
+          collected: newCollected,
+          remaining: newRemaining,
+        })
+        .eq('id', selectedStudent.id);
+
       setSelectedStudent(prev => ({
         ...prev,
         payments: newPayments,
@@ -155,7 +228,7 @@ export default function StudentPopupModal({
         remaining: newRemaining,
       }));
 
-      toast.success(`Installment #${slot} updated successfully!`, { id: toastId });
+      toast.success(`Installment #${slot} saved successfully!`, { id: toastId });
       setEditingPayment(null);
       if (onStudentUpdated) onStudentUpdated();
     } catch (err) {
@@ -819,15 +892,43 @@ export default function StudentPopupModal({
                 </div>
               </div>
 
-              {/* Payment History Section (Matches User's Zoomed-in Screenshot Exactly) */}
+              {/* Payment History Section (Dynamic Installments & No Horizontal Overflow) */}
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <div style={{ fontSize: '12px', fontWeight: 800, color: '#fff' }}>
-                    Payment History
+                  <div style={{ fontSize: '12px', fontWeight: 800, color: '#fff', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span>Payment History</span>
+                    <span style={{ fontSize: '11px', color: '#8E9BB5', fontWeight: 600 }}>({paymentList.length})</span>
                   </div>
-                  <span style={{ fontSize: '10.5px', color: '#8E9BB5' }}>
-                    Click ✏️ to edit Amount & Date
-                  </span>
+
+                  <button
+                    type="button"
+                    onClick={handleOpenAddInstallment}
+                    style={{
+                      background: 'rgba(0, 229, 160, 0.15)',
+                      border: '1px solid rgba(0, 229, 160, 0.35)',
+                      color: '#00E5A0',
+                      padding: '4px 9px',
+                      borderRadius: '7px',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      transition: 'all 0.15s ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = '#00E5A0';
+                      e.currentTarget.style.color = '#080A12';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'rgba(0, 229, 160, 0.15)';
+                      e.currentTarget.style.color = '#00E5A0';
+                    }}
+                  >
+                    <span>+</span>
+                    <span>Add Installment</span>
+                  </button>
                 </div>
 
                 <div
@@ -836,109 +937,176 @@ export default function StudentPopupModal({
                     border: '1px solid rgba(148, 163, 225, 0.12)',
                     borderRadius: '12px',
                     overflow: 'hidden',
+                    width: '100%',
+                    boxSizing: 'border-box',
                   }}
                 >
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11.5px', textAlign: 'left' }}>
-                    <thead>
-                      <tr style={{ borderBottom: '1px solid rgba(148, 163, 225, 0.12)', color: '#8E9BB5', background: 'rgba(255, 255, 255, 0.02)' }}>
-                        <th style={{ padding: '9px 10px', width: '24px' }}>#</th>
-                        <th style={{ padding: '9px 10px' }}>BANK</th>
-                        <th style={{ padding: '9px 10px', textAlign: 'right' }}>AMOUNT</th>
-                        <th style={{ padding: '9px 10px', textAlign: 'right' }}>DATE</th>
-                        <th style={{ padding: '9px 10px', textAlign: 'center', width: '40px' }}>EDIT</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {paymentSlots.map((item) => (
+                  {paymentList.length === 0 ? (
+                    <div style={{ padding: '24px 16px', textAlign: 'center', color: '#8E9BB5', fontSize: '11.5px' }}>
+                      <div style={{ marginBottom: '8px', color: '#64748B' }}>No payment installments recorded yet</div>
+                      <button
+                        type="button"
+                        onClick={handleOpenAddInstallment}
+                        style={{
+                          background: 'rgba(124, 111, 255, 0.15)',
+                          border: '1px solid rgba(124, 111, 255, 0.35)',
+                          color: '#A78BFA',
+                          padding: '5px 12px',
+                          borderRadius: '8px',
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        + Add 1st Installment
+                      </button>
+                    </div>
+                  ) : (
+                    <table
+                      style={{
+                        width: '100%',
+                        tableLayout: 'fixed',
+                        borderCollapse: 'collapse',
+                        fontSize: '11px',
+                        textAlign: 'left',
+                        boxSizing: 'border-box',
+                      }}
+                    >
+                      <colgroup>
+                        <col style={{ width: '22px' }} />
+                        <col style={{ width: '115px' }} />
+                        <col style={{ width: '75px' }} />
+                        <col style={{ width: '75px' }} />
+                        <col style={{ width: '36px' }} />
+                      </colgroup>
+                      <thead>
                         <tr
-                          key={item.slot}
                           style={{
-                            borderBottom: '1px solid rgba(148, 163, 225, 0.06)',
-                            background: item.amount > 0 ? 'transparent' : 'rgba(255, 255, 255, 0.01)',
+                            borderBottom: '1px solid rgba(148, 163, 225, 0.12)',
+                            color: '#8E9BB5',
+                            background: 'rgba(255, 255, 255, 0.02)',
                           }}
                         >
-                          <td style={{ padding: '9px 10px', color: '#8E9BB5' }}>{item.slot}</td>
-
-                          <td style={{ padding: '9px 10px', color: '#fff', fontWeight: 600 }}>
-                            {item.amount > 0 ? (
-                              item.bank
-                            ) : (
-                              <span style={{ color: '#64748B', fontStyle: 'italic' }}>
-                                Slot {item.slot} (Empty)
-                              </span>
-                            )}
-                          </td>
-
-                          <td
+                          <th style={{ padding: '8px 4px', textAlign: 'center', fontWeight: 700 }}>#</th>
+                          <th style={{ padding: '8px 4px', fontWeight: 700 }}>BANK</th>
+                          <th style={{ padding: '8px 4px', textAlign: 'right', fontWeight: 700 }}>AMOUNT</th>
+                          <th style={{ padding: '8px 4px', textAlign: 'right', fontWeight: 700 }}>DATE</th>
+                          <th style={{ padding: '8px 4px', textAlign: 'center', fontWeight: 700 }}>EDIT</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {paymentList.map((item) => (
+                          <tr
+                            key={item.id || item.slot}
                             style={{
-                              padding: '9px 10px',
-                              textAlign: 'right',
-                              color: item.amount > 0 ? '#00E5A0' : '#64748B',
-                              fontWeight: 700,
+                              borderBottom: '1px solid rgba(148, 163, 225, 0.06)',
                             }}
                           >
-                            {item.amount > 0 ? formatCompactINR(item.amount) : '—'}
-                          </td>
+                            <td style={{ padding: '7px 4px', textAlign: 'center', color: '#8E9BB5', fontWeight: 600 }}>
+                              {item.slot}
+                            </td>
 
-                          <td
-                            style={{
-                              padding: '9px 10px',
-                              textAlign: 'right',
-                              color: item.date ? '#EDEFFA' : '#64748B',
-                            }}
-                          >
-                            {item.date ? formatDate(item.date) : '—'}
-                          </td>
-
-                          {/* Orange Edit Button Matching Screenshot */}
-                          <td style={{ padding: '9px 10px', textAlign: 'center' }}>
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEditPayment(item)}
-                              title={`Edit Installment #${item.slot} (Amount & Date)`}
+                            <td
+                              title={item.bank_name || 'STERLING STUDY ABROAD'}
                               style={{
-                                background: 'rgba(255, 111, 32, 0.16)',
-                                border: '1px solid rgba(255, 111, 32, 0.45)',
-                                color: '#FF8A00',
-                                width: '28px',
-                                height: '28px',
-                                borderRadius: '7px',
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontSize: '13px',
-                                transition: 'all 0.15s ease',
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.background = '#FF8A00';
-                                e.currentTarget.style.color = '#fff';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.background = 'rgba(255, 111, 32, 0.16)';
-                                e.currentTarget.style.color = '#FF8A00';
+                                padding: '7px 4px',
+                                color: '#fff',
+                                fontWeight: 600,
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
                               }}
                             >
-                              ✏️
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                              {item.bank_name || 'STERLING STUDY ABROAD'}
+                            </td>
 
-                  <div style={{ padding: '8px 12px', fontSize: '10.5px', color: '#8E9BB5', borderTop: '1px solid rgba(148, 163, 225, 0.08)' }}>
-                    {paymentSlots.filter(p => p.amount > 0).length >= 5
-                      ? 'All 5 installment slots are filled'
-                      : `${paymentSlots.filter(p => p.amount > 0).length} of 5 installment slots filled`}
-                  </div>
+                            <td
+                              style={{
+                                padding: '7px 4px',
+                                textAlign: 'right',
+                                color: '#00E5A0',
+                                fontWeight: 800,
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              {formatCompactINR(item.amount)}
+                            </td>
+
+                            <td
+                              style={{
+                                padding: '7px 4px',
+                                textAlign: 'right',
+                                color: '#CBD5E1',
+                                fontSize: '10.5px',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              {formatDate(item.payment_date || item.paid_date)}
+                            </td>
+
+                            {/* Orange Edit Button Matching Screenshot */}
+                            <td style={{ padding: '7px 4px', textAlign: 'center' }}>
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditPayment(item)}
+                                title={`Edit Installment #${item.slot} (Amount, Date, Bank)`}
+                                style={{
+                                  background: 'rgba(255, 111, 32, 0.16)',
+                                  border: '1px solid rgba(255, 111, 32, 0.45)',
+                                  color: '#FF8A00',
+                                  width: '26px',
+                                  height: '26px',
+                                  borderRadius: '6px',
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontSize: '12px',
+                                  transition: 'all 0.15s ease',
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.background = '#FF8A00';
+                                  e.currentTarget.style.color = '#fff';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.background = 'rgba(255, 111, 32, 0.16)';
+                                  e.currentTarget.style.color = '#FF8A00';
+                                }}
+                              >
+                                ✏️
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+
+                  {paymentList.length > 0 && (
+                    <div
+                      style={{
+                        padding: '8px 12px',
+                        fontSize: '10.5px',
+                        color: '#8E9BB5',
+                        borderTop: '1px solid rgba(148, 163, 225, 0.08)',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <span>{paymentList.length} installment{paymentList.length > 1 ? 's' : ''} recorded</span>
+                      <span style={{ color: '#00E5A0', fontWeight: 700 }}>
+                        Total: {formatCompactINR(paymentList.reduce((acc, p) => acc + Number(p.amount || 0), 0))}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
 
             </div>
 
             {/* =========================================================================
-                INLINE EDIT PAYMENT MODAL (Amount, Date, and Bank)
+                INLINE EDIT / ADD PAYMENT MODAL (Amount, Date, Bank & Slot)
                ========================================================================= */}
             {editingPayment && (
               <div
@@ -951,7 +1119,7 @@ export default function StudentPopupModal({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  padding: '20px',
+                  padding: '16px',
                 }}
                 onClick={() => setEditingPayment(null)}
               >
@@ -963,17 +1131,17 @@ export default function StudentPopupModal({
                     background: '#11162A',
                     border: '1px solid rgba(148, 163, 225, 0.25)',
                     borderRadius: '16px',
-                    padding: '22px',
+                    padding: '20px',
                     boxShadow: '0 20px 50px rgba(0,0,0,0.8), 0 0 30px rgba(255, 138, 0, 0.2)',
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: '14px',
+                    gap: '12px',
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ fontSize: '15px', fontWeight: 800, color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <span style={{ color: '#FF8A00' }}>✏️</span>
-                      <span>Edit Installment #{editingPayment.slot}</span>
+                      <span>{editingPayment.isNew ? `Add Installment #${editingPayment.slot}` : `Edit Installment #${editingPayment.slot}`}</span>
                     </div>
                     <button
                       onClick={() => setEditingPayment(null)}
@@ -983,80 +1151,130 @@ export default function StudentPopupModal({
                     </button>
                   </div>
 
+                  {/* Slot Number */}
+                  <div>
+                    <label style={{ fontSize: '10.5px', fontWeight: 700, color: '#8E9BB5', textTransform: 'uppercase', display: 'block', marginBottom: '5px' }}>
+                      Installment Slot #
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={editingPayment.slot}
+                      onChange={(e) => setEditingPayment((prev) => ({ ...prev, slot: parseInt(e.target.value, 10) || 1 }))}
+                      style={{
+                        width: '100%',
+                        background: 'rgba(255, 255, 255, 0.06)',
+                        border: '1px solid rgba(148, 163, 225, 0.2)',
+                        borderRadius: '8px',
+                        padding: '8px 12px',
+                        color: '#fff',
+                        fontSize: '13px',
+                        fontWeight: 700,
+                        outline: 'none',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
+
                   {/* 1. AMOUNT (₹) */}
                   <div>
-                    <label style={{ fontSize: '11px', fontWeight: 700, color: '#00E5A0', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
+                    <label style={{ fontSize: '10.5px', fontWeight: 700, color: '#00E5A0', textTransform: 'uppercase', display: 'block', marginBottom: '5px' }}>
                       Amount (₹) *
                     </label>
                     <input
                       type="number"
                       step="1"
-                      placeholder="e.g. 87400"
+                      placeholder="e.g. 50000"
                       value={editingPayment.amount}
-                      onChange={(e) => setEditingPayment(prev => ({ ...prev, amount: e.target.value }))}
+                      onChange={(e) => setEditingPayment((prev) => ({ ...prev, amount: e.target.value }))}
                       autoFocus
                       style={{
                         width: '100%',
                         background: 'rgba(255, 255, 255, 0.06)',
                         border: '1px solid rgba(0, 229, 160, 0.4)',
                         borderRadius: '8px',
-                        padding: '10px 12px',
+                        padding: '9px 12px',
                         color: '#00E5A0',
                         fontSize: '15px',
                         fontWeight: 800,
                         outline: 'none',
+                        boxSizing: 'border-box',
                       }}
                     />
                   </div>
 
                   {/* 2. PAYMENT DATE */}
                   <div>
-                    <label style={{ fontSize: '11px', fontWeight: 700, color: '#36D1DC', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
+                    <label style={{ fontSize: '10.5px', fontWeight: 700, color: '#36D1DC', textTransform: 'uppercase', display: 'block', marginBottom: '5px' }}>
                       Payment Date *
                     </label>
                     <input
                       type="date"
                       value={editingPayment.date}
-                      onChange={(e) => setEditingPayment(prev => ({ ...prev, date: e.target.value }))}
+                      onChange={(e) => setEditingPayment((prev) => ({ ...prev, date: e.target.value }))}
                       style={{
                         width: '100%',
                         background: 'rgba(255, 255, 255, 0.06)',
                         border: '1px solid rgba(148, 163, 225, 0.2)',
                         borderRadius: '8px',
-                        padding: '9px 12px',
+                        padding: '8px 12px',
                         color: '#fff',
-                        fontSize: '13px',
+                        fontSize: '12px',
                         fontWeight: 600,
                         outline: 'none',
+                        boxSizing: 'border-box',
                       }}
                     />
                   </div>
 
                   {/* 3. BANK / ACCOUNT NAME */}
                   <div>
-                    <label style={{ fontSize: '11px', fontWeight: 700, color: '#A78BFA', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
+                    <label style={{ fontSize: '10.5px', fontWeight: 700, color: '#A78BFA', textTransform: 'uppercase', display: 'block', marginBottom: '5px' }}>
                       Bank / Account
                     </label>
                     <input
                       type="text"
-                      placeholder="e.g. STERLING STUDY ABROAD, CMA, Federal Bank"
+                      placeholder="e.g. STERLING STUDY ABROAD, Federal Bank"
                       value={editingPayment.bank}
-                      onChange={(e) => setEditingPayment(prev => ({ ...prev, bank: e.target.value }))}
+                      onChange={(e) => setEditingPayment((prev) => ({ ...prev, bank: e.target.value }))}
                       style={{
                         width: '100%',
                         background: 'rgba(255, 255, 255, 0.06)',
                         border: '1px solid rgba(148, 163, 225, 0.2)',
                         borderRadius: '8px',
-                        padding: '9px 12px',
+                        padding: '8px 12px',
                         color: '#fff',
                         fontSize: '12px',
                         outline: 'none',
+                        boxSizing: 'border-box',
                       }}
                     />
                   </div>
 
                   {/* Actions */}
                   <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                    {!editingPayment.isNew && (
+                      <button
+                        type="button"
+                        onClick={() => handleDeletePayment(editingPayment.slot)}
+                        disabled={isSavingPayment}
+                        title="Delete this installment"
+                        style={{
+                          background: 'rgba(255, 111, 142, 0.15)',
+                          border: '1px solid rgba(255, 111, 142, 0.35)',
+                          color: '#FF6F8E',
+                          borderRadius: '8px',
+                          padding: '9px 12px',
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Delete
+                      </button>
+                    )}
+
                     <button
                       type="button"
                       onClick={() => setEditingPayment(null)}
@@ -1067,8 +1285,8 @@ export default function StudentPopupModal({
                         border: '1px solid rgba(148, 163, 225, 0.25)',
                         color: '#8E9BB5',
                         borderRadius: '8px',
-                        padding: '10px',
-                        fontSize: '12px',
+                        padding: '9px',
+                        fontSize: '11.5px',
                         fontWeight: 600,
                         cursor: 'pointer',
                       }}
@@ -1086,8 +1304,8 @@ export default function StudentPopupModal({
                         color: '#080A12',
                         border: 'none',
                         borderRadius: '8px',
-                        padding: '10px',
-                        fontSize: '12.5px',
+                        padding: '9px',
+                        fontSize: '12px',
                         fontWeight: 800,
                         cursor: isSavingPayment ? 'wait' : 'pointer',
                         boxShadow: '0 4px 14px rgba(0, 229, 160, 0.4)',
