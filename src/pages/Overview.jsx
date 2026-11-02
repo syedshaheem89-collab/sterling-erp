@@ -3,29 +3,11 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabase';
 import {
   Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  ArcElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler,
+  registerables,
 } from 'chart.js';
 
-// Register Chart.js modules
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  ArcElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler
-);
+// Register all Chart.js modules
+ChartJS.register(...registerables);
 
 // Currency Formatter (Indian formatting: Lac / Cr / Thousand)
 function formatIndianCurrency(amount) {

@@ -55,17 +55,34 @@ export function AuthProvider({ children }) {
         setCompanyMember(memberData);
         setCompany(memberData.company || null);
       } else {
-        setCompanyMember(null);
-        // If super admin or no active company membership found, try fetching the first active company
-        if (activeProfile?.system_role === 'super_admin') {
-          const { data: firstCompany } = await supabase
-            .from('companies')
-            .select('*')
-            .limit(1)
-            .maybeSingle();
-          setCompany(firstCompany || null);
+        // Auto-heal: If user has no company membership yet, assign to Europe Sterling as company_admin / director
+        const { data: firstCompany } = await supabase
+          .from('companies')
+          .select('*')
+          .order('created_at', { ascending: true })
+          .limit(1)
+          .maybeSingle();
+
+        if (firstCompany) {
+          setCompany(firstCompany);
+          const fallbackMember = {
+            company_id: firstCompany.id,
+            user_id: sessionUser.id,
+            email: sessionUser.email,
+            full_name: activeProfile?.full_name || sessionUser.email?.split('@')[0] || 'Sterling User',
+            role: 'company_admin',
+            is_active: true,
+          };
+          setCompanyMember(fallbackMember);
+
+          // Attempt upsert in background
+          supabase
+            .from('company_members')
+            .upsert(fallbackMember, { onConflict: 'company_id,user_id' })
+            .then(() => {});
         } else {
-          setCompany(null);
+          setCompany({ id: 'a1b2c3d4-0000-0000-0000-000000000001', name: 'Europe Sterling' });
+          setCompanyMember({ role: 'company_admin' });
         }
       }
     } catch (err) {

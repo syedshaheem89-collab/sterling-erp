@@ -39,6 +39,112 @@ function LoadingScreen() {
   );
 }
 
+// Error boundary to catch and display any rendering issue gracefully
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null, info: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, info) {
+    console.error('Unhandled render error caught by ErrorBoundary:', error, info);
+    this.setState({ info });
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{
+          minHeight: '100vh',
+          background: '#080A12',
+          color: '#EDEFFA',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '24px',
+          fontFamily: "'Plus Jakarta Sans', sans-serif"
+        }}>
+          <div style={{
+            maxWidth: '560px',
+            width: '100%',
+            background: 'rgba(20, 25, 45, 0.9)',
+            border: '1px solid rgba(255, 111, 142, 0.4)',
+            borderRadius: '16px',
+            padding: '28px',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.6)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+              <span style={{ fontSize: '28px' }}>⚠️</span>
+              <h2 style={{ fontSize: '18px', fontWeight: 800, color: '#FF6F8E', margin: 0 }}>
+                Application Workspace Error
+              </h2>
+            </div>
+            <p style={{ fontSize: '13.5px', color: '#A8B2C7', lineHeight: 1.6, marginBottom: '16px' }}>
+              A component error occurred while rendering the workspace:
+            </p>
+            <pre style={{
+              background: '#0e1220',
+              padding: '12px 14px',
+              borderRadius: '8px',
+              fontSize: '12px',
+              color: '#FFB020',
+              overflowX: 'auto',
+              whiteSpace: 'pre-wrap',
+              marginBottom: '20px',
+              border: '1px solid rgba(255, 176, 32, 0.2)'
+            }}>
+              {this.state.error?.message || String(this.state.error)}
+            </pre>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                onClick={() => window.location.reload()}
+                style={{
+                  flex: 1,
+                  background: 'linear-gradient(135deg, #7C6FFF, #5B4FE0)',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '10px',
+                  padding: '12px',
+                  fontWeight: 700,
+                  fontSize: '13px',
+                  cursor: 'pointer'
+                }}
+              >
+                Reload Dashboard
+              </button>
+              <button
+                onClick={() => {
+                  localStorage.clear();
+                  window.location.reload();
+                }}
+                style={{
+                  flex: 1,
+                  background: 'rgba(255, 111, 142, 0.15)',
+                  color: '#FF6F8E',
+                  border: '1px solid #FF6F8E',
+                  borderRadius: '10px',
+                  padding: '12px',
+                  fontWeight: 700,
+                  fontSize: '13px',
+                  cursor: 'pointer'
+                }}
+              >
+                Clear Cache & Sign Out
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 // Internal auth-aware component router
 function AppInner() {
   const { user, loading } = useAuth();
@@ -51,7 +157,11 @@ function AppInner() {
     return <Login />;
   }
 
-  return <Shell />;
+  return (
+    <ErrorBoundary>
+      <Shell />
+    </ErrorBoundary>
+  );
 }
 
 // Master App Component with Context and Toast notification providers
