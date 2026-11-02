@@ -4,6 +4,28 @@ import supabase from '../supabase';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import PaymentModal from '../components/PaymentModal';
+import GoogleSheetImporterModal from '../components/GoogleSheetImporterModal';
+
+const COUNTRY_FLAGS = {
+  'Germany': '🇩🇪',
+  'United Kingdom': '🇬🇧',
+  'UK': '🇬🇧',
+  'France': '🇫🇷',
+  'Georgia': '🇬🇪',
+  'Malta': '🇲🇹',
+  'Albania': '🇦🇱',
+  'Poland': '🇵🇱',
+  'Canada': '🇨🇦',
+  'Ireland': '🇮🇪',
+  'Italy': '🇮🇹',
+  'United States': '🇺🇸',
+  'Australia': '🇦🇺',
+  'New Zealand': '🇳🇿',
+  'Latvia': '🇱🇻',
+  'Cyprus': '🇨🇾',
+  'Spain': '🇪🇸',
+  'Netherlands': '🇳🇱',
+};
 
 // --- INLINE ICONS (Zero external icon dependency) ---
 const SearchIcon = () => (
@@ -181,6 +203,7 @@ export default function Students({ setCurrentPage, initialFilter } = {}) {
   const [showStudentModal, setShowStudentModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showBulkLedgerModal, setShowBulkLedgerModal] = useState(false);
+  const [showMasterImporterModal, setShowMasterImporterModal] = useState(false);
 
   // Active student & payment selections
   const [currentStudent, setCurrentStudent] = useState(null);
@@ -993,33 +1016,28 @@ export default function Students({ setCurrentPage, initialFilter } = {}) {
           </button>
 
           {canAddStudent && (
-            <>
-              <button
-                type="button"
-                className="btn-secondary"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={importing}
-                style={{
-                  padding: '9px 16px',
-                  fontSize: '13px',
-                  background: 'rgba(0, 229, 160, 0.12)',
-                  color: '#00E5A0',
-                  border: '1px solid rgba(0, 229, 160, 0.35)',
-                  cursor: importing ? 'wait' : 'pointer'
-                }}
-                title="Bulk import students & installments from your Google Sheet (.xlsx / .csv)"
-              >
-                <UploadIcon />
-                <span>{importing ? `Importing (${importProgress.current}/${importProgress.total})...` : 'Import Google Sheet'}</span>
-              </button>
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileImport}
-                accept=".xlsx, .xls, .csv"
-                style={{ display: 'none' }}
-              />
-            </>
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => setShowMasterImporterModal(true)}
+              style={{
+                padding: '9px 18px',
+                fontSize: '13px',
+                background: 'linear-gradient(135deg, rgba(0, 229, 160, 0.18) 0%, rgba(54, 209, 220, 0.15) 100%)',
+                color: '#00E5A0',
+                border: '1px solid rgba(0, 229, 160, 0.5)',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                boxShadow: '0 4px 14px rgba(0, 229, 160, 0.2)',
+              }}
+              title="Bulk import students & installments from your Europe Sterling Master Google Sheet (.xlsx / .csv)"
+            >
+              <UploadIcon />
+              <span>Import Google Sheet</span>
+            </button>
           )}
 
           {canAddStudent && (
@@ -1588,20 +1606,45 @@ export default function Students({ setCurrentPage, initialFilter } = {}) {
                           boxShadow: '2px 0 6px rgba(0,0,0,0.3)',
                         }}
                       >
-                        <div style={{ fontWeight: 700, color: '#fff', fontSize: '14px' }}>
-                          {s.name}
-                        </div>
-                        <div style={{ fontSize: '12px', color: 'var(--muted)', marginTop: '2px' }}>
-                          {s.mobile || 'No Mobile'}
-                          {s.university && <span> &bull; {s.university}</span>}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div
+                            style={{
+                              width: '34px',
+                              height: '34px',
+                              borderRadius: '10px',
+                              background: 'linear-gradient(135deg, #7C6FFF 0%, #36D1DC 100%)',
+                              color: '#fff',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontWeight: 800,
+                              fontSize: '12px',
+                              flexShrink: 0,
+                              boxShadow: '0 2px 8px rgba(124, 111, 255, 0.3)',
+                            }}
+                          >
+                            {(s.name || 'S').slice(0, 2).toUpperCase()}
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 700, color: '#fff', fontSize: '14px' }}>
+                              {s.name}
+                            </div>
+                            <div style={{ fontSize: '12px', color: 'var(--muted)', marginTop: '2px' }}>
+                              {s.mobile || 'No Mobile'}
+                              {s.university && <span> &bull; {s.university}</span>}
+                            </div>
+                          </div>
                         </div>
                       </td>
 
                       {/* Country */}
                       <td style={{ padding: '14px 16px', color: 'var(--text)' }}>
-                        <div style={{ fontWeight: 500 }}>{s.country || '—'}</div>
+                        <div style={{ fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                          <span>{COUNTRY_FLAGS[s.country] || '🌍'}</span>
+                          <span>{s.country || '—'}</span>
+                        </div>
                         {s.course && (
-                          <div style={{ fontSize: '11px', color: 'var(--muted)' }}>{s.course}</div>
+                          <div style={{ fontSize: '11px', color: 'var(--muted)', marginTop: '2px' }}>{s.course}</div>
                         )}
                       </td>
 
@@ -1974,6 +2017,15 @@ export default function Students({ setCurrentPage, initialFilter } = {}) {
           }}
         />
       )}
+
+      {/* =========================================================================
+          MASTER GOOGLE SHEET IMPORTER MODAL
+         ========================================================================= */}
+      <GoogleSheetImporterModal
+        isOpen={showMasterImporterModal}
+        onClose={() => setShowMasterImporterModal(false)}
+        onImportSuccess={() => fetchStudents()}
+      />
 
       {/* Responsive CSS styling */}
       <style>{`

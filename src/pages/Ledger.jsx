@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabase';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
+import GoogleSheetImporterModal from '../components/GoogleSheetImporterModal';
 
 const SUGGESTED_CATEGORIES = [
   'Digital Marketing',
@@ -83,6 +84,7 @@ export default function Ledger({ setCurrentPage, initialTab }) {
     studentName: 'Student Name',
   });
   const fileInputRef = useRef(null);
+  const [showStudentImporter, setShowStudentImporter] = useState(false);
 
   // 1. Fetch Ledger Entries and Students
   async function fetchEntriesAndStudents() {
@@ -1848,6 +1850,51 @@ export default function Ledger({ setCurrentPage, initialTab }) {
               </button>
             </div>
 
+            {/* Master Student Importer Guidance Banner */}
+            <div
+              style={{
+                background: 'linear-gradient(135deg, rgba(124, 111, 255, 0.15) 0%, rgba(0, 229, 160, 0.12) 100%)',
+                border: '1px solid rgba(124, 111, 255, 0.3)',
+                borderRadius: '12px',
+                padding: '16px 20px',
+                marginBottom: '20px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '16px',
+              }}
+            >
+              <div>
+                <div style={{ fontSize: '14px', fontWeight: 700, color: '#fff' }}>
+                  💡 Importing your "Europe Sterling" Student Google Sheet?
+                </div>
+                <div style={{ fontSize: '12px', color: 'var(--muted)', marginTop: '4px' }}>
+                  This Ledger modal is for company expenses & vouchers. To import students, courses, counselors, and all 5 installment payments, use the dedicated Master Importer!
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowImportModal(false);
+                  setShowStudentImporter(true);
+                }}
+                style={{
+                  background: 'linear-gradient(135deg, #00E5A0 0%, #00B37E 100%)',
+                  color: '#080A12',
+                  border: 'none',
+                  padding: '9px 18px',
+                  borderRadius: '10px',
+                  fontSize: '12px',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  boxShadow: '0 4px 12px rgba(0, 229, 160, 0.3)',
+                }}
+              >
+                Open Student Importer 🚀
+              </button>
+            </div>
+
             {/* Column Mapping Selectors */}
             {importRows.length > 0 && (
               <div
@@ -1965,6 +2012,16 @@ export default function Ledger({ setCurrentPage, initialTab }) {
           </div>
         </div>
       )}
+
+      {/* Europe Sterling Student Master Importer */}
+      <GoogleSheetImporterModal
+        isOpen={showStudentImporter}
+        onClose={() => setShowStudentImporter(false)}
+        onImportSuccess={() => {
+          fetchEntriesAndStudents();
+          if (setCurrentPage) setCurrentPage('students');
+        }}
+      />
 
     </div>
   );
