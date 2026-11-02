@@ -44,6 +44,14 @@ const DownloadIcon = () => (
   </svg>
 );
 
+const UploadIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <polyline points="17 8 12 3 7 8" />
+    <line x1="12" y1="3" x2="12" y2="15" />
+  </svg>
+);
+
 const RefreshIcon = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <polyline points="23 4 23 10 17 10" />
@@ -528,6 +536,242 @@ export default function Students({ setCurrentPage, initialFilter } = {}) {
     }
   };
 
+  // --- BULK IMPORT FROM GOOGLE SHEET / EXCEL ---
+  const fileInputRef = React.useRef(null);
+  const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
+
+  const handleFileImport = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+
+    setImporting(true);
+    setImportProgress({ current: 0, total: 0 });
+    const toastId = toast.loading('Reading Google Sheet file...');
+
+    try {
+      const arrayBuf = await file.arrayBuffer();
+      const workbook = XLSX.read(arrayBuf, { type: 'array', cellDates: true });
+      const firstSheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[firstSheetName];
+      const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+
+      if (!rows || rows.length < 2) {
+        throw new Error('The selected sheet is empty or has no data rows.');
+      }
+
+      // Find header row by searching for 'student', 'name', or 'counselor'
+      let headerRowIndex = 0;
+      for (let i = 0; i < Math.min(6, rows.length); i++) {
+        const rowStr = rows[i].map(c => String(c).toLowerCase()).join(' ');
+        if (rowStr.includes('student') || rowStr.includes('name') || rowStr.includes('counselor')) {
+          headerRowIndex = i;
+          break;
+        }
+      }
+
+      const headers = rows[headerRowIndex].map(h => String(h || '').trim());
+      const dataRows = rows.slice(headerRowIndex + 1);
+
+      // Helper to find column index by matching aliases
+      const findCol = (aliases, fallbackIdx = -1) => {
+        const lowerAliases = aliases.map(a => a.toLowerCase().trim());
+        const found = headers.findIndex(h => {
+          const lh = h.toLowerCase().trim();
+          return lowerAliases.some(alias => lh === alias || lh.includes(alias));
+        });
+        return found !== -1 ? found : fallbackIdx;
+      };
+
+      // Column mapping matching exact Google Sheet layout
+      const colName = findCol(['student full name', 'full name', 'student name', 'name'], 2);
+      const colEmail = findCol(['email address', 'email', 'e-mail'], 1);
+      const colMobile = findCol(['phone number', 'mobile number', 'mobile', 'phone'], 3);
+      const colCounselor = findCol(['counselor'], 4);
+      const colTeamLead = findCol(['team lead', 'team_lead', 'tl'], 5);
+      const colLeadSource = findCol(['lead source', 'lead_source', 'source'], 6);
+      const colUniversity = findCol(['university'], 7);
+      const colCourse = findCol(['course', 'course name'], 8);
+      const colCountry = findCol(['country'], 9);
+      const colIntake = findCol(['intake'], 10);
+      const colStage = findCol(['payment stage', 'stage', 'pay stage'], 11);
+
+      // Installments 1 to 5
+      const colBnk1 = findCol(['1st acc', '1st bank', 'bnk1', 'bank 1'], 12);
+      const colAmt1 = findCol(['1st amount', 'amt1', 'amount 1'], 13);
+      const colDt1  = findCol(['paid date-1', 'paid date 1', 'dt1', 'date 1'], 14);
+
+      const colBnk2 = findCol(['2nd acc', '2nd bank', 'bnk2', 'bank 2'], 15);
+      const colAmt2 = findCol(['2nd amount', 'amt2', 'amount 2'], 16);
+      const colDt2  = findCol(['paid date-2', 'paid date 2', 'dt2', 'date 2'], 17);
+
+      const colBnk3 = findCol(['3rd acc', '3rd bank', 'bnk3', 'bank 3'], 18);
+      const colAmt3 = findCol(['3rd amount', 'amt3', 'amount 3'], 19);
+      const colDt3  = findCol(['paid date-3', 'paid date 3', 'dt3', 'date 3'], 20);
+
+      const colBnk4 = findCol(['4th acc', '4th bank', 'bnk4', 'bank 4'], 21);
+      const colAmt4 = findCol(['4th amount', 'amt4', 'amount 4'], 22);
+      const colDt4  = findCol(['paid date-4', 'paid date 4', 'dt4', 'date 4'], 23);
+
+      const colBnk5 = findCol(['5th acc', '5th bank', 'bnk5', 'bank 5'], 24);
+      const colAmt5 = findCol(['5th amount', 'amt5', 'amount 5'], 25);
+      const colDt5  = findCol(['paid date-5', 'paid date 5', 'dt5', 'date 5'], 26);
+
+      const colRefund = findCol(['refund'], 27);
+      const colCommitted = findCol(['total service charge', 'committed', 'service charge', 'total committed'], 29);
+      const colStatus = findCol(['active/dropped', 'enroll_status', 'status', 'active / dropped'], 31);
+      const colB2B = findCol(['b2b charge', 'b2b'], 32);
+      const colIncStudent = findCol(['incentive from student', 'anna incentive student', 'incentive student'], 33);
+      const colIncCompany = findCol(['incentive from sterling', 'anna incentive sterling', 'incentive company'], 34);
+      const colCommission = findCol(['commission'], 35);
+      const colOtherExpense = findCol(['other expenses', 'other expense'], 36);
+
+      const numVal = (v) => {
+        if (!v) return 0;
+        const n = parseFloat(String(v).replace(/[^0-9.-]/g, ''));
+        return isNaN(n) ? 0 : n;
+      };
+
+      const dateVal = (v) => {
+        if (!v) return new Date().toISOString().split('T')[0];
+        if (v instanceof Date && !isNaN(v)) return v.toISOString().split('T')[0];
+        const parsed = new Date(v);
+        if (!isNaN(parsed)) return parsed.toISOString().split('T')[0];
+        return new Date().toISOString().split('T')[0];
+      };
+
+      const parseStatus = (v) => {
+        const s = String(v || '').trim().toLowerCase();
+        if (s.includes('drop')) return 'Dropped';
+        if (s.includes('refund')) return 'Refund';
+        if (s.includes('enroll')) return 'Enrolled';
+        return 'Active';
+      };
+
+      const parseStage = (v) => {
+        const s = String(v || '').trim();
+        const valid = ['Pending', '1st Installment', '2nd Installment', '3rd Installment', '4th Installment', '5th Installment', 'Full Payment', 'Refund'];
+        const found = valid.find(st => st.toLowerCase() === s.toLowerCase());
+        return found || 'Pending';
+      };
+
+      const targetCompanyId = companyId || 'a1b2c3d4-0000-0000-0000-000000000001';
+      const parsedStudents = [];
+
+      dataRows.forEach((r) => {
+        const name = String(r[colName] || '').trim();
+        if (!name) return; // Skip empty row
+
+        const studentObj = {
+          company_id: targetCompanyId,
+          name,
+          email: String(r[colEmail] || '').trim() || null,
+          mobile: String(r[colMobile] || '').trim(),
+          counselor_name: String(r[colCounselor] || 'Unknown').trim(),
+          team_lead: String(r[colTeamLead] || '').trim(),
+          lead_source: String(r[colLeadSource] || 'Unknown').trim(),
+          university: String(r[colUniversity] || '').trim(),
+          course: String(r[colCourse] || '').trim(),
+          country: String(r[colCountry] || 'Unknown').trim(),
+          intake: String(r[colIntake] || 'Unknown').trim(),
+          pay_stage: parseStage(r[colStage]),
+          enroll_status: parseStatus(r[colStatus]),
+          committed: numVal(r[colCommitted]),
+          refund: numVal(r[colRefund]),
+          b2b_charge: numVal(r[colB2B]),
+          incentive_student: numVal(r[colIncStudent]),
+          incentive_company: numVal(r[colIncCompany]),
+          commission: numVal(r[colCommission]),
+          other_expense: numVal(r[colOtherExpense]),
+        };
+
+        const rawPayments = [];
+        const slots = [
+          { slot: 1, bnk: r[colBnk1], amt: numVal(r[colAmt1]), dt: r[colDt1] },
+          { slot: 2, bnk: r[colBnk2], amt: numVal(r[colAmt2]), dt: r[colDt2] },
+          { slot: 3, bnk: r[colBnk3], amt: numVal(r[colAmt3]), dt: r[colDt3] },
+          { slot: 4, bnk: r[colBnk4], amt: numVal(r[colAmt4]), dt: r[colDt4] },
+          { slot: 5, bnk: r[colBnk5], amt: numVal(r[colAmt5]), dt: r[colDt5] },
+        ];
+
+        slots.forEach(({ slot, bnk, amt, dt }) => {
+          const bankName = String(bnk || '').trim();
+          if (amt > 0 && bankName) {
+            rawPayments.push({
+              slot,
+              bank_name: bankName,
+              amount: amt,
+              payment_date: dateVal(dt),
+              payment_type: 'standard',
+            });
+          }
+        });
+
+        parsedStudents.push({ student: studentObj, payments: rawPayments });
+      });
+
+      if (parsedStudents.length === 0) {
+        throw new Error('No valid students found in the sheet. Please make sure the sheet has student names.');
+      }
+
+      toast.loading(`Importing ${parsedStudents.length} students into ERP...`, { id: toastId });
+      setImportProgress({ current: 0, total: parsedStudents.length });
+
+      let importedStudentsCount = 0;
+      let importedPaymentsCount = 0;
+
+      // Batch insert in chunks of 20
+      const BATCH_SIZE = 20;
+      for (let i = 0; i < parsedStudents.length; i += BATCH_SIZE) {
+        const batch = parsedStudents.slice(i, i + BATCH_SIZE);
+        const studentsToInsert = batch.map(b => b.student);
+
+        const { data: insertedStudents, error: insertErr } = await supabase
+          .from('students')
+          .insert(studentsToInsert)
+          .select('id, name');
+
+        if (insertErr) throw insertErr;
+
+        const paymentsToInsert = [];
+        insertedStudents.forEach((inserted, idx) => {
+          const original = batch[idx];
+          if (original && original.payments && original.payments.length > 0) {
+            original.payments.forEach(p => {
+              paymentsToInsert.push({
+                ...p,
+                student_id: inserted.id,
+                company_id: targetCompanyId,
+              });
+            });
+          }
+        });
+
+        if (paymentsToInsert.length > 0) {
+          const { error: pErr } = await supabase.from('payments').insert(paymentsToInsert);
+          if (pErr) console.warn('Payment insert warning:', pErr.message);
+          importedPaymentsCount += paymentsToInsert.length;
+        }
+
+        importedStudentsCount += batch.length;
+        setImportProgress({ current: importedStudentsCount, total: parsedStudents.length });
+      }
+
+      toast.success(`Successfully imported ${importedStudentsCount} students & ${importedPaymentsCount} installments!`, {
+        id: toastId,
+        duration: 7000,
+      });
+
+      fetchStudents();
+    } catch (err) {
+      console.error('Import error:', err);
+      toast.error(err.message || 'Failed to import Google Sheet', { id: toastId, duration: 7000 });
+    } finally {
+      setImporting(false);
+    }
+  };
+
   // --- ACTIONS: DELETE STUDENT ---
   const handleDeleteStudent = async (student, e) => {
     e.stopPropagation();
@@ -747,6 +991,36 @@ export default function Students({ setCurrentPage, initialFilter } = {}) {
             <DownloadIcon />
             <span>Export Excel</span>
           </button>
+
+          {canAddStudent && (
+            <>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={importing}
+                style={{
+                  padding: '9px 16px',
+                  fontSize: '13px',
+                  background: 'rgba(0, 229, 160, 0.12)',
+                  color: '#00E5A0',
+                  border: '1px solid rgba(0, 229, 160, 0.35)',
+                  cursor: importing ? 'wait' : 'pointer'
+                }}
+                title="Bulk import students & installments from your Google Sheet (.xlsx / .csv)"
+              >
+                <UploadIcon />
+                <span>{importing ? `Importing (${importProgress.current}/${importProgress.total})...` : 'Import Google Sheet'}</span>
+              </button>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileImport}
+                accept=".xlsx, .xls, .csv"
+                style={{ display: 'none' }}
+              />
+            </>
+          )}
 
           {canAddStudent && (
             <button
