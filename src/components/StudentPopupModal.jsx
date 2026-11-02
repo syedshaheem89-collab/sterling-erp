@@ -1,0 +1,785 @@
+import React, { useState, useMemo } from 'react';
+import * as XLSX from 'xlsx';
+import { supabase } from '../supabase';
+import toast from 'react-hot-toast';
+
+// Format Indian Currency for compact chips (e.g. ₹2.16 L, ₹87.4K, ₹0)
+function formatCompactINR(amount) {
+  const val = Number(amount || 0);
+  if (val === 0) return '₹0';
+  if (Math.abs(val) >= 10000000) return `₹${(val / 10000000).toFixed(2)} Cr`;
+  if (Math.abs(val) >= 100000) return `₹${(val / 100000).toFixed(2)} L`;
+  if (Math.abs(val) >= 1000) return `₹${(val / 1000).toFixed(1)}K`;
+  return `₹${val.toLocaleString('en-IN')}`;
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return 'N/A';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+export default function StudentPopupModal({
+  isOpen,
+  onClose,
+  title = 'All Applications',
+  students = [],
+  onStudentUpdated,
+}) {
+  const [selectedStudent, setSelectedStudent] = useState(null);
+  const [search, setSearch] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // If modal is closed, reset selected student
+  if (!isOpen) return null;
+
+  // Filter students by search in List View
+  const filteredList = useMemo(() => {
+    if (!search.trim()) return students;
+    const q = search.toLowerCase();
+    return students.filter((s) => {
+      const name = (s.name || '').toLowerCase();
+      const country = (s.country || '').toLowerCase();
+      const counselor = (s.counselor_name || '').toLowerCase();
+      const univ = (s.university || '').toLowerCase();
+      return name.includes(q) || country.includes(q) || counselor.includes(q) || univ.includes(q);
+    });
+  }, [students, search]);
+
+  // Export list to Excel
+  const handleExport = () => {
+    if (students.length === 0) return;
+    const rows = students.map((s, idx) => ({
+      '#': idx + 1,
+      'Name': s.name,
+      'Status': s.enroll_status || 'Active',
+      'Country': s.country || '',
+      'Counselor': s.counselor_name || '',
+      'University': s.university || '',
+      'Intake': s.intake || '',
+      'Committed (₹)': s.committed || 0,
+      'Collected (₹)': s.collected || 0,
+      'Remaining (₹)': s.remaining || 0,
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Students');
+    XLSX.writeFile(wb, `${title.replace(/[^a-zA-Z0-9]/g, '_')}.xlsx`);
+  };
+
+  // Delete student handler
+  const handleDeleteStudent = async (studentId, studentName) => {
+    if (!window.confirm(`Are you sure you want to delete student "${studentName}"? This will also delete their payment records.`)) {
+      return;
+    }
+    setIsDeleting(true);
+    const toastId = toast.loading('Deleting student record...');
+    try {
+      const { error } = await supabase.from('students').delete().eq('id', studentId);
+      if (error) throw error;
+      toast.success(`Student "${studentName}" deleted successfully`, { id: toastId });
+      setSelectedStudent(null);
+      if (onStudentUpdated) onStudentUpdated();
+    } catch (err) {
+      console.error(err);
+      toast.error(err.message || 'Failed to delete student', { id: toastId });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 1000,
+        background: 'rgba(4, 6, 14, 0.75)',
+        backdropFilter: 'blur(8px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '16px',
+        animation: 'fadeIn 0.15s ease-out',
+      }}
+      onClick={() => {
+        setSelectedStudent(null);
+        onClose();
+      }}
+    >
+      {/* Modal Card Window (Exact dimensions & aesthetic of Screenshots 2 & 3) */}
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: '410px',
+          maxWidth: '96vw',
+          maxHeight: '90vh',
+          background: '#0B0F1C',
+          border: '1px solid rgba(148, 163, 225, 0.22)',
+          borderRadius: '18px',
+          boxShadow: '0 25px 70px rgba(0, 0, 0, 0.8), 0 0 35px rgba(124, 111, 255, 0.15)',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          color: '#EDEFFA',
+          fontFamily: "'Plus Jakarta Sans', sans-serif",
+        }}
+      >
+        {/* =========================================================================
+            SCREENSHOT 2: LIST VIEW
+           ========================================================================= */}
+        {!selectedStudent ? (
+          <>
+            {/* Header */}
+            <div
+              style={{
+                padding: '18px 20px 14px',
+                borderBottom: '1px solid rgba(148, 163, 225, 0.12)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <div>
+                <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#fff', margin: 0 }}>
+                  {title}
+                </h3>
+                <div style={{ fontSize: '11px', color: '#8E9BB5', marginTop: '2px' }}>
+                  {students.length} students
+                </div>
+              </div>
+
+              {/* Action Icons */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button
+                  onClick={handleExport}
+                  title="Export to Excel"
+                  style={{
+                    background: 'rgba(54, 209, 220, 0.15)',
+                    border: '1px solid rgba(54, 209, 220, 0.35)',
+                    color: '#36D1DC',
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '14px',
+                  }}
+                >
+                  📥
+                </button>
+
+                <button
+                  onClick={onClose}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.06)',
+                    border: '1px solid rgba(148, 163, 225, 0.18)',
+                    color: '#8E9BB5',
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '14px',
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Search inside list */}
+            {students.length > 8 && (
+              <div style={{ padding: '8px 16px', borderBottom: '1px solid rgba(148, 163, 225, 0.08)' }}>
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Filter by name, country, counselor..."
+                  style={{
+                    width: '100%',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(148, 163, 225, 0.15)',
+                    borderRadius: '8px',
+                    padding: '7px 12px',
+                    color: '#fff',
+                    fontSize: '12px',
+                    outline: 'none',
+                  }}
+                />
+              </div>
+            )}
+
+            {/* Students List Scroll Area (Matches Screenshot 2 row style) */}
+            <div
+              style={{
+                flex: 1,
+                overflowY: 'auto',
+                padding: '12px 14px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px',
+              }}
+            >
+              {filteredList.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px 10px', color: '#8E9BB5', fontSize: '13px' }}>
+                  No students found
+                </div>
+              ) : (
+                filteredList.map((s) => {
+                  const isActive = s.enroll_status === 'Active' || s.enroll_status === 'Enrolled';
+                  const collected = Number(s.collected || 0);
+                  const committed = Number(s.committed || 0);
+
+                  return (
+                    <div
+                      key={s.id}
+                      onClick={() => setSelectedStudent(s)}
+                      style={{
+                        background: 'rgba(20, 26, 48, 0.65)',
+                        border: '1px solid rgba(148, 163, 225, 0.12)',
+                        borderRadius: '12px',
+                        padding: '11px 14px',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = 'rgba(124, 111, 255, 0.4)';
+                        e.currentTarget.style.background = 'rgba(26, 34, 62, 0.85)';
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = 'rgba(148, 163, 225, 0.12)';
+                        e.currentTarget.style.background = 'rgba(20, 26, 48, 0.65)';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                      }}
+                    >
+                      {/* Top Line: Name + Status Pill */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 800, color: '#fff', letterSpacing: '-0.01em' }}>
+                          {s.name}
+                        </span>
+
+                        <span
+                          style={{
+                            background: isActive ? 'rgba(0, 229, 160, 0.15)' : 'rgba(255, 111, 142, 0.15)',
+                            color: isActive ? '#00E5A0' : '#FF6F8E',
+                            padding: '2px 8px',
+                            borderRadius: '10px',
+                            fontSize: '10.5px',
+                            fontWeight: 700,
+                          }}
+                        >
+                          {isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+
+                      {/* Bottom Line: Country & Counselor (Left) + Collected / Committed (Right) */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '11px' }}>
+                        <div style={{ color: '#8E9BB5', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <span style={{ color: '#36D1DC' }}>🏛️ {s.country || 'Global'}</span>
+                          <span>&bull;</span>
+                          <span style={{ color: '#A78BFA' }}>👤 {s.counselor_name || 'Unassigned'}</span>
+                        </div>
+
+                        <div style={{ color: '#A8B2C7', fontWeight: 600 }}>
+                          {formatCompactINR(collected)} / {formatCompactINR(committed)}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </>
+        ) : (
+          /* =========================================================================
+              SCREENSHOT 3: SINGLE STUDENT DETAIL VIEW
+             ========================================================================= */
+          <>
+            {/* Header with Back Arrow */}
+            <div
+              style={{
+                padding: '16px 20px',
+                borderBottom: '1px solid rgba(148, 163, 225, 0.12)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <button
+                onClick={() => setSelectedStudent(null)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#fff',
+                  fontSize: '15px',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: 0,
+                }}
+              >
+                <span>&larr;</span>
+                <span style={{ textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                  {selectedStudent.name}
+                </span>
+              </button>
+
+              <button
+                onClick={onClose}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.06)',
+                  border: '1px solid rgba(148, 163, 225, 0.18)',
+                  color: '#8E9BB5',
+                  width: '30px',
+                  height: '30px',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '14px',
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Scrollable Content Body */}
+            <div
+              style={{
+                flex: 1,
+                overflowY: 'auto',
+                padding: '16px 20px 24px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px',
+              }}
+            >
+              {/* Badges Row */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                <span
+                  style={{
+                    background: 'rgba(0, 229, 160, 0.15)',
+                    color: '#00E5A0',
+                    padding: '3px 9px',
+                    borderRadius: '10px',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                  }}
+                >
+                  {selectedStudent.enroll_status || 'Active'}
+                </span>
+
+                <span
+                  style={{
+                    background: 'rgba(124, 111, 255, 0.2)',
+                    color: '#A78BFA',
+                    padding: '3px 9px',
+                    borderRadius: '10px',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                  }}
+                >
+                  {selectedStudent.pay_stage || selectedStudent.payment_stage || 'Pending'}
+                </span>
+
+                {selectedStudent.enroll_status === 'Enrolled' && (
+                  <span
+                    style={{
+                      background: 'rgba(54, 209, 220, 0.2)',
+                      color: '#36D1DC',
+                      padding: '3px 9px',
+                      borderRadius: '10px',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                    }}
+                  >
+                    📌 Enrolled
+                  </span>
+                )}
+
+                <span
+                  style={{
+                    background: 'rgba(255, 176, 32, 0.18)',
+                    color: '#FFB020',
+                    padding: '3px 9px',
+                    borderRadius: '10px',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                  }}
+                >
+                  {Array.isArray(selectedStudent.payments) ? selectedStudent.payments.length : 0} Installments
+                </span>
+              </div>
+
+              {/* Action Buttons Row */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    toast('Edit student details on the Students directory tab', { icon: '✏️' });
+                  }}
+                  style={{
+                    background: 'linear-gradient(135deg, #7C6FFF 0%, #6959f6 100%)',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '10px',
+                    padding: '9px 12px',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <span>✏️</span>
+                  <span>Edit Details</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleDeleteStudent(selectedStudent.id, selectedStudent.name)}
+                  disabled={isDeleting}
+                  style={{
+                    background: 'rgba(255, 111, 142, 0.12)',
+                    color: '#FF6F8E',
+                    border: '1px solid rgba(255, 111, 142, 0.35)',
+                    borderRadius: '10px',
+                    padding: '9px 12px',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    cursor: isDeleting ? 'wait' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <span>🗑️</span>
+                  <span>Delete Student</span>
+                </button>
+              </div>
+
+              {/* General Info Card */}
+              <div
+                style={{
+                  background: 'rgba(20, 26, 48, 0.55)',
+                  border: '1px solid rgba(148, 163, 225, 0.12)',
+                  borderRadius: '12px',
+                  padding: '12px 14px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                  fontSize: '12px',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#8E9BB5' }}>Country</span>
+                  <span style={{ fontWeight: 700, color: '#36D1DC' }}>🏛️ {selectedStudent.country || 'N/A'}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#8E9BB5' }}>Intake</span>
+                  <span style={{ fontWeight: 700, color: '#fff' }}>🗓️ {selectedStudent.intake || 'N/A'}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#8E9BB5' }}>Counselor</span>
+                  <span style={{ fontWeight: 700, color: '#A78BFA' }}>👤 {selectedStudent.counselor_name || 'Unassigned'}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#8E9BB5' }}>Team Lead</span>
+                  <span style={{ fontWeight: 700, color: '#fff' }}>👤 {selectedStudent.team_lead || 'Shaheem'}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#8E9BB5' }}>University</span>
+                  <span style={{ fontWeight: 700, color: '#FFB020' }}>🏰 {selectedStudent.university || 'Pending selection'}</span>
+                </div>
+              </div>
+
+              {/* Payment Summary Section */}
+              <div>
+                <div style={{ fontSize: '12px', fontWeight: 800, color: '#fff', marginBottom: '8px' }}>
+                  Payment Summary
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '8px' }}>
+                  {/* COLLECTED */}
+                  <div
+                    style={{
+                      background: 'rgba(0, 229, 160, 0.08)',
+                      borderTop: '2px solid #00E5A0',
+                      borderRadius: '8px',
+                      padding: '10px',
+                      textAlign: 'center',
+                    }}
+                  >
+                    <div style={{ fontSize: '9.5px', color: '#8E9BB5', textTransform: 'uppercase' }}>COLLECTED</div>
+                    <div style={{ fontSize: '14px', fontWeight: 800, color: '#00E5A0', marginTop: '2px' }}>
+                      {formatCompactINR(selectedStudent.collected)}
+                    </div>
+                  </div>
+
+                  {/* COMMITTED */}
+                  <div
+                    style={{
+                      background: 'rgba(124, 111, 255, 0.08)',
+                      borderTop: '2px solid #7C6FFF',
+                      borderRadius: '8px',
+                      padding: '10px',
+                      textAlign: 'center',
+                    }}
+                  >
+                    <div style={{ fontSize: '9.5px', color: '#8E9BB5', textTransform: 'uppercase' }}>COMMITTED</div>
+                    <div style={{ fontSize: '14px', fontWeight: 800, color: '#A78BFA', marginTop: '2px' }}>
+                      {formatCompactINR(selectedStudent.committed)}
+                    </div>
+                  </div>
+
+                  {/* REMAINING */}
+                  <div
+                    style={{
+                      background: 'rgba(255, 111, 142, 0.08)',
+                      borderTop: '2px solid #FF6F8E',
+                      borderRadius: '8px',
+                      padding: '10px',
+                      textAlign: 'center',
+                    }}
+                  >
+                    <div style={{ fontSize: '9.5px', color: '#8E9BB5', textTransform: 'uppercase' }}>REMAINING</div>
+                    <div style={{ fontSize: '14px', fontWeight: 800, color: '#FF6F8E', marginTop: '2px' }}>
+                      {formatCompactINR(selectedStudent.remaining)}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Progress Bar */}
+                {(() => {
+                  const pct = selectedStudent.committed > 0
+                    ? Math.min(100, Math.round((selectedStudent.collected / selectedStudent.committed) * 100))
+                    : 0;
+                  return (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
+                      <div
+                        style={{
+                          flex: 1,
+                          height: '5px',
+                          background: 'rgba(255, 255, 255, 0.08)',
+                          borderRadius: '3px',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: `${pct}%`,
+                            height: '100%',
+                            background: 'linear-gradient(90deg, #36D1DC, #7C6FFF)',
+                            borderRadius: '3px',
+                          }}
+                        />
+                      </div>
+                      <span style={{ fontSize: '11px', fontWeight: 700, color: '#36D1DC' }}>{pct}%</span>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Profit Accounting Section */}
+              <div>
+                <div style={{ fontSize: '12px', fontWeight: 800, color: '#fff', marginBottom: '8px' }}>
+                  Profit Accounting
+                </div>
+
+                <div
+                  style={{
+                    background: 'rgba(20, 26, 48, 0.55)',
+                    border: '1px solid rgba(148, 163, 225, 0.12)',
+                    borderRadius: '12px',
+                    padding: '12px 14px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '7px',
+                    fontSize: '11.5px',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#8E9BB5' }}>Total Collected</span>
+                    <span style={{ fontWeight: 800, color: '#00E5A0' }}>{formatCompactINR(selectedStudent.collected)}</span>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#8E9BB5' }}>Refund</span>
+                    <span style={{ color: '#FF6F8E' }}>- {formatCompactINR(selectedStudent.refund || 0)}</span>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#8E9BB5' }}>B2B Charge</span>
+                    <span style={{ color: '#FF6F8E' }}>- {formatCompactINR(selectedStudent.b2b_charge || 0)}</span>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#8E9BB5' }}>Anna Incentive (Student Side)</span>
+                    <span style={{ color: '#FF6F8E' }}>- {formatCompactINR(selectedStudent.incentive_student || 0)}</span>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#8E9BB5' }}>Anna Incentive (Company Side)</span>
+                    <span style={{ color: '#FF6F8E' }}>- {formatCompactINR(selectedStudent.incentive_company || 0)}</span>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#8E9BB5' }}>General Expenses</span>
+                    <span style={{ color: '#FF6F8E' }}>- {formatCompactINR(selectedStudent.other_expense || 0)}</span>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#8E9BB5' }}>University Commission</span>
+                    <span style={{ color: '#00E5A0' }}>+ {formatCompactINR(selectedStudent.commission || 0)}</span>
+                  </div>
+
+                  {/* Sterling Profit Highlight Box */}
+                  {(() => {
+                    const profit =
+                      Number(selectedStudent.collected || 0) -
+                      Number(selectedStudent.refund || 0) -
+                      Number(selectedStudent.b2b_charge || 0) -
+                      Number(selectedStudent.incentive_student || 0) -
+                      Number(selectedStudent.incentive_company || 0) -
+                      Number(selectedStudent.other_expense || 0) +
+                      Number(selectedStudent.commission || 0);
+
+                    return (
+                      <div
+                        style={{
+                          marginTop: '6px',
+                          paddingTop: '8px',
+                          borderTop: '1px solid rgba(148, 163, 225, 0.12)',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <span style={{ fontWeight: 800, color: '#fff', fontSize: '12px' }}>Sterling Profit</span>
+                        <span style={{ fontSize: '14px', fontWeight: 800, color: profit >= 0 ? '#A78BFA' : '#FF6F8E' }}>
+                          {formatCompactINR(profit)}
+                        </span>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              {/* Anna Chechi Section */}
+              <div>
+                <div style={{ fontSize: '12px', fontWeight: 800, color: '#fff', marginBottom: '8px' }}>
+                  Anna Chechi
+                </div>
+
+                <div
+                  style={{
+                    background: 'rgba(20, 26, 48, 0.55)',
+                    border: '1px solid rgba(148, 163, 225, 0.12)',
+                    borderRadius: '12px',
+                    padding: '12px 14px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '7px',
+                    fontSize: '11.5px',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#8E9BB5' }}>Committed</span>
+                    <span style={{ color: '#fff', fontWeight: 600 }}>
+                      {formatCompactINR((selectedStudent.incentive_student || 0) + (selectedStudent.incentive_company || 0))}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#8E9BB5' }}>Paid (bank + ledger)</span>
+                    <span style={{ color: '#00E5A0', fontWeight: 600 }}>
+                      {formatCompactINR(selectedStudent.incentive_student || 0)}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#8E9BB5' }}>Remaining to Give</span>
+                    <span style={{ color: '#FFB020', fontWeight: 600 }}>
+                      {formatCompactINR(selectedStudent.incentive_company || 0)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Payment History Section */}
+              <div>
+                <div style={{ fontSize: '12px', fontWeight: 800, color: '#fff', marginBottom: '8px' }}>
+                  Payment History
+                </div>
+
+                <div
+                  style={{
+                    background: 'rgba(20, 26, 48, 0.55)',
+                    border: '1px solid rgba(148, 163, 225, 0.12)',
+                    borderRadius: '12px',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', textAlign: 'left' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid rgba(148, 163, 225, 0.12)', color: '#8E9BB5', background: 'rgba(255, 255, 255, 0.02)' }}>
+                        <th style={{ padding: '8px 10px', width: '28px' }}>#</th>
+                        <th style={{ padding: '8px 10px' }}>BANK</th>
+                        <th style={{ padding: '8px 10px', textAlign: 'right' }}>AMOUNT</th>
+                        <th style={{ padding: '8px 10px', textAlign: 'right' }}>DATE</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Array.isArray(selectedStudent.payments) && selectedStudent.payments.length > 0 ? (
+                        selectedStudent.payments.map((p, pIdx) => (
+                          <tr key={p.id || pIdx} style={{ borderBottom: '1px solid rgba(148, 163, 225, 0.06)' }}>
+                            <td style={{ padding: '8px 10px', color: '#8E9BB5' }}>{p.slot || pIdx + 1}</td>
+                            <td style={{ padding: '8px 10px', color: '#fff', fontWeight: 600 }}>
+                              {p.bank_name || 'STERLING STUDY ABROAD'}
+                            </td>
+                            <td style={{ padding: '8px 10px', textAlign: 'right', color: '#00E5A0', fontWeight: 700 }}>
+                              {formatCompactINR(p.amount)}
+                            </td>
+                            <td style={{ padding: '8px 10px', textAlign: 'right', color: '#8E9BB5' }}>
+                              {formatDate(p.payment_date || p.paid_date)}
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={4} style={{ padding: '16px', textAlign: 'center', color: '#8E9BB5' }}>
+                            No installment payments recorded yet.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+
+                  <div style={{ padding: '8px 12px', fontSize: '10.5px', color: '#8E9BB5', borderTop: '1px solid rgba(148, 163, 225, 0.08)' }}>
+                    {Array.isArray(selectedStudent.payments) && selectedStudent.payments.length >= 5
+                      ? 'All 5 installment slots are filled'
+                      : `${Array.isArray(selectedStudent.payments) ? selectedStudent.payments.length : 0} of 5 installment slots filled`}
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}

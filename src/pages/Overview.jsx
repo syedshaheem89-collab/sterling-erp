@@ -6,7 +6,7 @@ import {
   registerables,
 } from 'chart.js';
 import GoogleSheetImporterModal from '../components/GoogleSheetImporterModal';
-import StudentDrilldownDrawer from '../components/StudentDrilldownDrawer';
+import StudentPopupModal from '../components/StudentPopupModal';
 
 // Register all Chart.js modules
 ChartJS.register(...registerables);
@@ -1905,18 +1905,15 @@ export default function Overview({ setCurrentPage }) {
       )}
 
       {/* =========================================================================
-          2026 INTERACTIVE STUDENT DRILLDOWN DRAWER
+          STUDENT POPUP MODAL (Matching Screenshots 2 & 3)
          ========================================================================= */}
       {drilldownState.isOpen && (
-        <StudentDrilldownDrawer
+        <StudentPopupModal
           isOpen={drilldownState.isOpen}
           onClose={() => setDrilldownState((prev) => ({ ...prev, isOpen: false }))}
           title={drilldownState.title}
-          subtitle={drilldownState.subtitle}
-          badgeText={drilldownState.badgeText}
-          badgeColor={drilldownState.badgeColor}
           students={drilldownState.students}
-          setCurrentPage={setCurrentPage}
+          onStudentUpdated={() => fetchOverviewData()}
         />
       )}
 
