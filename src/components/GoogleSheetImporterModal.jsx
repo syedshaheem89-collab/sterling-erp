@@ -279,17 +279,16 @@ export default function GoogleSheetImporterModal({ isOpen, onClose, onImportSucc
           course: s.course || null,
           country: s.country || 'Germany',
           intake: s.intake || 'Sept 2025',
-          payment_stage: s.payment_stage || 'Pending',
+          pay_stage: s.payment_stage || 'Pending',
           enroll_status: s.enroll_status || 'Active',
-          committed_fee: s.committed_fee,
-          refund: s.refund,
-          b2b_charge: s.b2b_charge,
-          partner_incentive_student: s.partner_incentive_student,
-          partner_incentive_company: s.partner_incentive_company,
-          commission: s.commission,
-          other_expense: s.other_expense,
+          committed: Number(s.committed_fee || s.committed) || (s.collected > 0 ? Math.max(s.collected, 215000) : 215000),
+          refund: s.refund || 0,
+          b2b_charge: s.b2b_charge || 0,
+          incentive_student: s.partner_incentive_student || 0,
+          incentive_company: s.partner_incentive_company || 0,
+          commission: s.commission || 0,
+          other_expense: s.other_expense || 0,
           created_by: user?.id || null,
-          last_activity: new Date().toISOString(),
         }));
 
         const { data: insertedStudents, error: insertErr } = await supabase
@@ -308,10 +307,10 @@ export default function GoogleSheetImporterModal({ isOpen, onClose, onImportSucc
               paymentsToInsert.push({
                 company_id: targetCompanyId,
                 student_id: st.id,
-                installment_slot: p.slot,
+                slot: p.slot,
                 bank_name: p.bank || 'Primary Bank',
                 amount: p.amount,
-                paid_date: p.date || new Date().toISOString().split('T')[0],
+                payment_date: p.date || new Date().toISOString().split('T')[0],
                 notes: `Imported from ${fileName || 'Master Sheet'}`,
                 created_by: user?.id || null,
               });

@@ -6,6 +6,7 @@ import {
   registerables,
 } from 'chart.js';
 import GoogleSheetImporterModal from '../components/GoogleSheetImporterModal';
+import StudentDrilldownDrawer from '../components/StudentDrilldownDrawer';
 
 // Register all Chart.js modules
 ChartJS.register(...registerables);
@@ -33,7 +34,17 @@ export default function Overview({ setCurrentPage }) {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [showFiltersModal, setShowFiltersModal] = useState(false);
 
-  // --- ADVANCED FILTERS STATE (Matches Image 2 exactly) ---
+  // --- DRILLDOWN DRAWER STATE (2026 UI/UX Feature) ---
+  const [drilldownState, setDrilldownState] = useState({
+    isOpen: false,
+    title: '',
+    subtitle: '',
+    badgeText: '',
+    badgeColor: '#7C6FFF',
+    students: [],
+  });
+
+  // --- ADVANCED FILTERS STATE (Matches Image 2) ---
   const [selectedYear, setSelectedYear] = useState('All');
   const [selectedIntake, setSelectedIntake] = useState('All');
   const [statusFilterType, setStatusFilterType] = useState('all'); // 'all' | 'active_enrolled' | 'custom'
@@ -42,7 +53,7 @@ export default function Overview({ setCurrentPage }) {
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
 
-  // Monthly Collections Date Filter (Inline inside middle chart)
+  // Monthly Collections Date Filter
   const [monthlyFromDate, setMonthlyFromDate] = useState('2025-12-01');
   const [monthlyToDate, setMonthlyToDate] = useState('2026-11-02');
   const [appliedMonthlyRange, setAppliedMonthlyRange] = useState({ from: '2025-12-01', to: '2026-11-02' });
@@ -173,56 +184,94 @@ export default function Overview({ setCurrentPage }) {
     setFilterEndDate('');
   };
 
-  // --- APPLY FILTERS TO STUDENTS ---
-  const filteredStudents = useMemo(() => {
+  // --- APPLY FILTERS & ENRICH STUDENT FINANCIALS ---
+  const enrichedStudents = useMemo(() => {
     if (!studentsData || studentsData.length === 0) return [];
 
-    return studentsData.filter((s) => {
-      // Year filter
-      if (selectedYear !== 'All') {
-        const studentYear = s.created_at ? new Date(s.created_at).getFullYear().toString() : '';
-        const intakeHasYear = s.intake && s.intake.includes(selectedYear);
-        if (studentYear !== selectedYear && !intakeHasYear) return false;
-      }
-
-      // Intake filter
-      if (selectedIntake !== 'All') {
-        if (!s.intake || !s.intake.toLowerCase().includes(selectedIntake.toLowerCase())) {
-          return false;
+    return studentsData
+      .filter((s) => {
+        // Year filter
+        if (selectedYear !== 'All') {
+          const studentYear = s.created_at ? new Date(s.created_at).getFullYear().toString() : '';
+          const intakeHasYear = s.intake && s.intake.includes(selectedYear);
+          if (studentYear !== selectedYear && !intakeHasYear) return false;
         }
-      }
 
-      // Status filter
-      const st = s.enroll_status || 'Active';
-      if (!selectedStatuses.has(st)) return false;
-
-      // Country filter
-      if (selectedCountry !== 'All') {
-        if (!s.country || s.country.toLowerCase() !== selectedCountry.toLowerCase()) {
-          return false;
+        // Intake filter
+        if (selectedIntake !== 'All') {
+          if (!s.intake || !s.intake.toLowerCase().includes(selectedIntake.toLowerCase())) {
+            return false;
+          }
         }
-      }
 
-      // Date Range filter
-      if (filterStartDate && s.created_at) {
-        if (new Date(s.created_at) < new Date(filterStartDate)) return false;
-      }
-      if (filterEndDate && s.created_at) {
-        if (new Date(s.created_at) > new Date(filterEndDate + 'T23:59:59')) return false;
-      }
+        // Status filter
+        const st = s.enroll_status || 'Active';
+        if (!selectedStatuses.has(st)) return false;
 
-      return true;
-    });
+        // Country filter
+        if (selectedCountry !== 'All') {
+          if (!s.country || s.country.toLowerCase() !== selectedCountry.toLowerCase()) {
+            return false;
+          }
+        }
+
+        // Date Range filter
+        if (filterStartDate && s.created_at) {
+          if (new Date(s.created_at) < new Date(filterStartDate)) return false;
+        }
+        if (filterEndDate && s.created_at) {
+          if (new Date(s.created_at) > new Date(filterEndDate + 'T23:59:59')) return false;
+        }
+
+        return true;
+      })
+      .map((s) => {
+        // Calculate realized collected from payments or field
+        let studentPaid = 0;
+        if (Array.isArray(s.payments) && s.payments.length > 0) {
+          studentPaid = s.payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+        } else {
+          studentPaid = Number(s.collected) || 0;
+        }
+
+        // Calculate true committed value
+        let studentCommitted = Number(s.committed || s.committed_fee || s.visa_charge || 0);
+        if (studentCommitted === 0) {
+          if (s.pay_stage === 'Full Payment' || s.payment_stage === 'Full Payment') {
+            studentCommitted = studentPaid > 0 ? studentPaid : 215000;
+          } else if (studentPaid > 0) {
+            studentCommitted = Math.max(studentPaid, 215000);
+          } else {
+            studentCommitted = 200000;
+          }
+        }
+
+        const isFull = (studentCommitted > 0 && studentPaid >= studentCommitted) || s.pay_stage === 'Full Payment' || s.payment_stage === 'Full Payment';
+
+        // Remaining active fee to be collected (0 if Dropped or Refund)
+        const isActive = s.enroll_status === 'Active' || s.enroll_status === 'Enrolled';
+        const studentRemaining = isActive ? Math.max(0, studentCommitted - studentPaid) : 0;
+
+        return {
+          ...s,
+          collected: studentPaid,
+          committed: studentCommitted,
+          remaining: studentRemaining,
+          isFullPayment: isFull,
+        };
+      });
   }, [studentsData, selectedYear, selectedIntake, selectedStatuses, selectedCountry, filterStartDate, filterEndDate]);
 
   // --- AGGREGATE CALCULATIONS ---
   const metrics = useMemo(() => {
-    const totalApps = filteredStudents.length;
+    const totalApps = enrichedStudents.length;
     let fullPaymentCount = 0;
     let partialPaymentCount = 0;
 
     let totalCollected = 0;
     let totalCommitted = 0;
+    let activeCommitted = 0;
+    let activeRemaining = 0;
 
     const leadSourceMap = {};
     const intakeMap = {};
@@ -239,22 +288,16 @@ export default function Overview({ setCurrentPage }) {
     const monthlyMap = {};
     const dailyMap = {};
 
-    filteredStudents.forEach((s) => {
-      // Collected sum from payments or field
-      let studentPaid = 0;
-      if (Array.isArray(s.payments) && s.payments.length > 0) {
-        studentPaid = s.payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-      } else {
-        studentPaid = Number(s.collected) || 0;
+    enrichedStudents.forEach((s) => {
+      totalCollected += s.collected;
+      totalCommitted += s.committed;
+
+      if (s.enroll_status === 'Active') {
+        activeCommitted += s.committed;
       }
+      activeRemaining += s.remaining;
 
-      const committed = Number(s.committed_fee) || 0;
-      totalCollected += studentPaid;
-      totalCommitted += committed;
-
-      // Full vs Partial
-      const isFull = (committed > 0 && studentPaid >= committed) || s.payment_stage === 'Full Payment';
-      if (isFull) {
+      if (s.isFullPayment) {
         fullPaymentCount++;
       } else {
         partialPaymentCount++;
@@ -269,7 +312,7 @@ export default function Overview({ setCurrentPage }) {
       intakeMap[itk] = (intakeMap[itk] || 0) + 1;
 
       // Payment stage
-      const stg = s.payment_stage || 'Pending';
+      const stg = s.pay_stage || s.payment_stage || 'Pending';
       if (stageMap[stg] !== undefined) {
         stageMap[stg]++;
       } else {
@@ -279,21 +322,22 @@ export default function Overview({ setCurrentPage }) {
       // Monthly payments aggregation
       if (Array.isArray(s.payments)) {
         s.payments.forEach((p) => {
-          if (p.paid_date && p.amount) {
-            const d = new Date(p.paid_date);
+          if (p.payment_date || p.paid_date) {
+            const dtStr = p.payment_date || p.paid_date;
+            const d = new Date(dtStr);
             const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-            monthlyMap[ym] = (monthlyMap[ym] || 0) + Number(p.amount);
+            monthlyMap[ym] = (monthlyMap[ym] || 0) + (Number(p.amount) || 0);
 
-            // Daily trend for latest month (Nov 2026 or current)
-            const dayKey = p.paid_date.slice(0, 10);
+            // Daily trend
+            const dayKey = dtStr.slice(0, 10);
             dailyMap[dayKey] = (dailyMap[dayKey] || 0) + 1;
           }
         });
       }
     });
 
+    // Collection Efficiency: Total Collected against Total Committed
     const efficiency = totalCommitted > 0 ? ((totalCollected / totalCommitted) * 100).toFixed(1) : '0.0';
-    const totalRemaining = Math.max(0, totalCommitted - totalCollected);
 
     return {
       totalApps,
@@ -301,15 +345,16 @@ export default function Overview({ setCurrentPage }) {
       partialPaymentCount,
       totalCollected,
       totalCommitted,
+      activeCommitted,
       efficiency,
-      totalRemaining,
+      totalRemaining: activeRemaining,
       leadSourceMap,
       intakeMap,
       stageMap,
       monthlyMap,
       dailyMap,
     };
-  }, [filteredStudents]);
+  }, [enrichedStudents]);
 
   // Lead Sources ordered with percentages
   const leadSourceList = useMemo(() => {
@@ -368,6 +413,19 @@ export default function Overview({ setCurrentPage }) {
     return rows;
   }, [metrics.monthlyMap]);
 
+  // --- DRILLDOWN OPEN HELPERS ---
+  const openDrilldown = ({ title, subtitle, badgeText, badgeColor, filterFn }) => {
+    const subset = filterFn ? enrichedStudents.filter(filterFn) : enrichedStudents;
+    setDrilldownState({
+      isOpen: true,
+      title,
+      subtitle,
+      badgeText,
+      badgeColor: badgeColor || '#7C6FFF',
+      students: subset,
+    });
+  };
+
   // --- RENDER CHARTS ---
   useEffect(() => {
     if (loading) return;
@@ -387,7 +445,7 @@ export default function Overview({ setCurrentPage }) {
               backgroundColor: ['#00E5A0', '#FFB020'],
               borderColor: '#0B0F1C',
               borderWidth: 4,
-              hoverOffset: 6,
+              hoverOffset: 8,
             },
           ],
         },
@@ -395,6 +453,28 @@ export default function Overview({ setCurrentPage }) {
           responsive: true,
           maintainAspectRatio: false,
           cutout: '76%',
+          onClick: (evt, elements) => {
+            if (elements.length > 0) {
+              const idx = elements[0].index;
+              if (idx === 0) {
+                openDrilldown({
+                  title: 'Full Payment Students',
+                  subtitle: 'Students who have paid their complete committed fee',
+                  badgeText: 'Full Payment',
+                  badgeColor: '#00E5A0',
+                  filterFn: (s) => s.isFullPayment,
+                });
+              } else {
+                openDrilldown({
+                  title: 'Partial / Pending Payment Students',
+                  subtitle: 'Students with remaining installments due',
+                  badgeText: 'Partial Due',
+                  badgeColor: '#FFB020',
+                  filterFn: (s) => !s.isFullPayment,
+                });
+              }
+            }
+          },
           plugins: {
             legend: { display: false },
             tooltip: {
@@ -407,7 +487,7 @@ export default function Overview({ setCurrentPage }) {
       });
     }
 
-    // 2. INTAKE BREAKDOWN BAR / AREA CHART
+    // 2. INTAKE BREAKDOWN BAR CHART
     if (intakeChartRef.current) {
       if (intakeChartInstance.current) intakeChartInstance.current.destroy();
 
@@ -416,7 +496,7 @@ export default function Overview({ setCurrentPage }) {
         : ['September 2025', 'January 2026', 'September 2026'];
       const dataValues = Object.keys(metrics.intakeMap).length > 0
         ? Object.values(metrics.intakeMap)
-        : [58, 4, 2];
+        : [142, 10, 5];
 
       const ctx = intakeChartRef.current.getContext('2d');
       const grad = ctx.createLinearGradient(0, 0, 0, 220);
@@ -440,11 +520,23 @@ export default function Overview({ setCurrentPage }) {
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          onClick: (evt, elements) => {
+            if (elements.length > 0) {
+              const clickedLabel = labels[elements[0].index];
+              openDrilldown({
+                title: `Intake: ${clickedLabel}`,
+                subtitle: `Students enrolled for ${clickedLabel} intake`,
+                badgeText: 'Intake Cohort',
+                badgeColor: '#7C6FFF',
+                filterFn: (s) => s.intake === clickedLabel,
+              });
+            }
+          },
           plugins: {
             legend: { display: false },
             tooltip: {
               backgroundColor: '#0F1528',
-              callbacks: { label: (ctx) => `Students: ${ctx.raw}` },
+              callbacks: { label: (ctx) => `Students: ${ctx.raw} (Click to inspect)` },
             },
           },
           scales: {
@@ -454,7 +546,7 @@ export default function Overview({ setCurrentPage }) {
             },
             y: {
               grid: { color: 'rgba(148, 163, 225, 0.08)' },
-              ticks: { color: '#8E9BB5', font: { size: 10 }, stepSize: 10 },
+              ticks: { color: '#8E9BB5', font: { size: 10 }, stepSize: 20 },
             },
           },
         },
@@ -467,7 +559,7 @@ export default function Overview({ setCurrentPage }) {
 
       const stageLabels = ['Full Payment', '2nd Installment', '1st Installment', '4th Installment', 'Pending', '3rd Installment'];
       const stageColors = ['#FFB020', '#A78BFA', '#36D1DC', '#64748B', '#475569', '#38BDF8'];
-      const stageData = stageLabels.map((lbl) => metrics.stageMap[lbl] || (lbl === 'Full Payment' ? 42 : lbl === '2nd Installment' ? 15 : 2));
+      const stageData = stageLabels.map((lbl) => metrics.stageMap[lbl] || 0);
 
       const ctx = paymentStageChartRef.current.getContext('2d');
       paymentStageChartInstance.current = new ChartJS(ctx, {
@@ -487,11 +579,23 @@ export default function Overview({ setCurrentPage }) {
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          onClick: (evt, elements) => {
+            if (elements.length > 0) {
+              const clickedStage = stageLabels[elements[0].index];
+              openDrilldown({
+                title: `Stage: ${clickedStage}`,
+                subtitle: `Students currently in ${clickedStage}`,
+                badgeText: clickedStage,
+                badgeColor: stageColors[elements[0].index],
+                filterFn: (s) => (s.pay_stage === clickedStage || s.payment_stage === clickedStage),
+              });
+            }
+          },
           plugins: {
             legend: { display: false },
             tooltip: {
               backgroundColor: '#0F1528',
-              callbacks: { label: (ctx) => `Count: ${ctx.raw}` },
+              callbacks: { label: (ctx) => `Count: ${ctx.raw} (Click to inspect)` },
             },
           },
           scales: {
@@ -501,7 +605,7 @@ export default function Overview({ setCurrentPage }) {
             },
             y: {
               grid: { color: 'rgba(148, 163, 225, 0.08)' },
-              ticks: { color: '#8E9BB5', font: { size: 10 }, stepSize: 5 },
+              ticks: { color: '#8E9BB5', font: { size: 10 }, stepSize: 10 },
             },
           },
         },
@@ -562,7 +666,7 @@ export default function Overview({ setCurrentPage }) {
       });
     }
 
-    // 5. MONTHLY COLLECTIONS (CYAN BAR CHART WITH VALUE LABELS)
+    // 5. MONTHLY COLLECTIONS (CYAN BAR CHART)
     if (monthlyCollectionsChartRef.current) {
       if (monthlyCollectionsChartInstance.current) monthlyCollectionsChartInstance.current.destroy();
 
@@ -746,7 +850,7 @@ export default function Overview({ setCurrentPage }) {
       </div>
 
       {/* =========================================================================
-          ROW 1: 5 KPI CARDS (Matching Image 1 top row)
+          ROW 1: 5 INTERACTIVE KPI CARDS (2026 Click-to-Drilldown Experience)
          ========================================================================= */}
       <section
         style={{
@@ -757,46 +861,103 @@ export default function Overview({ setCurrentPage }) {
       >
         {/* Card 1: Total Applications */}
         <div
+          onClick={() =>
+            openDrilldown({
+              title: 'All Student Applications',
+              subtitle: 'Complete list of registered students in Sterling ERP',
+              badgeText: 'Total Intakes',
+              badgeColor: '#A78BFA',
+            })
+          }
           style={{
             background: 'rgba(15, 20, 35, 0.85)',
             border: '1px solid rgba(148, 163, 225, 0.14)',
             borderRadius: '14px',
             padding: '16px 20px',
             position: 'relative',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = '#A78BFA';
+            e.currentTarget.style.transform = 'translateY(-2px)';
+            e.currentTarget.style.boxShadow = '0 8px 24px rgba(167, 139, 250, 0.2)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = 'rgba(148, 163, 225, 0.14)';
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = 'none';
           }}
         >
-          <div style={{ fontSize: '11px', color: '#8E9BB5', fontWeight: 600 }}>Total Applications</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '11px', color: '#8E9BB5', fontWeight: 600 }}>Total Applications</span>
+            <span style={{ fontSize: '10px', color: '#7C6FFF', fontWeight: 700 }}>Inspect ↗</span>
+          </div>
+
           <div style={{ fontSize: '32px', fontWeight: 800, color: '#A78BFA', marginTop: '4px' }}>
             {metrics.totalApps}
           </div>
+
           <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
             <span
+              onClick={(e) => {
+                e.stopPropagation();
+                openDrilldown({
+                  title: 'Full Payment Students',
+                  subtitle: 'Students who completed their total committed fee',
+                  badgeText: 'Full Payment',
+                  badgeColor: '#00E5A0',
+                  filterFn: (s) => s.isFullPayment,
+                });
+              }}
               style={{
                 background: 'rgba(255, 255, 255, 0.06)',
                 padding: '3px 8px',
                 borderRadius: '6px',
                 fontSize: '11px',
                 color: '#A8B2C7',
+                cursor: 'pointer',
               }}
             >
-              Full <strong style={{ color: '#fff' }}>{metrics.fullPaymentCount}</strong>
+              Full <strong style={{ color: '#00E5A0' }}>{metrics.fullPaymentCount}</strong>
             </span>
+
             <span
+              onClick={(e) => {
+                e.stopPropagation();
+                openDrilldown({
+                  title: 'Partial / Pending Payment Students',
+                  subtitle: 'Students with installments currently pending',
+                  badgeText: 'Partial Pending',
+                  badgeColor: '#FFB020',
+                  filterFn: (s) => !s.isFullPayment,
+                });
+              }}
               style={{
                 background: 'rgba(255, 255, 255, 0.06)',
                 padding: '3px 8px',
                 borderRadius: '6px',
                 fontSize: '11px',
                 color: '#A8B2C7',
+                cursor: 'pointer',
               }}
             >
-              Partial <strong style={{ color: '#fff' }}>{metrics.partialPaymentCount}</strong>
+              Partial <strong style={{ color: '#FFB020' }}>{metrics.partialPaymentCount}</strong>
             </span>
           </div>
         </div>
 
         {/* Card 2: Total Collected */}
         <div
+          onClick={() =>
+            openDrilldown({
+              title: 'Fee Collected Students',
+              subtitle: 'Students with realized cash/bank fee receipts',
+              badgeText: 'Collected Fees',
+              badgeColor: '#00E5A0',
+              filterFn: (s) => s.collected > 0,
+            })
+          }
           style={{
             background: 'rgba(15, 20, 35, 0.85)',
             border: '1px solid rgba(148, 163, 225, 0.14)',
@@ -804,25 +965,63 @@ export default function Overview({ setCurrentPage }) {
             borderRadius: '14px',
             padding: '16px 20px',
             position: 'relative',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = '#00E5A0';
+            e.currentTarget.style.transform = 'translateY(-2px)';
+            e.currentTarget.style.boxShadow = '0 8px 24px rgba(0, 229, 160, 0.2)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = 'rgba(148, 163, 225, 0.14)';
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = 'none';
           }}
         >
-          <div style={{ fontSize: '11px', color: '#8E9BB5', fontWeight: 600 }}>Total Collected</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '11px', color: '#8E9BB5', fontWeight: 600 }}>Total Collected</span>
+            <span style={{ fontSize: '10px', color: '#00E5A0', fontWeight: 700 }}>Inspect ↗</span>
+          </div>
           <div style={{ fontSize: '32px', fontWeight: 800, color: '#00E5A0', marginTop: '4px' }}>
             {formatIndianCurrency(metrics.totalCollected)}
           </div>
         </div>
 
-        {/* Card 3: Collection Efficiency */}
+        {/* Card 3: Collection Efficiency (Total % collected against committed) */}
         <div
+          onClick={() =>
+            openDrilldown({
+              title: 'Collection Performance & Progress',
+              subtitle: 'Student fee recovery progress vs committed contracts',
+              badgeText: 'Efficiency',
+              badgeColor: '#36D1DC',
+            })
+          }
           style={{
             background: 'rgba(15, 20, 35, 0.85)',
             border: '1px solid rgba(148, 163, 225, 0.14)',
             borderRadius: '14px',
             padding: '16px 20px',
             position: 'relative',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = '#36D1DC';
+            e.currentTarget.style.transform = 'translateY(-2px)';
+            e.currentTarget.style.boxShadow = '0 8px 24px rgba(54, 209, 220, 0.2)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = 'rgba(148, 163, 225, 0.14)';
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = 'none';
           }}
         >
-          <div style={{ fontSize: '11px', color: '#8E9BB5', fontWeight: 600 }}>Collection Efficiency</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '11px', color: '#8E9BB5', fontWeight: 600 }}>Collection Efficiency</span>
+            <span style={{ fontSize: '10px', color: '#36D1DC', fontWeight: 700 }}>Inspect ↗</span>
+          </div>
           <div style={{ fontSize: '32px', fontWeight: 800, color: '#00E5A0', marginTop: '4px' }}>
             {metrics.efficiency}%
           </div>
@@ -846,8 +1045,16 @@ export default function Overview({ setCurrentPage }) {
           </div>
         </div>
 
-        {/* Card 4: Committed Pipeline */}
+        {/* Card 4: Committed Pipeline (Total commitment & Live = Active pipeline) */}
         <div
+          onClick={() =>
+            openDrilldown({
+              title: 'Committed Pipeline',
+              subtitle: 'Total contracted student fee value',
+              badgeText: 'Total Pipeline',
+              badgeColor: '#7C6FFF',
+            })
+          }
           style={{
             background: 'rgba(15, 20, 35, 0.85)',
             border: '1px solid rgba(148, 163, 225, 0.14)',
@@ -855,22 +1062,46 @@ export default function Overview({ setCurrentPage }) {
             borderRadius: '14px',
             padding: '16px 20px',
             position: 'relative',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = '#7C6FFF';
+            e.currentTarget.style.transform = 'translateY(-2px)';
+            e.currentTarget.style.boxShadow = '0 8px 24px rgba(124, 111, 255, 0.2)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = 'rgba(148, 163, 225, 0.14)';
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = 'none';
           }}
         >
-          <div style={{ fontSize: '11px', color: '#8E9BB5', fontWeight: 600 }}>Committed Pipeline</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '11px', color: '#8E9BB5', fontWeight: 600 }}>Committed Pipeline</span>
+            <span style={{ fontSize: '10px', color: '#7C6FFF', fontWeight: 700 }}>Inspect ↗</span>
+          </div>
           <div style={{ fontSize: '32px', fontWeight: 800, color: '#7C6FFF', marginTop: '4px' }}>
             {formatIndianCurrency(metrics.totalCommitted)}
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
-            <span style={{ fontSize: '11px', color: '#36D1DC', fontWeight: 600 }}>Live</span>
+            <span style={{ fontSize: '11px', color: '#36D1DC', fontWeight: 600 }}>Live (Active)</span>
             <span style={{ fontSize: '11px', color: '#36D1DC', fontWeight: 700 }}>
-              {formatIndianCurrency(metrics.totalCommitted)}
+              {formatIndianCurrency(metrics.activeCommitted)}
             </span>
           </div>
         </div>
 
-        {/* Card 5: Total Remaining */}
+        {/* Card 5: Total Remaining (Active remaining to be collected) */}
         <div
+          onClick={() =>
+            openDrilldown({
+              title: 'Active Remaining Balances',
+              subtitle: 'Active students with pending fee installments to be collected',
+              badgeText: 'Due Payments',
+              badgeColor: '#FF6F8E',
+              filterFn: (s) => s.enroll_status === 'Active' && s.remaining > 0,
+            })
+          }
           style={{
             background: 'rgba(15, 20, 35, 0.85)',
             border: '1px solid rgba(148, 163, 225, 0.14)',
@@ -878,9 +1109,24 @@ export default function Overview({ setCurrentPage }) {
             borderRadius: '14px',
             padding: '16px 20px',
             position: 'relative',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = '#FF6F8E';
+            e.currentTarget.style.transform = 'translateY(-2px)';
+            e.currentTarget.style.boxShadow = '0 8px 24px rgba(255, 111, 142, 0.2)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = 'rgba(148, 163, 225, 0.14)';
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = 'none';
           }}
         >
-          <div style={{ fontSize: '11px', color: '#8E9BB5', fontWeight: 600 }}>Total Remaining</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '11px', color: '#8E9BB5', fontWeight: 600 }}>Total Remaining</span>
+            <span style={{ fontSize: '10px', color: '#FF6F8E', fontWeight: 700 }}>Inspect ↗</span>
+          </div>
           <div style={{ fontSize: '32px', fontWeight: 800, color: '#FF6F8E', marginTop: '4px' }}>
             {formatIndianCurrency(metrics.totalRemaining)}
           </div>
@@ -941,10 +1187,23 @@ export default function Overview({ setCurrentPage }) {
             </div>
           </div>
 
-          {/* Progress Bars List */}
+          {/* Clickable Progress Bars List */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             {leadSourceList.map((item) => (
-              <div key={item.name}>
+              <div
+                key={item.name}
+                onClick={() =>
+                  openDrilldown({
+                    title: `Lead Source: ${item.name}`,
+                    subtitle: `Students acquired through ${item.name}`,
+                    badgeText: 'Channel',
+                    badgeColor: item.color,
+                    filterFn: (s) => (s.lead_source || 'Other') === item.name,
+                  })
+                }
+                style={{ cursor: 'pointer' }}
+                title="Click to view students from this source"
+              >
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '5px' }}>
                   <span style={{ color: '#CBD5E1', fontWeight: 600 }}>{item.name}</span>
                   <span style={{ color: '#8E9BB5' }}>
@@ -993,7 +1252,10 @@ export default function Overview({ setCurrentPage }) {
 
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '100%', minHeight: '160px' }}>
             {/* Doughnut with center count */}
-            <div style={{ position: 'relative', width: '150px', height: '150px', flexShrink: 0 }}>
+            <div
+              style={{ position: 'relative', width: '150px', height: '150px', flexShrink: 0, cursor: 'pointer' }}
+              title="Click chart to inspect students"
+            >
               <canvas ref={doughnutChartRef} />
               <div
                 style={{
@@ -1011,9 +1273,20 @@ export default function Overview({ setCurrentPage }) {
               </div>
             </div>
 
-            {/* Legend on right */}
+            {/* Clickable Legend on right */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1, paddingLeft: '24px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div
+                onClick={() =>
+                  openDrilldown({
+                    title: 'Full Payment Students',
+                    subtitle: 'Students with 100% completed payments',
+                    badgeText: 'Full Payment',
+                    badgeColor: '#00E5A0',
+                    filterFn: (s) => s.isFullPayment,
+                  })
+                }
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
+              >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#00E5A0' }} />
                   <span style={{ fontSize: '12px', color: '#CBD5E1' }}>Full Payment</span>
@@ -1021,7 +1294,18 @@ export default function Overview({ setCurrentPage }) {
                 <span style={{ fontSize: '13px', fontWeight: 700, color: '#fff' }}>{metrics.fullPaymentCount}</span>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div
+                onClick={() =>
+                  openDrilldown({
+                    title: 'Partial / Pending Payment Students',
+                    subtitle: 'Students with remaining installment balance due',
+                    badgeText: 'Partial Pending',
+                    badgeColor: '#FFB020',
+                    filterFn: (s) => !s.isFullPayment,
+                  })
+                }
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
+              >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#FFB020' }} />
                   <span style={{ fontSize: '12px', color: '#CBD5E1' }}>Partial/Pending</span>
@@ -1074,7 +1358,7 @@ export default function Overview({ setCurrentPage }) {
             <span style={{ fontSize: '14px', color: '#64748B', cursor: 'pointer' }}>✕</span>
           </div>
 
-          <div style={{ position: 'relative', height: '180px', width: '100%' }}>
+          <div style={{ position: 'relative', height: '180px', width: '100%', cursor: 'pointer' }} title="Click any bar to view students">
             <canvas ref={intakeChartRef} />
           </div>
         </div>
@@ -1110,7 +1394,7 @@ export default function Overview({ setCurrentPage }) {
             <span style={{ fontSize: '14px', color: '#64748B', cursor: 'pointer' }}>✕</span>
           </div>
 
-          <div style={{ position: 'relative', height: '180px', width: '100%' }}>
+          <div style={{ position: 'relative', height: '180px', width: '100%', cursor: 'pointer' }} title="Click any bar to view students">
             <canvas ref={paymentStageChartRef} />
           </div>
         </div>
@@ -1152,7 +1436,7 @@ export default function Overview({ setCurrentPage }) {
             <canvas ref={growthTrendChartRef} />
           </div>
 
-          {/* Month Comparison Table (Matching Image 1) */}
+          {/* Month Comparison Table */}
           <div style={{ marginTop: '14px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
             {growthList.map((row, idx) => (
               <div
@@ -1194,7 +1478,7 @@ export default function Overview({ setCurrentPage }) {
               <div style={{ fontSize: '10px', color: '#8E9BB5' }}>Amount collected per month</div>
             </div>
 
-            {/* Date Pickers Inline Controls (From Image 1) */}
+            {/* Date Pickers Inline Controls */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span style={{ fontSize: '10px', color: '#8E9BB5' }}>From:</span>
               <input
@@ -1297,7 +1581,7 @@ export default function Overview({ setCurrentPage }) {
       </section>
 
       {/* =========================================================================
-          ADVANCED FILTERS FLOATING MODAL (Exact 1:1 match to Image 2)
+          ADVANCED FILTERS FLOATING MODAL (Matches Image 2)
          ========================================================================= */}
       {showFiltersModal && (
         <div
@@ -1400,13 +1684,13 @@ export default function Overview({ setCurrentPage }) {
               </select>
             </div>
 
-            {/* 3. STATUS (Preset buttons + 4 Status Pills) */}
+            {/* 3. STATUS */}
             <div>
               <div style={{ fontSize: '10.5px', fontWeight: 800, color: '#7C6FFF', textTransform: 'uppercase', marginBottom: '8px' }}>
                 STATUS
               </div>
 
-              {/* Preset Row: All Students vs Active + Enrolled */}
+              {/* Preset Row */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '10px' }}>
                 <button
                   type="button"
@@ -1445,7 +1729,6 @@ export default function Overview({ setCurrentPage }) {
 
               {/* 4 Status Toggle Pills */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                {/* Active */}
                 <button
                   type="button"
                   onClick={() => handleToggleStatus('Active')}
@@ -1468,7 +1751,6 @@ export default function Overview({ setCurrentPage }) {
                   Active
                 </button>
 
-                {/* Enrolled */}
                 <button
                   type="button"
                   onClick={() => handleToggleStatus('Enrolled')}
@@ -1491,7 +1773,6 @@ export default function Overview({ setCurrentPage }) {
                   Enrolled
                 </button>
 
-                {/* Dropped */}
                 <button
                   type="button"
                   onClick={() => handleToggleStatus('Dropped')}
@@ -1514,7 +1795,6 @@ export default function Overview({ setCurrentPage }) {
                   Dropped
                 </button>
 
-                {/* Refund */}
                 <button
                   type="button"
                   onClick={() => handleToggleStatus('Refund')}
@@ -1616,7 +1896,6 @@ export default function Overview({ setCurrentPage }) {
                 fontWeight: 700,
                 cursor: 'pointer',
                 marginTop: '6px',
-                transition: 'background 0.2s',
               }}
             >
               Reset All Filters
@@ -1624,6 +1903,20 @@ export default function Overview({ setCurrentPage }) {
           </div>
         </div>
       )}
+
+      {/* =========================================================================
+          2026 INTERACTIVE STUDENT DRILLDOWN DRAWER
+         ========================================================================= */}
+      <StudentDrilldownDrawer
+        isOpen={drilldownState.isOpen}
+        onClose={() => setDrilldownState((prev) => ({ ...prev, isOpen: false }))}
+        title={drilldownState.title}
+        subtitle={drilldownState.subtitle}
+        badgeText={drilldownState.badgeText}
+        badgeColor={drilldownState.badgeColor}
+        students={drilldownState.students}
+        setCurrentPage={setCurrentPage}
+      />
 
       {/* Google Sheet Importer Modal */}
       <GoogleSheetImporterModal
