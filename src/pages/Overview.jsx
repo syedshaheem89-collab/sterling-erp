@@ -444,15 +444,36 @@ export default function Overview({ setCurrentPage }) {
               data: [metrics.fullPaymentCount || 1, metrics.partialPaymentCount || 0],
               backgroundColor: ['#00E5A0', '#FFB020'],
               borderColor: '#0B0F1C',
-              borderWidth: 4,
-              hoverOffset: 8,
+              borderWidth: 5,
+              hoverOffset: 10,
             },
           ],
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          cutout: '76%',
+          cutout: '70%',
+          plugins: {
+            legend: {
+              display: false,
+            },
+            tooltip: {
+              backgroundColor: '#0F1423',
+              titleColor: '#EDEFFA',
+              bodyColor: '#A8B2C7',
+              borderColor: 'rgba(148, 163, 225, 0.25)',
+              borderWidth: 1,
+              padding: 10,
+              callbacks: {
+                label: (context) => {
+                  const val = context.parsed;
+                  const total = (metrics.fullPaymentCount || 0) + (metrics.partialPaymentCount || 0);
+                  const pct = total > 0 ? ((val / total) * 100).toFixed(1) : 0;
+                  return ` ${context.label}: ${val} students (${pct}%)`;
+                },
+              },
+            },
+          },
           onClick: (evt, elements) => {
             if (elements.length > 0) {
               const idx = elements[0].index;
@@ -474,14 +495,6 @@ export default function Overview({ setCurrentPage }) {
                 });
               }
             }
-          },
-          plugins: {
-            legend: { display: false },
-            tooltip: {
-              backgroundColor: 'rgba(11, 15, 28, 0.95)',
-              padding: 10,
-              bodyColor: '#fff',
-            },
           },
         },
       });
@@ -1139,8 +1152,9 @@ export default function Overview({ setCurrentPage }) {
       <section
         style={{
           display: 'grid',
-          gridTemplateColumns: '65% 35%',
+          gridTemplateColumns: '62% 38%',
           gap: '14px',
+          alignItems: 'stretch',
         }}
       >
         {/* Left: LEAD SOURCE — STATUS */}
@@ -1150,9 +1164,11 @@ export default function Overview({ setCurrentPage }) {
             border: '1px solid rgba(148, 163, 225, 0.14)',
             borderRadius: '14px',
             padding: '20px 24px',
+            display: 'flex',
+            flexDirection: 'column',
           }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ fontSize: '12px', fontWeight: 800, color: '#EDEFFA', letterSpacing: '0.04em' }}>
                 LEAD SOURCE &mdash; STATUS
@@ -1164,6 +1180,7 @@ export default function Overview({ setCurrentPage }) {
                   borderRadius: '10px',
                   fontSize: '11px',
                   color: '#8E9BB5',
+                  fontWeight: 600,
                 }}
               >
                 {metrics.totalApps} Total
@@ -1187,8 +1204,17 @@ export default function Overview({ setCurrentPage }) {
             </div>
           </div>
 
-          {/* Clickable Progress Bars List */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          {/* Clickable Progress Bars List with smooth scrolling and perfect height */}
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+              maxHeight: '410px',
+              overflowY: 'auto',
+              paddingRight: '6px',
+            }}
+          >
             {leadSourceList.map((item) => (
               <div
                 key={item.name}
@@ -1201,11 +1227,22 @@ export default function Overview({ setCurrentPage }) {
                     filterFn: (s) => (s.lead_source || 'Other') === item.name,
                   })
                 }
-                style={{ cursor: 'pointer' }}
+                style={{
+                  cursor: 'pointer',
+                  padding: '4px 6px',
+                  borderRadius: '6px',
+                  transition: 'background 0.15s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent';
+                }}
                 title="Click to view students from this source"
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '5px' }}>
-                  <span style={{ color: '#CBD5E1', fontWeight: 600 }}>{item.name}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '6px' }}>
+                  <span style={{ color: '#EDEFFA', fontWeight: 600 }}>{item.name}</span>
                   <span style={{ color: '#8E9BB5' }}>
                     <strong style={{ color: '#fff' }}>{item.count}</strong> ({item.pct}%)
                   </span>
@@ -1232,7 +1269,7 @@ export default function Overview({ setCurrentPage }) {
           </div>
         </div>
 
-        {/* Right: COLLECTION STATUS (Doughnut Chart) */}
+        {/* Right: COLLECTION STATUS (Maximum Size, Perfectly Proportioned) */}
         <div
           style={{
             background: 'rgba(15, 20, 35, 0.85)',
@@ -1241,19 +1278,41 @@ export default function Overview({ setCurrentPage }) {
             padding: '20px 24px',
             display: 'flex',
             flexDirection: 'column',
+            justifyContent: 'space-between',
           }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-            <span style={{ fontSize: '12px', fontWeight: 800, color: '#EDEFFA', letterSpacing: '0.04em' }}>
-              COLLECTION STATUS
-            </span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '12px', fontWeight: 800, color: '#EDEFFA', letterSpacing: '0.04em' }}>
+                COLLECTION STATUS
+              </span>
+              <span
+                style={{
+                  background: 'rgba(0, 229, 160, 0.12)',
+                  border: '1px solid rgba(0, 229, 160, 0.3)',
+                  padding: '2px 8px',
+                  borderRadius: '10px',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  color: '#00E5A0',
+                }}
+              >
+                {metrics.efficiency}% Realized
+              </span>
+            </div>
             <span style={{ fontSize: '14px', color: '#64748B', cursor: 'pointer' }}>✕</span>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '100%', minHeight: '160px' }}>
-            {/* Doughnut with center count */}
+          {/* MAXIMUM SIZE DOUGHNUT CHART */}
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '10px 0' }}>
             <div
-              style={{ position: 'relative', width: '150px', height: '150px', flexShrink: 0, cursor: 'pointer' }}
+              style={{
+                position: 'relative',
+                width: '240px',
+                height: '240px',
+                flexShrink: 0,
+                cursor: 'pointer',
+              }}
               title="Click chart to inspect students"
             >
               <canvas ref={doughnutChartRef} />
@@ -1268,49 +1327,101 @@ export default function Overview({ setCurrentPage }) {
                   pointerEvents: 'none',
                 }}
               >
-                <div style={{ fontSize: '24px', fontWeight: 800, color: '#fff' }}>{metrics.totalApps}</div>
-                <div style={{ fontSize: '10px', color: '#8E9BB5' }}>Total</div>
+                <div style={{ fontSize: '38px', fontWeight: 900, color: '#fff', lineHeight: 1 }}>
+                  {metrics.totalApps}
+                </div>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: '#8E9BB5', textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: '4px' }}>
+                  Total Students
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* FULL WIDTH EXECUTIVE INTERACTIVE BREAKDOWN */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '10px' }}>
+            {/* Full Payment Card */}
+            <div
+              onClick={() =>
+                openDrilldown({
+                  title: 'Full Payment Students',
+                  subtitle: 'Students with 100% completed payments',
+                  badgeText: 'Full Payment',
+                  badgeColor: '#00E5A0',
+                  filterFn: (s) => s.isFullPayment,
+                })
+              }
+              style={{
+                background: 'rgba(0, 229, 160, 0.08)',
+                border: '1px solid rgba(0, 229, 160, 0.25)',
+                borderRadius: '10px',
+                padding: '12px 14px',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(0, 229, 160, 0.16)';
+                e.currentTarget.style.borderColor = 'rgba(0, 229, 160, 0.5)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(0, 229, 160, 0.08)';
+                e.currentTarget.style.borderColor = 'rgba(0, 229, 160, 0.25)';
+              }}
+              title="Click to view full payment students"
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#00E5A0', boxShadow: '0 0 6px #00E5A0' }} />
+                <span style={{ fontSize: '11px', fontWeight: 700, color: '#EDEFFA' }}>Full Payment</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '20px', fontWeight: 800, color: '#00E5A0' }}>
+                  {metrics.fullPaymentCount}
+                </span>
+                <span style={{ fontSize: '11px', fontWeight: 600, color: '#8E9BB5' }}>
+                  {metrics.totalApps > 0 ? ((metrics.fullPaymentCount / metrics.totalApps) * 100).toFixed(1) : 0}%
+                </span>
               </div>
             </div>
 
-            {/* Clickable Legend on right */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1, paddingLeft: '24px' }}>
-              <div
-                onClick={() =>
-                  openDrilldown({
-                    title: 'Full Payment Students',
-                    subtitle: 'Students with 100% completed payments',
-                    badgeText: 'Full Payment',
-                    badgeColor: '#00E5A0',
-                    filterFn: (s) => s.isFullPayment,
-                  })
-                }
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#00E5A0' }} />
-                  <span style={{ fontSize: '12px', color: '#CBD5E1' }}>Full Payment</span>
-                </div>
-                <span style={{ fontSize: '13px', fontWeight: 700, color: '#fff' }}>{metrics.fullPaymentCount}</span>
+            {/* Partial / Pending Card */}
+            <div
+              onClick={() =>
+                openDrilldown({
+                  title: 'Partial / Pending Payment Students',
+                  subtitle: 'Students with remaining installment balance due',
+                  badgeText: 'Partial Pending',
+                  badgeColor: '#FFB020',
+                  filterFn: (s) => !s.isFullPayment,
+                })
+              }
+              style={{
+                background: 'rgba(255, 176, 32, 0.08)',
+                border: '1px solid rgba(255, 176, 32, 0.25)',
+                borderRadius: '10px',
+                padding: '12px 14px',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 176, 32, 0.16)';
+                e.currentTarget.style.borderColor = 'rgba(255, 176, 32, 0.5)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 176, 32, 0.08)';
+                e.currentTarget.style.borderColor = 'rgba(255, 176, 32, 0.25)';
+              }}
+              title="Click to view partial/pending students"
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#FFB020', boxShadow: '0 0 6px #FFB020' }} />
+                <span style={{ fontSize: '11px', fontWeight: 700, color: '#EDEFFA' }}>Partial / Due</span>
               </div>
-
-              <div
-                onClick={() =>
-                  openDrilldown({
-                    title: 'Partial / Pending Payment Students',
-                    subtitle: 'Students with remaining installment balance due',
-                    badgeText: 'Partial Pending',
-                    badgeColor: '#FFB020',
-                    filterFn: (s) => !s.isFullPayment,
-                  })
-                }
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#FFB020' }} />
-                  <span style={{ fontSize: '12px', color: '#CBD5E1' }}>Partial/Pending</span>
-                </div>
-                <span style={{ fontSize: '13px', fontWeight: 700, color: '#fff' }}>{metrics.partialPaymentCount}</span>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '20px', fontWeight: 800, color: '#FFB020' }}>
+                  {metrics.partialPaymentCount}
+                </span>
+                <span style={{ fontSize: '11px', fontWeight: 600, color: '#8E9BB5' }}>
+                  {metrics.totalApps > 0 ? ((metrics.partialPaymentCount / metrics.totalApps) * 100).toFixed(1) : 0}%
+                </span>
               </div>
             </div>
           </div>
