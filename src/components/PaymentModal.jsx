@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import supabase from '../supabase';
 import toast from 'react-hot-toast';
+import { uploadPaymentProof, extractReceiptUrl, embedReceiptIntoNotes } from '../utils/paymentProofHelper';
 
 /**
  * PaymentModal
@@ -49,7 +50,10 @@ export default function PaymentModal({
   const [paymentType, setPaymentType] = useState(payment?.payment_type || 'Normal');
   const [referenceNo, setReferenceNo] = useState(payment?.reference_no || '');
   const [notes, setNotes] = useState(payment?.notes || '');
+  const [receiptUrl, setReceiptUrl] = useState(payment ? (payment.receipt_url || extractReceiptUrl(payment)) : '');
+  const [isUploadingReceipt, setIsUploadingReceipt] = useState(false);
   const [saving, setSaving] = useState(false);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     if (payment) {
@@ -60,10 +64,37 @@ export default function PaymentModal({
       setPaymentType(payment.payment_type || 'Normal');
       setReferenceNo(payment.reference_no || '');
       setNotes(payment.notes || '');
+      setReceiptUrl(payment.receipt_url || extractReceiptUrl(payment) || '');
     } else if (slot) {
       setSelectedSlot(Number(slot));
+      setReceiptUrl('');
     }
   }, [payment, slot]);
+
+  // Handle file selection and compression for payment screenshot
+  const handleFileSelected = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingReceipt(true);
+    const toastId = toast.loading('Processing payment screenshot...');
+
+    try {
+      const url = await uploadPaymentProof(file, {
+        studentId: student?.id,
+        slot: selectedSlot,
+      });
+
+      setReceiptUrl(url);
+      toast.success('Screenshot attached successfully!', { id: toastId });
+    } catch (err) {
+      console.error('Screenshot upload error:', err);
+      toast.error('Failed to attach screenshot: ' + (err.message || 'Unknown error'), { id: toastId });
+    } finally {
+      setIsUploadingReceipt(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
 
   // Close on Escape key press
   useEffect(() => {
@@ -135,29 +166,54 @@ export default function PaymentModal({
         payment_date: paymentDate,
         payment_type: paymentType,
         reference_no: referenceNo.trim() || null,
-        notes: notes.trim() || null,
+        notes: embedReceiptIntoNotes(notes.trim(), receiptUrl) || null,
+        receipt_url: receiptUrl || null,
       };
 
       let resultData = null;
 
       if (isEditing) {
         paymentPayload.id = payment.id;
-        const { data, error } = await supabase
+        let { data, error } = await supabase
           .from('payments')
           .update(paymentPayload)
           .eq('id', payment.id)
           .select()
           .single();
 
+        // If receipt_url column doesn't exist, retry without it (already embedded in notes)
+        if (error && error.message && error.message.toLowerCase().includes('receipt_url')) {
+          delete paymentPayload.receipt_url;
+          const retry = await supabase
+            .from('payments')
+            .update(paymentPayload)
+            .eq('id', payment.id)
+            .select()
+            .single();
+          data = retry.data;
+          error = retry.error;
+        }
+
         if (error) throw error;
         resultData = data;
         toast.success(`Payment Slot ${selectedSlot} updated successfully`);
       } else {
-        const { data, error } = await supabase
+        let { data, error } = await supabase
           .from('payments')
           .insert([paymentPayload])
           .select()
           .single();
+
+        if (error && error.message && error.message.toLowerCase().includes('receipt_url')) {
+          delete paymentPayload.receipt_url;
+          const retry = await supabase
+            .from('payments')
+            .insert([paymentPayload])
+            .select()
+            .single();
+          data = retry.data;
+          error = retry.error;
+        }
 
         if (error) {
           // Fallback to upsert if duplicate key constraint
@@ -587,6 +643,141 @@ export default function PaymentModal({
                   onFocus={(e) => (e.target.style.borderColor = 'var(--blue)')}
                   onBlur={(e) => (e.target.style.borderColor = 'var(--border)')}
                 />
+              </div>
+
+              {/* Payment Proof / Screenshot */}
+              <div>
+                <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', fontWeight: 600, color: 'var(--amber)', marginBottom: '6px' }}>
+                  <span>Payment Screenshot / Receipt Proof</span>
+                  {receiptUrl && (
+                    <span style={{ color: 'var(--green)', fontSize: '11px', fontWeight: 600 }}>
+                      ✓ Screenshot Attached
+                    </span>
+                  )}
+                </label>
+
+                {/* Hidden File Input */}
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  accept="image/*,application/pdf"
+                  onChange={handleFileSelected}
+                  style={{ display: 'none' }}
+                />
+
+                {receiptUrl ? (
+                  <div
+                    style={{
+                      background: 'var(--bg3)',
+                      border: '1px solid rgba(0, 229, 160, 0.4)',
+                      borderRadius: '8px',
+                      padding: '10px 14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '12px',
+                    }}
+                  >
+                    <a
+                      href={receiptUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        textDecoration: 'none',
+                        color: 'inherit',
+                        flex: 1,
+                        minWidth: 0,
+                      }}
+                      title="Click to view full screenshot in new tab"
+                    >
+                      <img
+                        src={receiptUrl}
+                        alt="Payment screenshot"
+                        style={{
+                          width: '40px',
+                          height: '40px',
+                          borderRadius: '6px',
+                          objectFit: 'cover',
+                          border: '1px solid var(--border)',
+                          flexShrink: 0,
+                        }}
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: '12px', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          Payment Screenshot Attached
+                        </div>
+                        <div style={{ fontSize: '11px', color: 'var(--blue)' }}>
+                          Click to preview ↗
+                        </div>
+                      </div>
+                    </a>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isUploadingReceipt}
+                        className="btn-secondary"
+                        style={{ padding: '5px 10px', fontSize: '11px' }}
+                      >
+                        Change
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setReceiptUrl('')}
+                        disabled={isUploadingReceipt}
+                        style={{
+                          background: 'rgba(255, 111, 142, 0.15)',
+                          border: '1px solid rgba(255, 111, 142, 0.35)',
+                          color: 'var(--red)',
+                          padding: '5px 10px',
+                          borderRadius: '6px',
+                          fontSize: '11px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    style={{
+                      border: '1px dashed var(--border-strong)',
+                      borderRadius: '8px',
+                      padding: '16px',
+                      textAlign: 'center',
+                      cursor: isUploadingReceipt ? 'wait' : 'pointer',
+                      background: 'var(--bg3)',
+                      transition: 'all 0.15s ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = 'var(--green)';
+                      e.currentTarget.style.background = 'rgba(0, 229, 160, 0.05)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = 'var(--border-strong)';
+                      e.currentTarget.style.background = 'var(--bg3)';
+                    }}
+                  >
+                    <div style={{ fontSize: '20px', marginBottom: '4px' }}>
+                      {isUploadingReceipt ? '⏳' : '📎'}
+                    </div>
+                    <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text)' }}>
+                      {isUploadingReceipt ? 'Compressing & uploading...' : 'Upload Payment Screenshot'}
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--muted)', marginTop: '2px' }}>
+                      Supports PNG, JPG, WebP, PDF (auto-optimized)
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>

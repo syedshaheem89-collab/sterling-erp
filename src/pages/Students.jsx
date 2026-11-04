@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import PaymentModal from '../components/PaymentModal';
 import GoogleSheetImporterModal from '../components/GoogleSheetImporterModal';
+import { extractReceiptUrl } from '../utils/paymentProofHelper';
 
 const COUNTRY_FLAGS = {
   'Germany': '🇩🇪',
@@ -3318,17 +3319,15 @@ function StudentDetailModal({
                   </div>
                 </div>
 
-                {payments.length < 5 && (
-                  <button
-                    type="button"
-                    className="btn-primary"
-                    onClick={() => onOpenAddPayment(null)}
-                    style={{ padding: '8px 16px', fontSize: '12px' }}
-                  >
-                    <PlusIcon />
-                    <span>Record Next Installment</span>
-                  </button>
-                )}
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={() => onOpenAddPayment(null)}
+                  style={{ padding: '8px 16px', fontSize: '12px' }}
+                >
+                  <PlusIcon />
+                  <span>Record Next Installment</span>
+                </button>
               </div>
 
               {/* Statement List */}
@@ -3411,7 +3410,36 @@ function StudentDetailModal({
                             </div>
                           </div>
 
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            {/* Receipt Proof Preview Link */}
+                            {(() => {
+                              const rUrl = pmt.receipt_url || extractReceiptUrl(pmt);
+                              if (!rUrl) return null;
+                              return (
+                                <a
+                                  href={rUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  title="View Payment Screenshot / Receipt Proof"
+                                  style={{
+                                    background: 'rgba(54, 209, 220, 0.15)',
+                                    border: '1px solid rgba(54, 209, 220, 0.35)',
+                                    color: '#36D1DC',
+                                    borderRadius: '6px',
+                                    padding: '5px 9px',
+                                    fontSize: '11px',
+                                    fontWeight: 700,
+                                    textDecoration: 'none',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                  }}
+                                >
+                                  <span>🧾</span> Proof
+                                </a>
+                              );
+                            })()}
+
                             <button
                               type="button"
                               onClick={() => onOpenEditPayment(pmt)}

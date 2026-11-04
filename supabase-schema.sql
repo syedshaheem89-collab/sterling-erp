@@ -121,14 +121,16 @@ CREATE TABLE public.payments (
     payment_type TEXT NOT NULL DEFAULT 'Bank Transfer', -- 'Cash', 'Bank Transfer', 'Online Gateway', 'Cheque', 'Other'
     reference_no TEXT,
     notes TEXT,
+    receipt_url TEXT, -- payment screenshot / receipt URL or optimized data URL
     created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
     CONSTRAINT uq_student_slot UNIQUE (student_id, slot)
 );
 
--- NOTE: If updating an existing database that previously had CHECK (slot BETWEEN 1 AND 5), execute:
+-- NOTE: If updating an existing database, execute:
 -- ALTER TABLE public.payments DROP CONSTRAINT IF EXISTS payments_slot_check;
 -- ALTER TABLE public.payments ADD CONSTRAINT payments_slot_check CHECK (slot >= 1);
+-- ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS receipt_url TEXT;
 
 -- 6) Ledger Entries Table
 CREATE TABLE public.ledger_entries (

@@ -1,7 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { supabase } from '../supabase';
 import toast from 'react-hot-toast';
+import { uploadPaymentProof, extractReceiptUrl, embedReceiptIntoNotes } from '../utils/paymentProofHelper';
+import ReceiptViewerModal from './ReceiptViewerModal';
 
 // Format Indian Currency for compact chips (e.g. ₹2.16 L, ₹87.4K, ₹0)
 function formatCompactINR(amount) {
@@ -32,8 +34,11 @@ export default function StudentPopupModal({
   const [isDeleting, setIsDeleting] = useState(false);
 
   // Edit Payment State
-  const [editingPayment, setEditingPayment] = useState(null); // { slot, bank, amount, date }
+  const [editingPayment, setEditingPayment] = useState(null); // { isNew, slot, bank, amount, date, receiptUrl }
   const [isSavingPayment, setIsSavingPayment] = useState(false);
+  const [isUploadingReceipt, setIsUploadingReceipt] = useState(false);
+  const [viewerReceipt, setViewerReceipt] = useState(null); // For full-screen lightbox
+  const fileInputRef = useRef(null);
 
   // If modal is closed, return null
   if (!isOpen) return null;
@@ -57,6 +62,10 @@ export default function StudentPopupModal({
     const existing = Array.isArray(selectedStudent.payments) ? selectedStudent.payments : [];
     return [...existing]
       .filter((p) => Number(p.amount) > 0 || p.bank_name || p.payment_date || p.paid_date)
+      .map((p) => ({
+        ...p,
+        receipt_url: extractReceiptUrl(p),
+      }))
       .sort((a, b) => Number(a.slot || 0) - Number(b.slot || 0));
   }, [selectedStudent]);
 
@@ -89,6 +98,7 @@ export default function StudentPopupModal({
       bank: item.bank_name || 'STERLING STUDY ABROAD',
       amount: Number(item.amount || 0) > 0 ? String(item.amount) : '',
       date: item.payment_date || item.paid_date ? String(item.payment_date || item.paid_date).slice(0, 10) : new Date().toISOString().split('T')[0],
+      receiptUrl: item.receipt_url || extractReceiptUrl(item) || null,
     });
   };
 
@@ -105,7 +115,37 @@ export default function StudentPopupModal({
       bank: 'STERLING STUDY ABROAD',
       amount: '',
       date: new Date().toISOString().split('T')[0],
+      receiptUrl: null,
     });
+  };
+
+  // Handle file selection and compression for payment screenshot
+  const handleFileSelected = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingReceipt(true);
+    const toastId = toast.loading('Processing payment screenshot...');
+
+    try {
+      const url = await uploadPaymentProof(file, {
+        studentId: selectedStudent?.id,
+        slot: editingPayment?.slot,
+      });
+
+      setEditingPayment((prev) => ({
+        ...prev,
+        receiptUrl: url,
+      }));
+
+      toast.success('Screenshot attached successfully!', { id: toastId });
+    } catch (err) {
+      console.error('Screenshot upload error:', err);
+      toast.error('Failed to attach screenshot: ' + (err.message || 'Unknown error'), { id: toastId });
+    } finally {
+      setIsUploadingReceipt(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   // Delete an installment
@@ -170,6 +210,7 @@ export default function StudentPopupModal({
       const slot = parseInt(editingPayment.slot, 10) || 1;
       const bnk = (editingPayment.bank || 'STERLING STUDY ABROAD').trim();
       const dt = editingPayment.date || new Date().toISOString().split('T')[0];
+      const receiptUrl = editingPayment.receiptUrl || null;
 
       if (amt <= 0) {
         // Delete payment slot
@@ -179,19 +220,38 @@ export default function StudentPopupModal({
           .eq('student_id', selectedStudent.id)
           .eq('slot', slot);
       } else {
-        // Upsert payment slot
-        const { error: upsertErr } = await supabase
+        // 1. First attempt upsert with receipt_url column
+        const paymentPayload = {
+          student_id: selectedStudent.id,
+          company_id: selectedStudent.company_id,
+          slot,
+          bank_name: bnk,
+          amount: amt,
+          payment_date: dt,
+          receipt_url: receiptUrl,
+        };
+
+        let { error: upsertErr } = await supabase
           .from('payments')
-          .upsert({
-            student_id: selectedStudent.id,
-            company_id: selectedStudent.company_id,
-            slot,
-            bank_name: bnk,
-            amount: amt,
-            payment_date: dt,
-          }, {
+          .upsert(paymentPayload, {
             onConflict: 'student_id,slot',
           });
+
+        // 2. If database doesn't have receipt_url column yet, fallback to storing in notes!
+        if (upsertErr && upsertErr.message && upsertErr.message.toLowerCase().includes('receipt_url')) {
+          const existingPayment = (selectedStudent.payments || []).find((p) => Number(p.slot) === slot);
+          const fallbackNotes = embedReceiptIntoNotes(existingPayment?.notes || '', receiptUrl);
+
+          delete paymentPayload.receipt_url;
+          paymentPayload.notes = fallbackNotes;
+
+          const res2 = await supabase
+            .from('payments')
+            .upsert(paymentPayload, {
+              onConflict: 'student_id,slot',
+            });
+          upsertErr = res2.error;
+        }
 
         if (upsertErr) {
           if (upsertErr.message && upsertErr.message.toLowerCase().includes('check')) {
@@ -967,7 +1027,7 @@ export default function StudentPopupModal({
                       <div
                         style={{
                           display: 'grid',
-                          gridTemplateColumns: '24px 1fr 78px 84px 34px',
+                          gridTemplateColumns: '22px 1fr 70px 74px 32px 30px',
                           gap: '6px',
                           alignItems: 'center',
                           padding: '9px 12px',
@@ -983,6 +1043,7 @@ export default function StudentPopupModal({
                         <div>BANK</div>
                         <div style={{ textAlign: 'right' }}>AMOUNT</div>
                         <div style={{ textAlign: 'right' }}>DATE</div>
+                        <div style={{ textAlign: 'center' }}>PROOF</div>
                         <div style={{ textAlign: 'center' }}>EDIT</div>
                       </div>
 
@@ -993,7 +1054,7 @@ export default function StudentPopupModal({
                             key={item.id || item.slot}
                             style={{
                               display: 'grid',
-                              gridTemplateColumns: '24px 1fr 78px 84px 34px',
+                              gridTemplateColumns: '22px 1fr 70px 74px 32px 30px',
                               gap: '6px',
                               alignItems: 'center',
                               padding: '8px 12px',
@@ -1039,11 +1100,83 @@ export default function StudentPopupModal({
                               style={{
                                 textAlign: 'right',
                                 color: '#CBD5E1',
-                                fontSize: '10.5px',
+                                fontSize: '10px',
                                 whiteSpace: 'nowrap',
                               }}
                             >
                               {formatDate(item.payment_date || item.paid_date)}
+                            </div>
+
+                            {/* PROOF SCREENSHOT BUTTON */}
+                            <div style={{ textAlign: 'center' }}>
+                              {item.receipt_url ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setViewerReceipt({
+                                    url: item.receipt_url,
+                                    slot: item.slot,
+                                    studentName: selectedStudent.name,
+                                    amount: item.amount,
+                                    date: formatDate(item.payment_date || item.paid_date),
+                                    bank: item.bank_name,
+                                  })}
+                                  title="View Payment Screenshot / Receipt Proof"
+                                  style={{
+                                    background: 'rgba(54, 209, 220, 0.18)',
+                                    border: '1px solid rgba(54, 209, 220, 0.45)',
+                                    color: '#36D1DC',
+                                    width: '26px',
+                                    height: '26px',
+                                    borderRadius: '6px',
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: '12px',
+                                    transition: 'all 0.15s ease',
+                                    boxShadow: '0 0 10px rgba(54, 209, 220, 0.25)',
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = '#36D1DC';
+                                    e.currentTarget.style.color = '#080A12';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = 'rgba(54, 209, 220, 0.18)';
+                                    e.currentTarget.style.color = '#36D1DC';
+                                  }}
+                                >
+                                  🧾
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEditPayment(item)}
+                                  title="Attach Screenshot"
+                                  style={{
+                                    background: 'rgba(255, 255, 255, 0.04)',
+                                    border: '1px dashed rgba(148, 163, 225, 0.25)',
+                                    color: '#64748B',
+                                    width: '24px',
+                                    height: '24px',
+                                    borderRadius: '6px',
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: '11px',
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.borderColor = '#00E5A0';
+                                    e.currentTarget.style.color = '#00E5A0';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.borderColor = 'rgba(148, 163, 225, 0.25)';
+                                    e.currentTarget.style.color = '#64748B';
+                                  }}
+                                >
+                                  +
+                                </button>
+                              )}
                             </div>
 
                             {/* EDIT: orange pencil button */}
@@ -1254,6 +1387,150 @@ export default function StudentPopupModal({
                     />
                   </div>
 
+                  {/* 4. PAYMENT SCREENSHOT / RECEIPT PROOF */}
+                  <div>
+                    <label style={{ fontSize: '10.5px', fontWeight: 700, color: '#FFB020', textTransform: 'uppercase', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '5px' }}>
+                      <span>Payment Screenshot / Proof</span>
+                      {editingPayment.receiptUrl && (
+                        <span style={{ color: '#00E5A0', fontSize: '10px', textTransform: 'none', fontWeight: 600 }}>
+                          ✓ Attached
+                        </span>
+                      )}
+                    </label>
+
+                    {/* Hidden file input */}
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      accept="image/*,application/pdf"
+                      onChange={handleFileSelected}
+                      style={{ display: 'none' }}
+                    />
+
+                    {editingPayment.receiptUrl ? (
+                      <div
+                        style={{
+                          background: 'rgba(255, 255, 255, 0.04)',
+                          border: '1px solid rgba(0, 229, 160, 0.35)',
+                          borderRadius: '8px',
+                          padding: '8px 10px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '8px',
+                        }}
+                      >
+                        <div
+                          onClick={() => setViewerReceipt({
+                            url: editingPayment.receiptUrl,
+                            slot: editingPayment.slot,
+                            studentName: selectedStudent.name,
+                            amount: editingPayment.amount,
+                            date: editingPayment.date,
+                            bank: editingPayment.bank,
+                          })}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            cursor: 'pointer',
+                            flex: 1,
+                            minWidth: 0,
+                          }}
+                          title="Click to view full preview"
+                        >
+                          <img
+                            src={editingPayment.receiptUrl}
+                            alt="Receipt preview"
+                            style={{
+                              width: '34px',
+                              height: '34px',
+                              borderRadius: '6px',
+                              objectFit: 'cover',
+                              border: '1px solid rgba(148, 163, 225, 0.3)',
+                              flexShrink: 0,
+                            }}
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: '11px', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              Screenshot Attached
+                            </div>
+                            <div style={{ fontSize: '9.5px', color: '#36D1DC' }}>Click to view full image ↗</div>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={isUploadingReceipt}
+                            style={{
+                              background: 'rgba(255, 255, 255, 0.08)',
+                              border: '1px solid rgba(148, 163, 225, 0.2)',
+                              color: '#EDEFFA',
+                              padding: '3px 7px',
+                              borderRadius: '6px',
+                              fontSize: '10px',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Change
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingPayment((prev) => ({ ...prev, receiptUrl: null }))}
+                            disabled={isUploadingReceipt}
+                            style={{
+                              background: 'rgba(255, 111, 142, 0.15)',
+                              border: '1px solid rgba(255, 111, 142, 0.35)',
+                              color: '#FF6F8E',
+                              padding: '3px 7px',
+                              borderRadius: '6px',
+                              fontSize: '10px',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div
+                        onClick={() => fileInputRef.current?.click()}
+                        style={{
+                          border: '1px dashed rgba(148, 163, 225, 0.3)',
+                          borderRadius: '8px',
+                          padding: '10px 12px',
+                          textAlign: 'center',
+                          cursor: isUploadingReceipt ? 'wait' : 'pointer',
+                          background: 'rgba(255, 255, 255, 0.02)',
+                          transition: 'all 0.15s ease',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.borderColor = '#00E5A0';
+                          e.currentTarget.style.background = 'rgba(0, 229, 160, 0.05)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.borderColor = 'rgba(148, 163, 225, 0.3)';
+                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.02)';
+                        }}
+                      >
+                        <div style={{ fontSize: '15px', marginBottom: '2px' }}>
+                          {isUploadingReceipt ? '⏳' : '📎'}
+                        </div>
+                        <div style={{ fontSize: '11px', fontWeight: 600, color: '#EDEFFA' }}>
+                          {isUploadingReceipt ? 'Compressing & uploading...' : 'Upload Payment Screenshot'}
+                        </div>
+                        <div style={{ fontSize: '9px', color: '#8E9BB5', marginTop: '2px' }}>
+                          PNG, JPG, WebP, PDF (auto-compressed)
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
                   {/* Actions */}
                   <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
                     {!editingPayment.isNew && (
@@ -1299,7 +1576,7 @@ export default function StudentPopupModal({
                     <button
                       type="button"
                       onClick={handleSavePayment}
-                      disabled={isSavingPayment}
+                      disabled={isSavingPayment || isUploadingReceipt}
                       style={{
                         flex: 2,
                         background: 'linear-gradient(135deg, #00E5A0 0%, #00B37E 100%)',
@@ -1309,7 +1586,7 @@ export default function StudentPopupModal({
                         padding: '9px',
                         fontSize: '12px',
                         fontWeight: 800,
-                        cursor: isSavingPayment ? 'wait' : 'pointer',
+                        cursor: isSavingPayment || isUploadingReceipt ? 'wait' : 'pointer',
                         boxShadow: '0 4px 14px rgba(0, 229, 160, 0.4)',
                       }}
                     >
@@ -1322,6 +1599,18 @@ export default function StudentPopupModal({
           </>
         )}
       </div>
+
+      {/* Lightbox Modal for Viewing Screenshots */}
+      <ReceiptViewerModal
+        isOpen={Boolean(viewerReceipt)}
+        onClose={() => setViewerReceipt(null)}
+        receiptUrl={viewerReceipt?.url}
+        studentName={viewerReceipt?.studentName || selectedStudent?.name}
+        installmentSlot={viewerReceipt?.slot || 1}
+        amount={viewerReceipt?.amount || 0}
+        date={viewerReceipt?.date || ''}
+        bank={viewerReceipt?.bank || ''}
+      />
     </div>
   );
 }
