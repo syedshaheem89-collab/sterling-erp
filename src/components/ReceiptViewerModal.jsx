@@ -28,6 +28,40 @@ export default function ReceiptViewerModal({
 
   const isPdf = typeof receiptUrl === 'string' && receiptUrl.toLowerCase().includes('.pdf');
 
+  // Safely open full image in a new tab without Chrome blocking data URLs
+  const handleOpenFull = () => {
+    if (!receiptUrl) return;
+    if (receiptUrl.startsWith('data:')) {
+      try {
+        const arr = receiptUrl.split(',');
+        const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
+        const bstr = atob(arr[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        while (n--) {
+          u8arr[n] = bstr.charCodeAt(n);
+        }
+        const blob = new Blob([u8arr], { type: mime });
+        const blobUrl = URL.createObjectURL(blob);
+        window.open(blobUrl, '_blank');
+      } catch (e) {
+        const win = window.open('');
+        if (win) {
+          win.document.title = `Payment Proof - ${studentName}`;
+          win.document.body.style.margin = '0';
+          win.document.body.style.background = '#080A12';
+          win.document.body.style.display = 'flex';
+          win.document.body.style.justifyContent = 'center';
+          win.document.body.style.alignItems = 'center';
+          win.document.body.style.minHeight = '100vh';
+          win.document.body.innerHTML = `<img src="${receiptUrl}" style="max-width:100%;max-height:100vh;object-fit:contain;" />`;
+        }
+      }
+    } else {
+      window.open(receiptUrl, '_blank');
+    }
+  };
+
   return (
     <div
       style={{
@@ -100,12 +134,10 @@ export default function ReceiptViewerModal({
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {/* Download / Open in New Tab Button */}
-            <a
-              href={receiptUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              download={`Payment_Proof_${studentName}_Slot_${installmentSlot}`}
+            {/* Open in New Tab Button (Safe Blob URL so Chrome never blocks) */}
+            <button
+              type="button"
+              onClick={handleOpenFull}
               style={{
                 background: 'rgba(54, 209, 220, 0.15)',
                 border: '1px solid rgba(54, 209, 220, 0.35)',
@@ -114,14 +146,14 @@ export default function ReceiptViewerModal({
                 borderRadius: '8px',
                 fontSize: '11.5px',
                 fontWeight: 700,
-                textDecoration: 'none',
+                cursor: 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '5px',
               }}
             >
               <span>↗</span> Open Full
-            </a>
+            </button>
 
             {/* Close Button */}
             <button

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import supabase from '../supabase';
 import toast from 'react-hot-toast';
 import { uploadPaymentProof, extractReceiptUrl, embedReceiptIntoNotes } from '../utils/paymentProofHelper';
+import ReceiptViewerModal from './ReceiptViewerModal';
 
 /**
  * PaymentModal
@@ -52,6 +53,7 @@ export default function PaymentModal({
   const [notes, setNotes] = useState(payment?.notes || '');
   const [receiptUrl, setReceiptUrl] = useState(payment ? (payment.receipt_url || extractReceiptUrl(payment)) : '');
   const [isUploadingReceipt, setIsUploadingReceipt] = useState(false);
+  const [showViewer, setShowViewer] = useState(false);
   const [saving, setSaving] = useState(false);
   const fileInputRef = useRef(null);
 
@@ -157,6 +159,11 @@ export default function PaymentModal({
         student.companyId ||
         'a1b2c3d4-0000-0000-0000-000000000001';
 
+      // Map frontend paymentType to allowed database check constraint values
+      // ('Bank Transfer', 'Cash', 'Online Gateway', 'Cheque', 'Other')
+      const allowedDbTypes = ['Bank Transfer', 'Cash', 'Online Gateway', 'Cheque', 'Other'];
+      const dbPaymentType = allowedDbTypes.includes(paymentType) ? paymentType : 'Bank Transfer';
+
       const paymentPayload = {
         student_id: student.id,
         company_id: companyId,
@@ -164,72 +171,45 @@ export default function PaymentModal({
         bank_name: bankName.trim(),
         amount: numAmount,
         payment_date: paymentDate,
-        payment_type: paymentType,
+        payment_type: dbPaymentType,
         reference_no: referenceNo.trim() || null,
         notes: embedReceiptIntoNotes(notes.trim(), receiptUrl) || null,
         receipt_url: receiptUrl || null,
       };
 
-      let resultData = null;
+      const savePayloadToDb = async (payloadToSave) => {
+        let p = { ...payloadToSave };
+        let res = isEditing
+          ? await supabase.from('payments').update(p).eq('id', payment.id).select().single()
+          : await supabase.from('payments').insert([p]).select().single();
 
-      if (isEditing) {
-        paymentPayload.id = payment.id;
-        let { data, error } = await supabase
-          .from('payments')
-          .update(paymentPayload)
-          .eq('id', payment.id)
-          .select()
-          .single();
-
-        // If receipt_url column doesn't exist, retry without it (already embedded in notes)
-        if (error && error.message && error.message.toLowerCase().includes('receipt_url')) {
-          delete paymentPayload.receipt_url;
-          const retry = await supabase
-            .from('payments')
-            .update(paymentPayload)
-            .eq('id', payment.id)
-            .select()
-            .single();
-          data = retry.data;
-          error = retry.error;
+        // 1. If duplicate key, fallback to upsert
+        if (!isEditing && res.error && (res.error.code === '23505' || String(res.error.message || '').includes('unique'))) {
+          res = await supabase.from('payments').upsert([p], { onConflict: 'student_id,slot' }).select().single();
         }
 
-        if (error) throw error;
-        resultData = data;
-        toast.success(`Payment Slot ${selectedSlot} updated successfully`);
-      } else {
-        let { data, error } = await supabase
-          .from('payments')
-          .insert([paymentPayload])
-          .select()
-          .single();
-
-        if (error && error.message && error.message.toLowerCase().includes('receipt_url')) {
-          delete paymentPayload.receipt_url;
-          const retry = await supabase
-            .from('payments')
-            .insert([paymentPayload])
-            .select()
-            .single();
-          data = retry.data;
-          error = retry.error;
+        // 2. If receipt_url column doesn't exist, remove receipt_url and retry
+        if (res.error && res.error.message && res.error.message.toLowerCase().includes('receipt_url')) {
+          delete p.receipt_url;
+          res = isEditing
+            ? await supabase.from('payments').update(p).eq('id', payment.id).select().single()
+            : await supabase.from('payments').upsert([p], { onConflict: 'student_id,slot' }).select().single();
         }
 
-        if (error) {
-          // Fallback to upsert if duplicate key constraint
-          const { data: upsertData, error: upsertErr } = await supabase
-            .from('payments')
-            .upsert([paymentPayload], { onConflict: 'student_id,slot' })
-            .select()
-            .single();
-
-          if (upsertErr) throw upsertErr;
-          resultData = upsertData;
-        } else {
-          resultData = data;
+        // 3. If payment_type check constraint fails, fallback to 'Bank Transfer'
+        if (res.error && res.error.message && res.error.message.toLowerCase().includes('payment_type')) {
+          p.payment_type = 'Bank Transfer';
+          res = isEditing
+            ? await supabase.from('payments').update(p).eq('id', payment.id).select().single()
+            : await supabase.from('payments').upsert([p], { onConflict: 'student_id,slot' }).select().single();
         }
-        toast.success(`Payment Slot ${selectedSlot} recorded successfully`);
-      }
+
+        if (res.error) throw res.error;
+        return res.data;
+      };
+
+      const resultData = await savePayloadToDb(paymentPayload);
+      toast.success(isEditing ? `Payment Slot ${selectedSlot} updated successfully` : `Payment Slot ${selectedSlot} recorded successfully`);
 
       if (onSave) {
         onSave(resultData);
@@ -678,20 +658,17 @@ export default function PaymentModal({
                       gap: '12px',
                     }}
                   >
-                    <a
-                      href={receiptUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <div
+                      onClick={() => setShowViewer(true)}
                       style={{
                         display: 'flex',
                         alignItems: 'center',
                         gap: '10px',
-                        textDecoration: 'none',
-                        color: 'inherit',
+                        cursor: 'pointer',
                         flex: 1,
                         minWidth: 0,
                       }}
-                      title="Click to view full screenshot in new tab"
+                      title="Click to view full screenshot preview"
                     >
                       <img
                         src={receiptUrl}
@@ -716,7 +693,7 @@ export default function PaymentModal({
                           Click to preview ↗
                         </div>
                       </div>
-                    </a>
+                    </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <button
@@ -838,6 +815,18 @@ export default function PaymentModal({
           </div>
         </form>
       </div>
+
+      {/* Lightbox Modal for Viewing Screenshots */}
+      <ReceiptViewerModal
+        isOpen={showViewer}
+        onClose={() => setShowViewer(false)}
+        receiptUrl={receiptUrl}
+        studentName={student?.name}
+        installmentSlot={selectedSlot}
+        amount={amount}
+        date={paymentDate}
+        bank={bankName}
+      />
 
       <style>{`
         @keyframes fadeIn {

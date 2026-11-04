@@ -130,6 +130,7 @@ CREATE TABLE public.payments (
 -- NOTE: If updating an existing database, execute:
 -- ALTER TABLE public.payments DROP CONSTRAINT IF EXISTS payments_slot_check;
 -- ALTER TABLE public.payments ADD CONSTRAINT payments_slot_check CHECK (slot >= 1);
+-- ALTER TABLE public.payments DROP CONSTRAINT IF EXISTS payments_payment_type_check;
 -- ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS receipt_url TEXT;
 
 -- 6) Ledger Entries Table
