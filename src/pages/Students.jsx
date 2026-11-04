@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import PaymentModal from '../components/PaymentModal';
 import GoogleSheetImporterModal from '../components/GoogleSheetImporterModal';
+import ReceiptViewerModal from '../components/ReceiptViewerModal';
 import { extractReceiptUrl } from '../utils/paymentProofHelper';
 
 const COUNTRY_FLAGS = {
@@ -2961,6 +2962,7 @@ function StudentDetailModal({
   onDeletePayment,
   onClose,
 }) {
+  const [viewerReceipt, setViewerReceipt] = useState(null);
   const payments = student.payments || [];
   const percentCollected =
     student.committed > 0
@@ -3411,15 +3413,24 @@ function StudentDetailModal({
                           </div>
 
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            {/* Receipt Proof Preview Link */}
+                            {/* Receipt Proof Preview Button */}
                             {(() => {
                               const rUrl = pmt.receipt_url || extractReceiptUrl(pmt);
                               if (!rUrl) return null;
                               return (
-                                <a
-                                  href={rUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setViewerReceipt({
+                                      url: rUrl,
+                                      studentName: student?.name,
+                                      slot: pmt.slot || 1,
+                                      amount: pmt.amount,
+                                      date: pmt.payment_date,
+                                      bank: pmt.bank_name,
+                                    });
+                                  }}
                                   title="View Payment Screenshot / Receipt Proof"
                                   style={{
                                     background: 'rgba(54, 209, 220, 0.15)',
@@ -3433,10 +3444,12 @@ function StudentDetailModal({
                                     display: 'inline-flex',
                                     alignItems: 'center',
                                     gap: '4px',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s ease',
                                   }}
                                 >
                                   <span>🧾</span> Proof
-                                </a>
+                                </button>
                               );
                             })()}
 
@@ -3620,6 +3633,18 @@ function StudentDetailModal({
           )}
         </div>
       </div>
+
+      {/* Lightbox Modal for Viewing Screenshots / Proof */}
+      <ReceiptViewerModal
+        isOpen={Boolean(viewerReceipt)}
+        onClose={() => setViewerReceipt(null)}
+        receiptUrl={viewerReceipt?.url}
+        studentName={viewerReceipt?.studentName || student?.name}
+        installmentSlot={viewerReceipt?.slot || 1}
+        amount={viewerReceipt?.amount || 0}
+        date={viewerReceipt?.date}
+        bank={viewerReceipt?.bank || ''}
+      />
     </div>
   );
 }
