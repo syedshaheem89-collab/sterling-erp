@@ -253,8 +253,23 @@ export default function StudentPopupModal({
           upsertErr = res2.error;
         }
 
+        // 3. If payment_type check constraint fails, try valid fallback types
+        if (upsertErr && upsertErr.message && upsertErr.message.toLowerCase().includes('payment_type')) {
+          const fallbackTypes = ['standard', 'Normal', 'normal', 'Cash'];
+          for (const ft of fallbackTypes) {
+            paymentPayload.payment_type = ft;
+            const resType = await supabase
+              .from('payments')
+              .upsert(paymentPayload, { onConflict: 'student_id,slot' });
+            if (!resType.error) {
+              upsertErr = null;
+              break;
+            }
+          }
+        }
+
         if (upsertErr) {
-          if (upsertErr.message && upsertErr.message.toLowerCase().includes('check')) {
+          if (upsertErr.message && upsertErr.message.toLowerCase().includes('payments_slot_check')) {
             throw new Error(`Database check constraint: If adding slot > 5, please execute: ALTER TABLE payments DROP CONSTRAINT IF EXISTS payments_slot_check; in Supabase SQL editor.`);
           }
           throw upsertErr;

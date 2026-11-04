@@ -140,6 +140,26 @@ export function extractReceiptUrl(payment) {
 }
 
 /**
+ * Safely extracts payment type from payment record, checking notes [Type: ...] tag as fallback.
+ * 
+ * @param {Object} payment 
+ * @returns {string}
+ */
+export function extractPaymentType(payment) {
+  if (!payment) return 'Normal';
+  if (payment.payment_type && payment.payment_type !== 'standard' && payment.payment_type !== 'Bank Transfer') {
+    return payment.payment_type;
+  }
+  if (payment.notes && typeof payment.notes === 'string') {
+    const match = payment.notes.match(/\[Type:\s*([^\]]+)\]/i);
+    if (match && match[1]) {
+      return match[1].trim();
+    }
+  }
+  return payment.payment_type || 'Normal';
+}
+
+/**
  * Embeds or removes [RECEIPT_URL:...] tag inside a notes string.
  * 
  * @param {string} notes 

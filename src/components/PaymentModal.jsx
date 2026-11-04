@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import supabase from '../supabase';
 import toast from 'react-hot-toast';
-import { uploadPaymentProof, extractReceiptUrl, embedReceiptIntoNotes } from '../utils/paymentProofHelper';
+import { uploadPaymentProof, extractReceiptUrl, embedReceiptIntoNotes, extractPaymentType } from '../utils/paymentProofHelper';
 import ReceiptViewerModal from './ReceiptViewerModal';
 
 /**
@@ -48,7 +48,7 @@ export default function PaymentModal({
   const [paymentDate, setPaymentDate] = useState(
     payment?.payment_date || new Date().toISOString().split('T')[0]
   );
-  const [paymentType, setPaymentType] = useState(payment?.payment_type || 'Normal');
+  const [paymentType, setPaymentType] = useState(payment ? extractPaymentType(payment) : 'Normal');
   const [referenceNo, setReferenceNo] = useState(payment?.reference_no || '');
   const [notes, setNotes] = useState(payment?.notes || '');
   const [receiptUrl, setReceiptUrl] = useState(payment ? (payment.receipt_url || extractReceiptUrl(payment)) : '');
@@ -63,7 +63,7 @@ export default function PaymentModal({
       setBankName(payment.bank_name || '');
       setAmount(payment.amount ? String(payment.amount) : '');
       setPaymentDate(payment.payment_date || new Date().toISOString().split('T')[0]);
-      setPaymentType(payment.payment_type || 'Normal');
+      setPaymentType(extractPaymentType(payment));
       setReferenceNo(payment.reference_no || '');
       setNotes(payment.notes || '');
       setReceiptUrl(payment.receipt_url || extractReceiptUrl(payment) || '');
@@ -159,56 +159,106 @@ export default function PaymentModal({
         student.companyId ||
         'a1b2c3d4-0000-0000-0000-000000000001';
 
-      // Map frontend paymentType to allowed database check constraint values
-      // ('Bank Transfer', 'Cash', 'Online Gateway', 'Cheque', 'Other')
-      const allowedDbTypes = ['Bank Transfer', 'Cash', 'Online Gateway', 'Cheque', 'Other'];
-      const dbPaymentType = allowedDbTypes.includes(paymentType) ? paymentType : 'Bank Transfer';
+      // Always tag the chosen paymentType in notes so it is preserved even if the database constraint overrides the column
+      let finalNotes = notes.trim();
+      if (paymentType && paymentType !== 'Normal' && !finalNotes.includes('[Type:')) {
+        finalNotes = `[Type: ${paymentType}] ${finalNotes}`.trim();
+      }
 
-      const paymentPayload = {
+      const embeddedNotes = embedReceiptIntoNotes(finalNotes, receiptUrl) || null;
+
+      const basePayload = {
         student_id: student.id,
         company_id: companyId,
         slot: Number(selectedSlot),
         bank_name: bankName.trim(),
         amount: numAmount,
         payment_date: paymentDate,
-        payment_type: dbPaymentType,
         reference_no: referenceNo.trim() || null,
-        notes: embedReceiptIntoNotes(notes.trim(), receiptUrl) || null,
+        notes: embeddedNotes,
         receipt_url: receiptUrl || null,
       };
 
-      const savePayloadToDb = async (payloadToSave) => {
-        let p = { ...payloadToSave };
-        let res = isEditing
-          ? await supabase.from('payments').update(p).eq('id', payment.id).select().single()
-          : await supabase.from('payments').insert([p]).select().single();
+      const savePayloadToDb = async (initialPayload) => {
+        // Try multiple candidates in order:
+        // 1. User's exact selection: paymentType ('Normal', 'B2B', 'Direct to Counselor')
+        // 2. undefined: omit column entirely so Postgres default is used
+        // 3. 'standard' (common default in sterling schema)
+        // 4. 'normal' (lowercase)
+        // 5. 'Bank Transfer'
+        // 6. 'Cash'
+        // 7. 'Other'
+        const candidateTypes = [
+          paymentType,
+          undefined,
+          'standard',
+          'normal',
+          'Bank Transfer',
+          'Cash',
+          'Other',
+        ];
 
-        // 1. If duplicate key, fallback to upsert
-        if (!isEditing && res.error && (res.error.code === '23505' || String(res.error.message || '').includes('unique'))) {
-          res = await supabase.from('payments').upsert([p], { onConflict: 'student_id,slot' }).select().single();
+        const uniqueCandidates = [];
+        for (const t of candidateTypes) {
+          if (!uniqueCandidates.includes(t)) uniqueCandidates.push(t);
         }
 
-        // 2. If receipt_url column doesn't exist, remove receipt_url and retry
-        if (res.error && res.error.message && res.error.message.toLowerCase().includes('receipt_url')) {
-          delete p.receipt_url;
-          res = isEditing
+        let lastError = null;
+        let receiptColumnMissing = false;
+
+        for (const testType of uniqueCandidates) {
+          let p = { ...initialPayload };
+          if (receiptColumnMissing) {
+            delete p.receipt_url;
+          }
+          if (testType === undefined) {
+            delete p.payment_type;
+          } else {
+            p.payment_type = testType;
+          }
+
+          let res = isEditing
             ? await supabase.from('payments').update(p).eq('id', payment.id).select().single()
-            : await supabase.from('payments').upsert([p], { onConflict: 'student_id,slot' }).select().single();
+            : await supabase.from('payments').insert([p]).select().single();
+
+          // 1. If duplicate key, fallback to upsert
+          if (!isEditing && res.error && (res.error.code === '23505' || String(res.error.message || '').includes('unique'))) {
+            res = await supabase.from('payments').upsert([p], { onConflict: 'student_id,slot' }).select().single();
+          }
+
+          // 2. If receipt_url column doesn't exist, remove receipt_url and retry immediately
+          if (res.error && res.error.message && res.error.message.toLowerCase().includes('receipt_url')) {
+            receiptColumnMissing = true;
+            delete p.receipt_url;
+            res = isEditing
+              ? await supabase.from('payments').update(p).eq('id', payment.id).select().single()
+              : await supabase.from('payments').upsert([p], { onConflict: 'student_id,slot' }).select().single();
+          }
+
+          // If successfully saved, return!
+          if (!res.error && res.data) {
+            return res.data;
+          }
+
+          lastError = res.error;
+
+          // Check if error is slot check constraint (e.g. slot > 5)
+          if (res.error?.message && res.error.message.toLowerCase().includes('payments_slot_check')) {
+            throw new Error(`Slot ${selectedSlot} exceeds the database limit (1-5). Please run in Supabase SQL editor: ALTER TABLE payments DROP CONSTRAINT IF EXISTS payments_slot_check;`);
+          }
+
+          // If the error is NOT a payment_type constraint error, no point in cycling payment types
+          const errText = (res.error?.message || '').toLowerCase();
+          if (!errText.includes('payment_type')) {
+            break;
+          }
         }
 
-        // 3. If payment_type check constraint fails, fallback to 'Bank Transfer'
-        if (res.error && res.error.message && res.error.message.toLowerCase().includes('payment_type')) {
-          p.payment_type = 'Bank Transfer';
-          res = isEditing
-            ? await supabase.from('payments').update(p).eq('id', payment.id).select().single()
-            : await supabase.from('payments').upsert([p], { onConflict: 'student_id,slot' }).select().single();
-        }
-
-        if (res.error) throw res.error;
-        return res.data;
+        if (lastError) throw lastError;
+        return null;
       };
 
-      const resultData = await savePayloadToDb(paymentPayload);
+      const resultData = await savePayloadToDb(basePayload);
       toast.success(isEditing ? `Payment Slot ${selectedSlot} updated successfully` : `Payment Slot ${selectedSlot} recorded successfully`);
 
       if (onSave) {
