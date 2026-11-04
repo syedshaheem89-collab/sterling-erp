@@ -53,10 +53,11 @@ export default function Overview({ setCurrentPage }) {
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
 
-  // Monthly Collections Date Filter
+  // Monthly Collections Date Filter (Dynamic default to today)
+  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
   const [monthlyFromDate, setMonthlyFromDate] = useState('2025-12-01');
-  const [monthlyToDate, setMonthlyToDate] = useState('2026-11-02');
-  const [appliedMonthlyRange, setAppliedMonthlyRange] = useState({ from: '2025-12-01', to: '2026-11-02' });
+  const [monthlyToDate, setMonthlyToDate] = useState(todayStr);
+  const [appliedMonthlyRange, setAppliedMonthlyRange] = useState({ from: '2025-12-01', to: todayStr });
 
   // Chart canvas refs
   const doughnutChartRef = useRef(null);
@@ -287,6 +288,7 @@ export default function Overview({ setCurrentPage }) {
 
     const monthlyMap = {};
     const dailyMap = {};
+    const dailyAmountMap = {};
 
     enrichedStudents.forEach((s) => {
       totalCollected += s.collected;
@@ -325,12 +327,16 @@ export default function Overview({ setCurrentPage }) {
           if (p.payment_date || p.paid_date) {
             const dtStr = p.payment_date || p.paid_date;
             const d = new Date(dtStr);
-            const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-            monthlyMap[ym] = (monthlyMap[ym] || 0) + (Number(p.amount) || 0);
+            if (!isNaN(d.getTime())) {
+              const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+              const amt = Number(p.amount) || 0;
+              monthlyMap[ym] = (monthlyMap[ym] || 0) + amt;
 
-            // Daily trend
-            const dayKey = dtStr.slice(0, 10);
-            dailyMap[dayKey] = (dailyMap[dayKey] || 0) + 1;
+              // Daily trend
+              const dayKey = dtStr.slice(0, 10);
+              dailyMap[dayKey] = (dailyMap[dayKey] || 0) + 1;
+              dailyAmountMap[dayKey] = (dailyAmountMap[dayKey] || 0) + amt;
+            }
           }
         });
       }
@@ -353,6 +359,7 @@ export default function Overview({ setCurrentPage }) {
       stageMap,
       monthlyMap,
       dailyMap,
+      dailyAmountMap,
     };
   }, [enrichedStudents]);
 
@@ -625,12 +632,31 @@ export default function Overview({ setCurrentPage }) {
       });
     }
 
-    // 4. MONTHLY GROWTH TREND LINE CHART
+    // 4. MONTHLY GROWTH TREND LINE CHART (Real Database Collections)
     if (growthTrendChartRef.current) {
       if (growthTrendChartInstance.current) growthTrendChartInstance.current.destroy();
 
-      const months = ['Jan 26', 'Feb 26', 'Mar 26', 'Apr 26', 'May 26', 'Jun 26', 'Jul 26', 'Aug 26', 'Sep 26', 'Oct 26'];
-      const trendValues = [5, 12, 10, 7, 15, 23, 27, 25, 22, 18];
+      const sortedMonths = Object.keys(metrics.monthlyMap).sort();
+      const trendMonths = sortedMonths.length > 0
+        ? sortedMonths.slice(-12)
+        : ['2026-01', '2026-02', '2026-03', '2026-04', '2026-05', '2026-06', '2026-07', '2026-08', '2026-09', '2026-10', '2026-11'];
+
+      const months = trendMonths.map((ym) => {
+        const [y, m] = ym.split('-');
+        return new Date(Number(y), Number(m) - 1).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+      });
+
+      const trendValues = trendMonths.map((ym) => {
+        const raw = metrics.monthlyMap[ym] || 0;
+        return Number((raw / 100000).toFixed(2)); // in Lakhs
+      });
+
+      const pointColors = trendMonths.map((ym, idx) => {
+        if (idx === 0) return '#7C6FFF';
+        const cur = metrics.monthlyMap[ym] || 0;
+        const prev = metrics.monthlyMap[trendMonths[idx - 1]] || 0;
+        return cur >= prev ? '#00E5A0' : '#FF6F8E';
+      });
 
       const ctx = growthTrendChartRef.current.getContext('2d');
       const grad = ctx.createLinearGradient(0, 0, 0, 200);
@@ -648,8 +674,8 @@ export default function Overview({ setCurrentPage }) {
               borderWidth: 3,
               fill: true,
               backgroundColor: grad,
-              tension: 0.4,
-              pointBackgroundColor: ['#00E5A0', '#36D1DC', '#7C6FFF', '#FF6F8E', '#FFB020', '#00E5A0', '#38BDF8', '#A78BFA', '#00E5A0', '#7C6FFF'],
+              tension: 0.35,
+              pointBackgroundColor: pointColors,
               pointBorderColor: '#0B0F1C',
               pointBorderWidth: 2,
               pointRadius: 5,
@@ -660,7 +686,41 @@ export default function Overview({ setCurrentPage }) {
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#0F1528',
+              titleColor: '#EDEFFA',
+              bodyColor: '#A8B2C7',
+              borderColor: 'rgba(148, 163, 225, 0.25)',
+              borderWidth: 1,
+              padding: 10,
+              callbacks: {
+                label: (ctx) => {
+                  const ym = trendMonths[ctx.dataIndex];
+                  const raw = metrics.monthlyMap[ym] || 0;
+                  return ` Collected: ${formatIndianCurrency(raw)} (${ctx.raw} L)`;
+                },
+              },
+            },
+          },
+          onClick: (evt, elements) => {
+            if (elements.length > 0) {
+              const idx = elements[0].index;
+              const ym = trendMonths[idx];
+              const monthLabel = months[idx];
+              openDrilldown({
+                title: `Payments in ${monthLabel}`,
+                subtitle: `Students who paid fee installments during ${monthLabel}`,
+                badgeText: monthLabel,
+                badgeColor: '#7C6FFF',
+                filterFn: (s) => (s.payments || []).some((p) => {
+                  const d = p.payment_date || p.paid_date;
+                  return d && String(d).startsWith(ym);
+                }),
+              });
+            }
+          },
           scales: {
             x: {
               grid: { display: false },
@@ -671,7 +731,7 @@ export default function Overview({ setCurrentPage }) {
               ticks: {
                 color: '#8E9BB5',
                 font: { size: 9 },
-                callback: (val) => `₹${val}.00 L`,
+                callback: (val) => `₹${val} L`,
               },
             },
           },
@@ -679,12 +739,31 @@ export default function Overview({ setCurrentPage }) {
       });
     }
 
-    // 5. MONTHLY COLLECTIONS (CYAN BAR CHART)
+    // 5. MONTHLY COLLECTIONS (CYAN BAR CHART - Real Dynamic Data Filtered by Range)
     if (monthlyCollectionsChartRef.current) {
       if (monthlyCollectionsChartInstance.current) monthlyCollectionsChartInstance.current.destroy();
 
-      const barMonths = ['Dec 25', 'Jan 26', 'Feb 26', 'Mar 26', 'Apr 26', 'May 26', 'Jun 26', 'Jul 26', 'Aug 26', 'Sep 26', 'Oct 26'];
-      const barAmounts = [9.3, 17.7, 5.4, 3.76, 2.15, 5.44, 10.02, 12.9, 22.75, 36.84, 30.26];
+      const sortedMonths = Object.keys(metrics.monthlyMap).sort();
+      const fromYm = appliedMonthlyRange?.from ? appliedMonthlyRange.from.slice(0, 7) : null;
+      const toYm = appliedMonthlyRange?.to ? appliedMonthlyRange.to.slice(0, 7) : null;
+
+      const filteredMonths = sortedMonths.filter((ym) => {
+        if (fromYm && ym < fromYm) return false;
+        if (toYm && ym > toYm) return false;
+        return true;
+      });
+
+      const activeMonths = filteredMonths.length > 0 ? filteredMonths : sortedMonths.slice(-12);
+
+      const barMonths = activeMonths.map((ym) => {
+        const [y, m] = ym.split('-');
+        return new Date(Number(y), Number(m) - 1).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+      });
+
+      const barAmounts = activeMonths.map((ym) => {
+        const raw = metrics.monthlyMap[ym] || 0;
+        return Number((raw / 100000).toFixed(2)); // in Lakhs
+      });
 
       const ctx = monthlyCollectionsChartRef.current.getContext('2d');
       const grad = ctx.createLinearGradient(0, 0, 0, 250);
@@ -702,6 +781,7 @@ export default function Overview({ setCurrentPage }) {
               borderRadius: 6,
               borderSkipped: false,
               barPercentage: 0.62,
+              hoverBackgroundColor: '#00E5A0',
             },
           ],
         },
@@ -712,8 +792,36 @@ export default function Overview({ setCurrentPage }) {
             legend: { display: false },
             tooltip: {
               backgroundColor: '#0F1528',
-              callbacks: { label: (ctx) => `₹${ctx.raw} L` },
+              titleColor: '#EDEFFA',
+              bodyColor: '#A8B2C7',
+              borderColor: 'rgba(54, 209, 220, 0.3)',
+              borderWidth: 1,
+              padding: 10,
+              callbacks: {
+                label: (ctx) => {
+                  const ym = activeMonths[ctx.dataIndex];
+                  const raw = metrics.monthlyMap[ym] || 0;
+                  return ` Collected: ${formatIndianCurrency(raw)} (${ctx.raw} L)`;
+                },
+              },
             },
+          },
+          onClick: (evt, elements) => {
+            if (elements.length > 0) {
+              const idx = elements[0].index;
+              const ym = activeMonths[idx];
+              const monthLabel = barMonths[idx];
+              openDrilldown({
+                title: `Collections for ${monthLabel}`,
+                subtitle: `Students who made payments in ${monthLabel}`,
+                badgeText: monthLabel,
+                badgeColor: '#36D1DC',
+                filterFn: (s) => (s.payments || []).some((p) => {
+                  const d = p.payment_date || p.paid_date;
+                  return d && String(d).startsWith(ym);
+                }),
+              });
+            }
           },
           scales: {
             x: {
@@ -725,7 +833,7 @@ export default function Overview({ setCurrentPage }) {
               ticks: {
                 color: '#8E9BB5',
                 font: { size: 9 },
-                callback: (val) => `₹${val}.00 L`,
+                callback: (val) => `₹${val} L`,
               },
             },
           },
@@ -733,14 +841,32 @@ export default function Overview({ setCurrentPage }) {
       });
     }
 
-    // 6. DAILY TREND HORIZONTAL LINE CHART
+    // 6. DAILY TREND LINE CHART (Real Dynamic Daily Payments for Current Month)
     if (dailyTrendChartRef.current) {
       if (dailyTrendChartInstance.current) dailyTrendChartInstance.current.destroy();
 
-      const days = Array.from({ length: 30 }, (_, i) => `${i + 1}`);
-      const dayValues = days.map(() => 11);
+      const now = new Date();
+      const curY = now.getFullYear();
+      const curM = String(now.getMonth() + 1).padStart(2, '0');
+      const daysInMonth = new Date(curY, now.getMonth() + 1, 0).getDate();
+
+      const days = [];
+      const dayValues = [];
+      const dayAmounts = [];
+
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dayPad = String(day).padStart(2, '0');
+        const dayKey = `${curY}-${curM}-${dayPad}`;
+        days.push(`${day}`);
+        dayValues.push(metrics.dailyMap[dayKey] || 0);
+        dayAmounts.push(metrics.dailyAmountMap ? (metrics.dailyAmountMap[dayKey] || 0) : 0);
+      }
 
       const ctx = dailyTrendChartRef.current.getContext('2d');
+      const grad = ctx.createLinearGradient(0, 0, 0, 200);
+      grad.addColorStop(0, 'rgba(0, 229, 160, 0.35)');
+      grad.addColorStop(1, 'rgba(0, 229, 160, 0.0)');
+
       dailyTrendChartInstance.current = new ChartJS(ctx, {
         type: 'line',
         data: {
@@ -749,21 +875,69 @@ export default function Overview({ setCurrentPage }) {
             {
               data: dayValues,
               borderColor: '#00E5A0',
+              backgroundColor: grad,
+              fill: true,
               borderWidth: 2,
-              pointRadius: 0,
-              tension: 0,
+              pointRadius: (ctx) => (ctx.raw > 0 ? 4 : 0),
+              pointHoverRadius: 6,
+              pointBackgroundColor: '#00E5A0',
+              pointBorderColor: '#0B0F1C',
+              tension: 0.3,
             },
           ],
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#0F1528',
+              titleColor: '#EDEFFA',
+              bodyColor: '#A8B2C7',
+              borderColor: 'rgba(0, 229, 160, 0.3)',
+              borderWidth: 1,
+              padding: 10,
+              callbacks: {
+                title: (items) => `${now.toLocaleDateString('en-US', { month: 'short' })} ${items[0]?.label}, ${curY}`,
+                label: (ctx) => {
+                  const dayIdx = ctx.dataIndex;
+                  const count = ctx.raw;
+                  const amt = dayAmounts[dayIdx] || 0;
+                  return [
+                    ` Transactions: ${count} recorded`,
+                    ` Amount: ${formatIndianCurrency(amt)}`,
+                  ];
+                },
+              },
+            },
+          },
+          onClick: (evt, elements) => {
+            if (elements.length > 0) {
+              const dayNum = days[elements[0].index];
+              const dayPad = String(dayNum).padStart(2, '0');
+              const targetDate = `${curY}-${curM}-${dayPad}`;
+              openDrilldown({
+                title: `Daily Payments: ${targetDate}`,
+                subtitle: `Students who paid installments on ${targetDate}`,
+                badgeText: targetDate,
+                badgeColor: '#00E5A0',
+                filterFn: (s) => (s.payments || []).some((p) => {
+                  const d = p.payment_date || p.paid_date;
+                  return d && String(d).startsWith(targetDate);
+                }),
+              });
+            }
+          },
           scales: {
-            x: { display: false },
+            x: {
+              grid: { display: false },
+              ticks: { color: '#8E9BB5', font: { size: 9 }, maxTicksLimit: 12 },
+            },
             y: {
+              beginAtZero: true,
               grid: { color: 'rgba(148, 163, 225, 0.06)' },
-              ticks: { color: '#8E9BB5', font: { size: 9 }, stepSize: 1 },
+              ticks: { color: '#8E9BB5', font: { size: 9 }, stepSize: 1, precision: 0 },
             },
           },
         },
@@ -778,7 +952,7 @@ export default function Overview({ setCurrentPage }) {
       if (monthlyCollectionsChartInstance.current) monthlyCollectionsChartInstance.current.destroy();
       if (dailyTrendChartInstance.current) dailyTrendChartInstance.current.destroy();
     };
-  }, [loading, metrics]);
+  }, [loading, metrics, appliedMonthlyRange]);
 
   return (
     <div
@@ -1640,8 +1814,8 @@ export default function Overview({ setCurrentPage }) {
               <button
                 onClick={() => {
                   setMonthlyFromDate('2025-12-01');
-                  setMonthlyToDate('2026-11-02');
-                  setAppliedMonthlyRange({ from: '2025-12-01', to: '2026-11-02' });
+                  setMonthlyToDate(todayStr);
+                  setAppliedMonthlyRange({ from: '2025-12-01', to: todayStr });
                 }}
                 style={{
                   background: 'transparent',
@@ -1659,7 +1833,7 @@ export default function Overview({ setCurrentPage }) {
           </div>
 
           {/* Bar Chart */}
-          <div style={{ position: 'relative', height: '240px', width: '100%' }}>
+          <div style={{ position: 'relative', height: '240px', width: '100%', cursor: 'pointer' }} title="Click any month to inspect students">
             <canvas ref={monthlyCollectionsChartRef} />
           </div>
         </div>
@@ -1680,12 +1854,14 @@ export default function Overview({ setCurrentPage }) {
               <div style={{ fontSize: '12px', fontWeight: 800, color: '#EDEFFA', letterSpacing: '0.04em' }}>
                 DAILY TREND
               </div>
-              <div style={{ fontSize: '10px', color: '#8E9BB5' }}>November 2026</div>
+              <div style={{ fontSize: '10px', color: '#8E9BB5' }}>
+                {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+              </div>
             </div>
             <span style={{ fontSize: '14px', color: '#64748B', cursor: 'pointer' }}>✕</span>
           </div>
 
-          <div style={{ position: 'relative', height: '240px', width: '100%' }}>
+          <div style={{ position: 'relative', height: '240px', width: '100%', cursor: 'pointer' }} title="Click any day to inspect students">
             <canvas ref={dailyTrendChartRef} />
           </div>
         </div>
