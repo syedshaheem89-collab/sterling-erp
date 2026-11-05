@@ -60,8 +60,6 @@ export default function Overview({ setCurrentPage }) {
   const [appliedMonthlyRange, setAppliedMonthlyRange] = useState({ from: '2025-12-01', to: todayStr });
 
   // Chart canvas refs
-  const doughnutChartRef = useRef(null);
-  const doughnutChartInstance = useRef(null);
   const intakeChartRef = useRef(null);
   const intakeChartInstance = useRef(null);
   const paymentStageChartRef = useRef(null);
@@ -72,6 +70,9 @@ export default function Overview({ setCurrentPage }) {
   const monthlyCollectionsChartInstance = useRef(null);
   const dailyTrendChartRef = useRef(null);
   const dailyTrendChartInstance = useRef(null);
+
+  // SVG Donut interactive hover state
+  const [hoveredDonutSlice, setHoveredDonutSlice] = useState(null);
 
   const isCounselorOnly = isCounselor || role === 'counselor';
 
@@ -437,77 +438,7 @@ export default function Overview({ setCurrentPage }) {
   useEffect(() => {
     if (loading) return;
 
-    // 1. DOUGHNUT: COLLECTION STATUS
-    if (doughnutChartRef.current) {
-      if (doughnutChartInstance.current) doughnutChartInstance.current.destroy();
-
-      const ctx = doughnutChartRef.current.getContext('2d');
-      doughnutChartInstance.current = new ChartJS(ctx, {
-        type: 'doughnut',
-        data: {
-          labels: ['Full Payment', 'Partial/Pending'],
-          datasets: [
-            {
-              data: [metrics.fullPaymentCount || 1, metrics.partialPaymentCount || 0],
-              backgroundColor: ['#00E5A0', '#FFB020'],
-              borderColor: '#0B0F1C',
-              borderWidth: 5,
-              hoverOffset: 10,
-            },
-          ],
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          cutout: '70%',
-          plugins: {
-            legend: {
-              display: false,
-            },
-            tooltip: {
-              backgroundColor: '#0F1423',
-              titleColor: '#EDEFFA',
-              bodyColor: '#A8B2C7',
-              borderColor: 'rgba(148, 163, 225, 0.25)',
-              borderWidth: 1,
-              padding: 10,
-              callbacks: {
-                label: (context) => {
-                  const val = context.parsed;
-                  const total = (metrics.fullPaymentCount || 0) + (metrics.partialPaymentCount || 0);
-                  const pct = total > 0 ? ((val / total) * 100).toFixed(1) : 0;
-                  return ` ${context.label}: ${val} students (${pct}%)`;
-                },
-              },
-            },
-          },
-          onClick: (evt, elements) => {
-            if (elements.length > 0) {
-              const idx = elements[0].index;
-              if (idx === 0) {
-                openDrilldown({
-                  title: 'Full Payment Students',
-                  subtitle: 'Students who have paid their complete committed fee',
-                  badgeText: 'Full Payment',
-                  badgeColor: '#00E5A0',
-                  filterFn: (s) => s.isFullPayment,
-                });
-              } else {
-                openDrilldown({
-                  title: 'Partial / Pending Payment Students',
-                  subtitle: 'Students with remaining installments due',
-                  badgeText: 'Partial Due',
-                  badgeColor: '#FFB020',
-                  filterFn: (s) => !s.isFullPayment,
-                });
-              }
-            }
-          },
-        },
-      });
-    }
-
-    // 2. INTAKE BREAKDOWN BAR CHART
+    // 1. INTAKE BREAKDOWN BAR CHART
     if (intakeChartRef.current) {
       if (intakeChartInstance.current) intakeChartInstance.current.destroy();
 
@@ -945,7 +876,6 @@ export default function Overview({ setCurrentPage }) {
     }
 
     return () => {
-      if (doughnutChartInstance.current) doughnutChartInstance.current.destroy();
       if (intakeChartInstance.current) intakeChartInstance.current.destroy();
       if (paymentStageChartInstance.current) paymentStageChartInstance.current.destroy();
       if (growthTrendChartInstance.current) growthTrendChartInstance.current.destroy();
@@ -953,6 +883,13 @@ export default function Overview({ setCurrentPage }) {
       if (dailyTrendChartInstance.current) dailyTrendChartInstance.current.destroy();
     };
   }, [loading, metrics, appliedMonthlyRange]);
+
+  // SVG Donut Calculations for Collection Status (100% mathematically closed 360° vector ring)
+  const donutRadius = 70;
+  const donutCirc = 2 * Math.PI * donutRadius; // ~439.823
+  const donutTotal = metrics.totalApps || ((metrics.fullPaymentCount || 0) + (metrics.partialPaymentCount || 0)) || 1;
+  const donutArcFull = donutTotal > 0 ? ((metrics.fullPaymentCount || 0) / donutTotal) * donutCirc : 0;
+  const donutArcPartial = donutTotal > 0 ? ((metrics.partialPaymentCount || 0) / donutTotal) * donutCirc : 0;
 
   return (
     <div
@@ -963,7 +900,7 @@ export default function Overview({ setCurrentPage }) {
         padding: '16px 24px 36px',
         display: 'flex',
         flexDirection: 'column',
-        gap: '16px',
+        gap: '14px',
         backgroundColor: '#080A12',
         color: '#EDEFFA',
         fontFamily: "'Plus Jakarta Sans', sans-serif",
@@ -1059,8 +996,8 @@ export default function Overview({ setCurrentPage }) {
           style={{
             background: 'rgba(15, 20, 35, 0.85)',
             border: '1px solid rgba(148, 163, 225, 0.14)',
-            borderRadius: '14px',
-            padding: '16px 20px',
+            borderRadius: '12px',
+            padding: '12px 16px',
             position: 'relative',
             cursor: 'pointer',
             transition: 'all 0.2s ease',
@@ -1081,11 +1018,11 @@ export default function Overview({ setCurrentPage }) {
             <span style={{ fontSize: '10px', color: '#7C6FFF', fontWeight: 700 }}>Inspect ↗</span>
           </div>
 
-          <div style={{ fontSize: '32px', fontWeight: 800, color: '#A78BFA', marginTop: '4px' }}>
+          <div style={{ fontSize: '26px', fontWeight: 800, color: '#A78BFA', marginTop: '2px' }}>
             {metrics.totalApps}
           </div>
 
-          <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+          <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
             <span
               onClick={(e) => {
                 e.stopPropagation();
@@ -1099,9 +1036,9 @@ export default function Overview({ setCurrentPage }) {
               }}
               style={{
                 background: 'rgba(255, 255, 255, 0.06)',
-                padding: '3px 8px',
+                padding: '2px 7px',
                 borderRadius: '6px',
-                fontSize: '11px',
+                fontSize: '10px',
                 color: '#A8B2C7',
                 cursor: 'pointer',
               }}
@@ -1122,9 +1059,9 @@ export default function Overview({ setCurrentPage }) {
               }}
               style={{
                 background: 'rgba(255, 255, 255, 0.06)',
-                padding: '3px 8px',
+                padding: '2px 7px',
                 borderRadius: '6px',
-                fontSize: '11px',
+                fontSize: '10px',
                 color: '#A8B2C7',
                 cursor: 'pointer',
               }}
@@ -1149,8 +1086,8 @@ export default function Overview({ setCurrentPage }) {
             background: 'rgba(15, 20, 35, 0.85)',
             border: '1px solid rgba(148, 163, 225, 0.14)',
             borderTop: '2px solid #00E5A0',
-            borderRadius: '14px',
-            padding: '16px 20px',
+            borderRadius: '12px',
+            padding: '12px 16px',
             position: 'relative',
             cursor: 'pointer',
             transition: 'all 0.2s ease',
@@ -1170,7 +1107,7 @@ export default function Overview({ setCurrentPage }) {
             <span style={{ fontSize: '11px', color: '#8E9BB5', fontWeight: 600 }}>Total Collected</span>
             <span style={{ fontSize: '10px', color: '#00E5A0', fontWeight: 700 }}>Inspect ↗</span>
           </div>
-          <div style={{ fontSize: '32px', fontWeight: 800, color: '#00E5A0', marginTop: '4px' }}>
+          <div style={{ fontSize: '26px', fontWeight: 800, color: '#00E5A0', marginTop: '2px' }}>
             {formatIndianCurrency(metrics.totalCollected)}
           </div>
         </div>
@@ -1188,8 +1125,8 @@ export default function Overview({ setCurrentPage }) {
           style={{
             background: 'rgba(15, 20, 35, 0.85)',
             border: '1px solid rgba(148, 163, 225, 0.14)',
-            borderRadius: '14px',
-            padding: '16px 20px',
+            borderRadius: '12px',
+            padding: '12px 16px',
             position: 'relative',
             cursor: 'pointer',
             transition: 'all 0.2s ease',
@@ -1209,15 +1146,15 @@ export default function Overview({ setCurrentPage }) {
             <span style={{ fontSize: '11px', color: '#8E9BB5', fontWeight: 600 }}>Collection Efficiency</span>
             <span style={{ fontSize: '10px', color: '#36D1DC', fontWeight: 700 }}>Inspect ↗</span>
           </div>
-          <div style={{ fontSize: '32px', fontWeight: 800, color: '#00E5A0', marginTop: '4px' }}>
+          <div style={{ fontSize: '26px', fontWeight: 800, color: '#00E5A0', marginTop: '2px' }}>
             {metrics.efficiency}%
           </div>
           <div
             style={{
-              height: '5px',
+              height: '4px',
               background: 'rgba(255, 255, 255, 0.08)',
-              borderRadius: '3px',
-              marginTop: '12px',
+              borderRadius: '2px',
+              marginTop: '10px',
               overflow: 'hidden',
             }}
           >
@@ -1226,7 +1163,7 @@ export default function Overview({ setCurrentPage }) {
                 width: `${Math.min(100, Number(metrics.efficiency))}%`,
                 height: '100%',
                 background: '#00E5A0',
-                borderRadius: '3px',
+                borderRadius: '2px',
               }}
             />
           </div>
@@ -1246,8 +1183,8 @@ export default function Overview({ setCurrentPage }) {
             background: 'rgba(15, 20, 35, 0.85)',
             border: '1px solid rgba(148, 163, 225, 0.14)',
             borderTop: '2px solid #36D1DC',
-            borderRadius: '14px',
-            padding: '16px 20px',
+            borderRadius: '12px',
+            padding: '12px 16px',
             position: 'relative',
             cursor: 'pointer',
             transition: 'all 0.2s ease',
@@ -1267,12 +1204,12 @@ export default function Overview({ setCurrentPage }) {
             <span style={{ fontSize: '11px', color: '#8E9BB5', fontWeight: 600 }}>Committed Pipeline</span>
             <span style={{ fontSize: '10px', color: '#7C6FFF', fontWeight: 700 }}>Inspect ↗</span>
           </div>
-          <div style={{ fontSize: '32px', fontWeight: 800, color: '#7C6FFF', marginTop: '4px' }}>
+          <div style={{ fontSize: '26px', fontWeight: 800, color: '#7C6FFF', marginTop: '2px' }}>
             {formatIndianCurrency(metrics.totalCommitted)}
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
-            <span style={{ fontSize: '11px', color: '#36D1DC', fontWeight: 600 }}>Live (Active)</span>
-            <span style={{ fontSize: '11px', color: '#36D1DC', fontWeight: 700 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
+            <span style={{ fontSize: '10px', color: '#36D1DC', fontWeight: 600 }}>Live (Active)</span>
+            <span style={{ fontSize: '10px', color: '#36D1DC', fontWeight: 700 }}>
               {formatIndianCurrency(metrics.activeCommitted)}
             </span>
           </div>
@@ -1293,8 +1230,8 @@ export default function Overview({ setCurrentPage }) {
             background: 'rgba(15, 20, 35, 0.85)',
             border: '1px solid rgba(148, 163, 225, 0.14)',
             borderTop: '2px solid #FF6F8E',
-            borderRadius: '14px',
-            padding: '16px 20px',
+            borderRadius: '12px',
+            padding: '12px 16px',
             position: 'relative',
             cursor: 'pointer',
             transition: 'all 0.2s ease',
@@ -1314,7 +1251,7 @@ export default function Overview({ setCurrentPage }) {
             <span style={{ fontSize: '11px', color: '#8E9BB5', fontWeight: 600 }}>Total Remaining</span>
             <span style={{ fontSize: '10px', color: '#FF6F8E', fontWeight: 700 }}>Inspect ↗</span>
           </div>
-          <div style={{ fontSize: '32px', fontWeight: 800, color: '#FF6F8E', marginTop: '4px' }}>
+          <div style={{ fontSize: '26px', fontWeight: 800, color: '#FF6F8E', marginTop: '2px' }}>
             {formatIndianCurrency(metrics.totalRemaining)}
           </div>
         </div>
@@ -1337,12 +1274,12 @@ export default function Overview({ setCurrentPage }) {
             background: 'rgba(15, 20, 35, 0.85)',
             border: '1px solid rgba(148, 163, 225, 0.14)',
             borderRadius: '14px',
-            padding: '20px 24px',
+            padding: '16px 20px',
             display: 'flex',
             flexDirection: 'column',
           }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ fontSize: '12px', fontWeight: 800, color: '#EDEFFA', letterSpacing: '0.04em' }}>
                 LEAD SOURCE &mdash; STATUS
@@ -1378,13 +1315,13 @@ export default function Overview({ setCurrentPage }) {
             </div>
           </div>
 
-          {/* Clickable Progress Bars List with smooth scrolling and perfect height */}
+          {/* Clickable Progress Bars List with sleek height for standard screens */}
           <div
             style={{
               display: 'flex',
               flexDirection: 'column',
-              gap: '12px',
-              maxHeight: '410px',
+              gap: '8px',
+              maxHeight: '230px',
               overflowY: 'auto',
               paddingRight: '6px',
             }}
@@ -1403,7 +1340,7 @@ export default function Overview({ setCurrentPage }) {
                 }
                 style={{
                   cursor: 'pointer',
-                  padding: '4px 6px',
+                  padding: '3px 4px',
                   borderRadius: '6px',
                   transition: 'background 0.15s ease',
                 }}
@@ -1415,7 +1352,7 @@ export default function Overview({ setCurrentPage }) {
                 }}
                 title="Click to view students from this source"
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '6px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '4px' }}>
                   <span style={{ color: '#EDEFFA', fontWeight: 600 }}>{item.name}</span>
                   <span style={{ color: '#8E9BB5' }}>
                     <strong style={{ color: '#fff' }}>{item.count}</strong> ({item.pct}%)
@@ -1423,7 +1360,7 @@ export default function Overview({ setCurrentPage }) {
                 </div>
                 <div
                   style={{
-                    height: '6px',
+                    height: '5px',
                     background: 'rgba(255, 255, 255, 0.06)',
                     borderRadius: '3px',
                     overflow: 'hidden',
@@ -1443,19 +1380,19 @@ export default function Overview({ setCurrentPage }) {
           </div>
         </div>
 
-        {/* Right: COLLECTION STATUS (Maximum Size, Perfectly Proportioned) */}
+        {/* Right: COLLECTION STATUS (100% Vector 360° Closed Donut Ring) */}
         <div
           style={{
             background: 'rgba(15, 20, 35, 0.85)',
             border: '1px solid rgba(148, 163, 225, 0.14)',
             borderRadius: '14px',
-            padding: '20px 24px',
+            padding: '16px 20px',
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'space-between',
           }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ fontSize: '12px', fontWeight: 800, color: '#EDEFFA', letterSpacing: '0.04em' }}>
                 COLLECTION STATUS
@@ -1477,19 +1414,107 @@ export default function Overview({ setCurrentPage }) {
             <span style={{ fontSize: '14px', color: '#64748B', cursor: 'pointer' }}>✕</span>
           </div>
 
-          {/* MAXIMUM SIZE DOUGHNUT CHART */}
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '10px 0' }}>
+          {/* 100% CLOSED VECTOR 360° DONUT RING (ZERO GAPS, INTERACTIVE DRILLDOWN) */}
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '4px 0' }}>
             <div
               style={{
                 position: 'relative',
-                width: '240px',
-                height: '240px',
+                width: '175px',
+                height: '175px',
                 flexShrink: 0,
-                cursor: 'pointer',
               }}
-              title="Click chart to inspect students"
             >
-              <canvas ref={doughnutChartRef} />
+              <svg viewBox="0 0 200 200" width="100%" height="100%" style={{ overflow: 'visible' }}>
+                <defs>
+                  <filter id="donutGlowEmerald" x="-30%" y="-30%" width="160%" height="160%">
+                    <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#00E5A0" floodOpacity="0.5" />
+                  </filter>
+                  <filter id="donutGlowAmber" x="-30%" y="-30%" width="160%" height="160%">
+                    <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#FFB020" floodOpacity="0.5" />
+                  </filter>
+                </defs>
+
+                {/* Background track circle */}
+                <circle
+                  cx="100"
+                  cy="100"
+                  r={donutRadius}
+                  fill="none"
+                  stroke="rgba(255, 255, 255, 0.05)"
+                  strokeWidth="16"
+                />
+
+                {/* Slices group: Rotated -90deg so 12 o'clock is 0deg start */}
+                <g transform="rotate(-90 100 100)">
+                  {/* Slice 2: Partial / Due (Amber Arc) */}
+                  {donutArcPartial > 0 && (
+                    <circle
+                      cx="100"
+                      cy="100"
+                      r={donutRadius}
+                      fill="none"
+                      stroke="#FFB020"
+                      strokeWidth={hoveredDonutSlice === 'partial' ? 20 : 16}
+                      strokeDasharray={`${donutArcPartial} ${donutCirc}`}
+                      strokeDashoffset={-donutArcFull}
+                      strokeLinecap="butt"
+                      style={{
+                        cursor: 'pointer',
+                        transition: 'stroke-width 0.2s ease, filter 0.2s ease',
+                        filter: hoveredDonutSlice === 'partial' ? 'url(#donutGlowAmber)' : 'none',
+                      }}
+                      onMouseEnter={() => setHoveredDonutSlice('partial')}
+                      onMouseLeave={() => setHoveredDonutSlice(null)}
+                      onClick={() =>
+                        openDrilldown({
+                          title: 'Partial / Pending Payment Students',
+                          subtitle: 'Students with remaining installments due',
+                          badgeText: 'Partial Due',
+                          badgeColor: '#FFB020',
+                          filterFn: (s) => !s.isFullPayment,
+                        })
+                      }
+                    >
+                      <title>{`Partial / Due: ${metrics.partialPaymentCount} students (${metrics.totalApps > 0 ? ((metrics.partialPaymentCount / metrics.totalApps) * 100).toFixed(1) : 0}%)`}</title>
+                    </circle>
+                  )}
+
+                  {/* Slice 1: Full Payment (Emerald Arc) */}
+                  {donutArcFull > 0 && (
+                    <circle
+                      cx="100"
+                      cy="100"
+                      r={donutRadius}
+                      fill="none"
+                      stroke="#00E5A0"
+                      strokeWidth={hoveredDonutSlice === 'full' ? 20 : 16}
+                      strokeDasharray={`${donutArcFull} ${donutCirc}`}
+                      strokeDashoffset={0}
+                      strokeLinecap="butt"
+                      style={{
+                        cursor: 'pointer',
+                        transition: 'stroke-width 0.2s ease, filter 0.2s ease',
+                        filter: hoveredDonutSlice === 'full' ? 'url(#donutGlowEmerald)' : 'none',
+                      }}
+                      onMouseEnter={() => setHoveredDonutSlice('full')}
+                      onMouseLeave={() => setHoveredDonutSlice(null)}
+                      onClick={() =>
+                        openDrilldown({
+                          title: 'Full Payment Students',
+                          subtitle: 'Students who have paid their complete committed fee',
+                          badgeText: 'Full Payment',
+                          badgeColor: '#00E5A0',
+                          filterFn: (s) => s.isFullPayment,
+                        })
+                      }
+                    >
+                      <title>{`Full Payment: ${metrics.fullPaymentCount} students (${metrics.totalApps > 0 ? ((metrics.fullPaymentCount / metrics.totalApps) * 100).toFixed(1) : 0}%)`}</title>
+                    </circle>
+                  )}
+                </g>
+              </svg>
+
+              {/* Center Metrics (Always perfectly aligned) */}
               <div
                 style={{
                   position: 'absolute',
@@ -1501,18 +1526,32 @@ export default function Overview({ setCurrentPage }) {
                   pointerEvents: 'none',
                 }}
               >
-                <div style={{ fontSize: '38px', fontWeight: 900, color: '#fff', lineHeight: 1 }}>
+                <div style={{ fontSize: '32px', fontWeight: 900, color: '#fff', lineHeight: 1 }}>
                   {metrics.totalApps}
                 </div>
-                <div style={{ fontSize: '11px', fontWeight: 700, color: '#8E9BB5', textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: '4px' }}>
+                <div style={{ fontSize: '10px', fontWeight: 700, color: '#8E9BB5', textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: '4px' }}>
                   Total Students
                 </div>
+                {hoveredDonutSlice && (
+                  <div
+                    style={{
+                      fontSize: '10px',
+                      fontWeight: 800,
+                      color: hoveredDonutSlice === 'full' ? '#00E5A0' : '#FFB020',
+                      marginTop: '2px',
+                    }}
+                  >
+                    {hoveredDonutSlice === 'full'
+                      ? `Full: ${metrics.fullPaymentCount}`
+                      : `Due: ${metrics.partialPaymentCount}`}
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
           {/* FULL WIDTH EXECUTIVE INTERACTIVE BREAKDOWN */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '10px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '6px' }}>
             {/* Full Payment Card */}
             <div
               onClick={() =>
@@ -1528,7 +1567,7 @@ export default function Overview({ setCurrentPage }) {
                 background: 'rgba(0, 229, 160, 0.08)',
                 border: '1px solid rgba(0, 229, 160, 0.25)',
                 borderRadius: '10px',
-                padding: '12px 14px',
+                padding: '10px 12px',
                 cursor: 'pointer',
                 transition: 'all 0.15s ease',
               }}
@@ -1542,12 +1581,12 @@ export default function Overview({ setCurrentPage }) {
               }}
               title="Click to view full payment students"
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#00E5A0', boxShadow: '0 0 6px #00E5A0' }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' }}>
+                <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#00E5A0', boxShadow: '0 0 6px #00E5A0' }} />
                 <span style={{ fontSize: '11px', fontWeight: 700, color: '#EDEFFA' }}>Full Payment</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '20px', fontWeight: 800, color: '#00E5A0' }}>
+                <span style={{ fontSize: '18px', fontWeight: 800, color: '#00E5A0' }}>
                   {metrics.fullPaymentCount}
                 </span>
                 <span style={{ fontSize: '11px', fontWeight: 600, color: '#8E9BB5' }}>
@@ -1571,7 +1610,7 @@ export default function Overview({ setCurrentPage }) {
                 background: 'rgba(255, 176, 32, 0.08)',
                 border: '1px solid rgba(255, 176, 32, 0.25)',
                 borderRadius: '10px',
-                padding: '12px 14px',
+                padding: '10px 12px',
                 cursor: 'pointer',
                 transition: 'all 0.15s ease',
               }}
@@ -1585,12 +1624,12 @@ export default function Overview({ setCurrentPage }) {
               }}
               title="Click to view partial/pending students"
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#FFB020', boxShadow: '0 0 6px #FFB020' }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' }}>
+                <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#FFB020', boxShadow: '0 0 6px #FFB020' }} />
                 <span style={{ fontSize: '11px', fontWeight: 700, color: '#EDEFFA' }}>Partial / Due</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '20px', fontWeight: 800, color: '#FFB020' }}>
+                <span style={{ fontSize: '18px', fontWeight: 800, color: '#FFB020' }}>
                   {metrics.partialPaymentCount}
                 </span>
                 <span style={{ fontSize: '11px', fontWeight: 600, color: '#8E9BB5' }}>
@@ -1618,12 +1657,12 @@ export default function Overview({ setCurrentPage }) {
             background: 'rgba(15, 20, 35, 0.85)',
             border: '1px solid rgba(148, 163, 225, 0.14)',
             borderRadius: '14px',
-            padding: '20px 24px',
+            padding: '16px 20px',
             display: 'flex',
             flexDirection: 'column',
           }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ fontSize: '12px', fontWeight: 800, color: '#EDEFFA', letterSpacing: '0.04em' }}>
                 INTAKE BREAKDOWN
@@ -1643,7 +1682,7 @@ export default function Overview({ setCurrentPage }) {
             <span style={{ fontSize: '14px', color: '#64748B', cursor: 'pointer' }}>✕</span>
           </div>
 
-          <div style={{ position: 'relative', height: '180px', width: '100%', cursor: 'pointer' }} title="Click any bar to view students">
+          <div style={{ position: 'relative', height: '160px', width: '100%', cursor: 'pointer' }} title="Click any bar to view students">
             <canvas ref={intakeChartRef} />
           </div>
         </div>
@@ -1654,12 +1693,12 @@ export default function Overview({ setCurrentPage }) {
             background: 'rgba(15, 20, 35, 0.85)',
             border: '1px solid rgba(148, 163, 225, 0.14)',
             borderRadius: '14px',
-            padding: '20px 24px',
+            padding: '16px 20px',
             display: 'flex',
             flexDirection: 'column',
           }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ fontSize: '12px', fontWeight: 800, color: '#EDEFFA', letterSpacing: '0.04em' }}>
                 PAYMENT STAGES
@@ -1679,7 +1718,7 @@ export default function Overview({ setCurrentPage }) {
             <span style={{ fontSize: '14px', color: '#64748B', cursor: 'pointer' }}>✕</span>
           </div>
 
-          <div style={{ position: 'relative', height: '180px', width: '100%', cursor: 'pointer' }} title="Click any bar to view students">
+          <div style={{ position: 'relative', height: '160px', width: '100%', cursor: 'pointer' }} title="Click any bar to view students">
             <canvas ref={paymentStageChartRef} />
           </div>
         </div>
