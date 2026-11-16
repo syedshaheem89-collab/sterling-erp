@@ -697,6 +697,160 @@ const DEFAULT_COUNTRY_PORTALS = [
   },
 ];
 
+// ============================================================================
+// INTELLIGENT DEGREE LEVEL CLASSIFIER (Bachelors, Masters, Diploma, Certificate, PG Diploma, PG Certificate, PhD)
+// ============================================================================
+export function detectProgramLevel(courseName = '', rawLevel = '', duration = '') {
+  const name = String(courseName || '').trim();
+  const raw = String(rawLevel || '').trim();
+  const dur = String(duration || '').trim();
+  const nLow = name.toLowerCase();
+  const rLow = raw.toLowerCase();
+
+  // 1. PhD / Doctorate
+  if (
+    /\b(ph\.?d|doctorate|doctor of philosophy|dba\b|doctor of business)\b/i.test(name) ||
+    /\b(ph\.?d|doctorate|dba)\b/i.test(raw)
+  ) {
+    return 'PhD';
+  }
+
+  // 2. Preparatory / Foundation / Pathway Course
+  // CRITICAL: Must be checked BEFORE Bachelor/Master because titles like 'Preparatory Course for the Bachelor in Culinary Arts' contain 'Bachelor'!
+  if (
+    /\b(preparatory|foundation|pathway|pre-bachelor|pre bachelor|pre-master|pre master|international foundation|pre-sessional)\b/i.test(nLow)
+  ) {
+    return 'Diploma';
+  }
+
+  // 3. PG Certificate (Postgraduate Certificate / PGCert / Level 7 Certificate)
+  if (
+    /\b(pgcert|pg cert|pg-cert|postgraduate certificate|post-graduate certificate|post graduate certificate|graduate certificate|grad cert|gradcert|advanced certificate|executive certificate)\b/i.test(nLow) ||
+    (/\b(cert|certificate)\b/i.test(nLow) && /\b(postgraduate|graduate|pg\b|level 7|level 8)\b/i.test(rLow + ' ' + nLow))
+  ) {
+    return 'PG Certificate';
+  }
+
+  // 4. PG Diploma (Postgraduate Diploma / PGDip / Level 7 Diploma)
+  if (
+    /\b(pgdip|pg dip|pg-dip|postgraduate diploma|post-graduate diploma|post graduate diploma|graduate diploma|grad dip|graddip|advanced diploma|pgd\b)\b/i.test(nLow) ||
+    (/\b(diploma|dip\b)\b/i.test(nLow) && /\b(postgraduate|graduate|pg\b|level 7|level 8)\b/i.test(rLow + ' ' + nLow))
+  ) {
+    return 'PG Diploma';
+  }
+
+  // 5. Undergraduate Certificate (Certificate in Rooms Division, Certificate in Travel and Tourism, etc.)
+  if (/\b(certificate in|cert in|certificate\b|cert\b)\b/i.test(nLow)) {
+    return 'Certificate';
+  }
+
+  // 6. Undergraduate Diploma / Higher National Diploma / HND / Associate
+  if (
+    /\b(higher national diploma|hnd\b|hnc\b|national diploma|diploma in|diploma\b|dip\b|associate degree|associate of|vocational)\b/i.test(nLow)
+  ) {
+    return 'Diploma';
+  }
+
+  // 7. Masters / Postgraduate Degree (MSc, MA, MBA, etc.)
+  if (
+    /\b(master|masters|msc|m\.sc|m\.s\.|ma\b|m\.a\.|mba|m\.b\.a\.|meng|m\.eng|llm|l\.l\.m\.|mphil|m\.phil|mres|m\.res|mtech|m\.tech|mdes|m\.des|mfin|m\.fin|mcom|m\.com|med\b|m\.ed|m\.arch|march|mpharm|m\.pharm|postgraduate degree|pg degree)\b/i.test(nLow) ||
+    (/\b(master|msc|mba|ma\b|postgraduate|pg)\b/i.test(rLow) && !/\b(bachelor|undergraduate|ug)\b/i.test(nLow))
+  ) {
+    return 'Masters';
+  }
+
+  // 8. Bachelors / Undergraduate Degree (BSc, BA, BEng, BBA, etc.)
+  if (
+    /\b(bachelor|bachelors|bsc|b\.sc|b\.s\.|ba\b|b\.a\.|bba|b\.b\.a\.|beng|b\.eng|llb|l\.l\.b\.|btech|b\.tech|bcom|b\.com|bed\b|b\.ed|bdes|b\.des|bpharm|b\.pharm|barch|b\.arch|mbbs|bds|undergraduate degree|ug degree)\b/i.test(nLow) ||
+    /\b(bachelor|bsc|ba\b|undergraduate|ug)\b/i.test(rLow)
+  ) {
+    return 'Bachelors';
+  }
+
+  // 9. Duration & Credit heuristics
+  if (nLow.includes('60 ects') || dur.includes('60 ects') || dur.includes('1 year') || dur.includes('12 month')) {
+    return 'Certificate';
+  }
+  if (dur.includes('3 year') || dur.includes('4 year') || dur.includes('36 month') || dur.includes('48 month')) {
+    return 'Bachelors';
+  }
+
+  return 'Bachelors';
+}
+
+export function getLevelBadgeInfo(level) {
+  const l = String(level || '').trim();
+  if (l === 'PG Diploma') {
+    return {
+      label: 'PG Diploma',
+      shortLabel: 'PG Diploma',
+      color: '#FFB020',
+      bg: 'rgba(255, 176, 32, 0.12)',
+      border: 'rgba(255, 176, 32, 0.35)',
+      icon: '📜',
+    };
+  }
+  if (l === 'PG Certificate') {
+    return {
+      label: 'PG Certificate',
+      shortLabel: 'PG Certificate',
+      color: '#FB923C',
+      bg: 'rgba(251, 146, 60, 0.12)',
+      border: 'rgba(251, 146, 60, 0.35)',
+      icon: '📜',
+    };
+  }
+  if (l === 'Certificate') {
+    return {
+      label: 'Certificate',
+      shortLabel: 'Certificate',
+      color: '#10B981',
+      bg: 'rgba(16, 185, 129, 0.14)',
+      border: 'rgba(16, 185, 129, 0.4)',
+      icon: '📜',
+    };
+  }
+  if (l === 'Diploma' || l === 'UG Diploma' || l === 'Foundation / Prep') {
+    return {
+      label: 'Diploma',
+      shortLabel: 'Diploma',
+      color: '#00F296',
+      bg: 'rgba(0, 242, 150, 0.12)',
+      border: 'rgba(0, 242, 150, 0.35)',
+      icon: '📜',
+    };
+  }
+  if (l === 'Masters' || l === 'PG' || l.toLowerCase().includes('master')) {
+    return {
+      label: 'Masters',
+      shortLabel: 'Masters',
+      color: '#A855F7',
+      bg: 'rgba(168, 85, 247, 0.12)',
+      border: 'rgba(168, 85, 247, 0.35)',
+      icon: '🎓',
+    };
+  }
+  if (l === 'PhD' || l.toLowerCase().includes('doctor')) {
+    return {
+      label: 'PhD / Doctorate',
+      shortLabel: 'PhD',
+      color: '#FF3366',
+      bg: 'rgba(255, 51, 102, 0.12)',
+      border: 'rgba(255, 51, 102, 0.35)',
+      icon: '🔬',
+    };
+  }
+  // Default: Bachelors
+  return {
+    label: 'Bachelors',
+    shortLabel: 'Bachelors',
+    color: '#38BDF8',
+    bg: 'rgba(56, 189, 248, 0.12)',
+    border: 'rgba(56, 189, 248, 0.35)',
+    icon: '🎓',
+  };
+}
+
 export default function CourseFinder({ setCurrentPage }) {
   const { user } = useAuth();
 
@@ -706,7 +860,13 @@ export default function CourseFinder({ setCurrentPage }) {
       const saved = localStorage.getItem('sterling_course_catalog');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Auto-heal / re-detect levels for existing saved courses so stale levels are instantly corrected!
+          return parsed.map((c) => ({
+            ...c,
+            level: detectProgramLevel(c.programName, c.level, c.duration),
+          }));
+        }
       }
     } catch (e) {
       console.warn('Failed to load cached courses:', e);
@@ -824,13 +984,15 @@ export default function CourseFinder({ setCurrentPage }) {
       // 6. Program Level Multi-Checkboxes with Fuzzy Hierarchy Matching
       if (selectedLevels.length > 0) {
         const matchesLevel = selectedLevels.some((sl) => {
-          if (sl === c.level) return true;
-          if ((sl === 'Bachelors' || sl === 'UG') && (c.level === 'Bachelors' || c.level === 'UG' || c.level === "UG (Bachelor's)")) return true;
-          if ((sl === 'Masters' || sl === 'PG') && (c.level === 'Masters' || c.level === 'PG' || c.level === "PG (Master's)")) return true;
-          if ((sl === 'Diploma' || sl === 'UG Diploma') && (c.level === 'Diploma' || c.level === 'UG Diploma' || c.level === 'UG Diploma / Associate Degree')) return true;
-          if (sl === 'PG Diploma' && (c.level === 'PG Diploma' || c.level === 'PG Diploma / Certificate')) return true;
-          if (sl === 'PG Certificate' && (c.level === 'PG Certificate' || c.level === 'PG Diploma / Certificate')) return true;
-          if (sl === 'PhD' && (c.level === 'PhD' || c.level === 'PhD / Doctorate' || c.level === 'Doctorate')) return true;
+          const curLevel = detectProgramLevel(c.programName, c.level, c.duration);
+          if (sl === curLevel) return true;
+          if ((sl === 'Bachelors' || sl === 'UG') && (curLevel === 'Bachelors' || curLevel === 'UG')) return true;
+          if ((sl === 'Masters' || sl === 'PG') && (curLevel === 'Masters' || curLevel === 'PG')) return true;
+          if ((sl === 'Diploma' || sl === 'UG Diploma') && (curLevel === 'Diploma' || curLevel === 'Certificate' || curLevel === 'Foundation / Prep')) return true;
+          if (sl === 'Certificate' && (curLevel === 'Certificate' || curLevel === 'Diploma')) return true;
+          if (sl === 'PG Diploma' && curLevel === 'PG Diploma') return true;
+          if (sl === 'PG Certificate' && curLevel === 'PG Certificate') return true;
+          if (sl === 'PhD' && curLevel === 'PhD') return true;
           return false;
         });
         if (!matchesLevel) return false;
@@ -954,7 +1116,7 @@ export default function CourseFinder({ setCurrentPage }) {
       row['#'] = idx + 1;
       if (selectedColumns.university) row['University / Institution'] = c.university;
       if (selectedColumns.program) row['Program Title'] = c.programName;
-      if (selectedColumns.level) row['Degree Level'] = c.level;
+      if (selectedColumns.level) row['Degree Level'] = detectProgramLevel(c.programName, c.level, c.duration);
       if (selectedColumns.country) row['Country'] = c.country;
       if (selectedColumns.campus) row['Campus / Region'] = c.region || c.campus;
       if (selectedColumns.duration) row['Duration'] = c.duration;
@@ -1418,7 +1580,8 @@ export default function CourseFinder({ setCurrentPage }) {
                   { id: 'Masters', label: '🎓 Masters Degree (MSc / MA / MBA / MEng)' },
                   { id: 'PG Diploma', label: '📜 PG Diploma (Postgraduate Diploma / PGDip)' },
                   { id: 'PG Certificate', label: '📜 PG Certificate (Postgraduate Certificate / PGCert)' },
-                  { id: 'Diploma', label: '📜 Diploma (Undergraduate Diploma / Vocational / Associate)' },
+                  { id: 'Diploma', label: '📜 Diploma (Undergraduate Diploma / HND / Vocational)' },
+                  { id: 'Certificate', label: '📜 Certificate (Undergraduate / Vocational Certificate)' },
                   { id: 'PhD', label: '🔬 PhD / Doctorate Degree' },
                   { id: 'Pathway UG', label: 'Pathway Programs (UG)' },
                   { id: 'Pathway PG', label: 'Pathway Programs (PG)' },
@@ -1813,7 +1976,8 @@ export default function CourseFinder({ setCurrentPage }) {
 
                           {/* Intelligent Degree Level Badge */}
                           {(() => {
-                            const badge = getLevelBadgeInfo(prog.level);
+                            const effLvl = detectProgramLevel(prog.programName, prog.level, prog.duration);
+                            const badge = getLevelBadgeInfo(effLvl);
                             return (
                               <span
                                 style={{
@@ -1887,20 +2051,26 @@ export default function CourseFinder({ setCurrentPage }) {
                       >
                         <div>
                           <div style={{ fontSize: '10.5px', color: '#8E9BB5', fontWeight: 600 }}>Degree Level</div>
-                          <div
-                            style={{
-                              fontSize: '12px',
-                              fontWeight: 700,
-                              color: getLevelBadgeInfo(prog.level).color,
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              marginTop: '2px',
-                            }}
-                          >
-                            <span>{getLevelBadgeInfo(prog.level).icon}</span>
-                            <span>{getLevelBadgeInfo(prog.level).shortLabel}</span>
-                          </div>
+                          {(() => {
+                            const effLvl = detectProgramLevel(prog.programName, prog.level, prog.duration);
+                            const badge = getLevelBadgeInfo(effLvl);
+                            return (
+                              <div
+                                style={{
+                                  fontSize: '12px',
+                                  fontWeight: 700,
+                                  color: badge.color,
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  marginTop: '2px',
+                                }}
+                              >
+                                <span>{badge.icon}</span>
+                                <span>{badge.shortLabel}</span>
+                              </div>
+                            );
+                          })()}
                         </div>
 
                         <div>
@@ -2352,20 +2522,26 @@ function ProgramDetailsModal({ course, onClose, onApplyStudent }) {
               </div>
               <div>
                 <div style={{ fontSize: '11px', color: '#8E9BB5' }}>Degree Level</div>
-                <div
-                  style={{
-                    fontSize: '13px',
-                    fontWeight: 700,
-                    color: getLevelBadgeInfo(course.level).color,
-                    marginTop: '2px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                  }}
-                >
-                  <span>{getLevelBadgeInfo(course.level).icon}</span>
-                  <span>{getLevelBadgeInfo(course.level).label}</span>
-                </div>
+                {(() => {
+                  const effLvl = detectProgramLevel(course.programName, course.level, course.duration);
+                  const badge = getLevelBadgeInfo(effLvl);
+                  return (
+                    <div
+                      style={{
+                        fontSize: '13px',
+                        fontWeight: 700,
+                        color: badge.color,
+                        marginTop: '2px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                      }}
+                    >
+                      <span>{badge.icon}</span>
+                      <span>{badge.label}</span>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           </div>
@@ -2927,156 +3103,6 @@ function detectCountryFromData(fileName = '', sheetName = '', grid = [], headers
     flag: getCountryFlag(bestCountry),
     confidence: bestScore > 20 ? 'High' : bestScore > 5 ? 'Medium' : 'Default',
     reason,
-  };
-}
-
-// ============================================================================
-// INTELLIGENT DEGREE LEVEL CLASSIFIER (Bachelors, Masters, Diploma, PG Diploma, PG Certificate, PhD)
-// ============================================================================
-function detectProgramLevel(courseName = '', rawLevel = '', duration = '') {
-  const name = String(courseName || '').toLowerCase().trim();
-  const raw = String(rawLevel || '').toLowerCase().trim();
-  const dur = String(duration || '').toLowerCase().trim();
-  const combined = `${raw} ${name} ${dur}`;
-
-  // 1. PhD / Doctorate
-  if (/\b(ph\.?d|doctorate|doctor of philosophy|dba|doctor of business)\b/i.test(combined)) {
-    return 'PhD';
-  }
-
-  // 2. PG Certificate (Postgraduate Certificate / PGCert / Graduate Certificate)
-  if (
-    /\b(pgcert|pg cert|pg-cert|postgraduate certificate|post-graduate certificate|post graduate certificate|graduate certificate|grad cert|gradcert|advanced certificate|executive certificate)\b/i.test(
-      combined
-    )
-  ) {
-    return 'PG Certificate';
-  }
-
-  // 3. PG Diploma (Postgraduate Diploma / PGDip / Graduate Diploma)
-  if (
-    /\b(pgdip|pg dip|pg-dip|postgraduate diploma|post-graduate diploma|post graduate diploma|graduate diploma|grad dip|graddip|advanced diploma|pgd\b)\b/i.test(
-      combined
-    )
-  ) {
-    return 'PG Diploma';
-  }
-
-  // 4. Masters / Postgraduate Degree (Master of Science, Arts, MBA, LLM, etc.)
-  if (
-    /\b(master|masters|msc|m\.sc|m\.s\.|ma\b|m\.a\.|mba|m\.b\.a\.|meng|m\.eng|llm|l\.l\.m\.|mphil|m\.phil|mres|m\.res|mtech|m\.tech|mdes|m\.des|mfin|m\.fin|mcom|m\.com|med\b|m\.ed|m\.arch|march|mpharm|m\.pharm|postgraduate|post-graduate|pg degree)\b/i.test(
-      combined
-    )
-  ) {
-    return 'Masters';
-  }
-
-  // 5. Bachelors / Undergraduate Degree (BSc, BA, BEng, BBA, LLB, etc.)
-  if (
-    /\b(bachelor|bachelors|bsc|b\.sc|b\.s\.|ba\b|b\.a\.|bba|b\.b\.a\.|beng|b\.eng|llb|l\.l\.b\.|btech|b\.tech|bcom|b\.com|bed\b|b\.ed|bdes|b\.des|bpharm|b\.pharm|barch|b\.arch|mbbs|bds|undergraduate|ug degree|hons|honours)\b/i.test(
-      combined
-    )
-  ) {
-    return 'Bachelors';
-  }
-
-  // 6. Diploma / Certificate / Foundation / Associate Degree
-  if (
-    /\b(diploma|dip\b|cert\b|certificate|foundation|associate|associate degree|hnd|hnc|undergraduate diploma|ug diploma|vocational|stage 1|pathway)\b/i.test(
-      combined
-    )
-  ) {
-    if (/\b(postgraduate|graduate|pg|level 7|level 8)\b/i.test(combined)) {
-      return combined.includes('cert') ? 'PG Certificate' : 'PG Diploma';
-    }
-    return 'Diploma';
-  }
-
-  // 7. Check European Qualification Framework Levels
-  if (/\blevel 8\b/i.test(combined)) return 'PhD';
-  if (/\blevel 7\b/i.test(combined)) return 'Masters';
-  if (/\blevel 6\b/i.test(combined)) return 'Bachelors';
-  if (/\blevel 5\b/i.test(combined)) return 'Diploma';
-  if (/\b(level 4|level 3)\b/i.test(combined)) return 'Diploma';
-
-  // 8. Duration heuristics if title was ambiguous
-  if (dur.includes('3 year') || dur.includes('4 year') || dur.includes('36 month') || dur.includes('48 month')) {
-    return 'Bachelors';
-  }
-  if (dur.includes('1 year') || dur.includes('2 year') || dur.includes('12 month') || dur.includes('18 month') || dur.includes('24 month')) {
-    if (raw.includes('ug') || raw.includes('bachelor')) return 'Bachelors';
-    return 'Masters';
-  }
-
-  // 9. Fallback based on rawLevel if available
-  if (raw.includes('master') || raw.includes('pg') || raw.includes('postgraduate')) return 'Masters';
-  if (raw.includes('bachelor') || raw.includes('ug') || raw.includes('undergraduate')) return 'Bachelors';
-  if (raw.includes('phd') || raw.includes('doctor')) return 'PhD';
-  if (raw.includes('diploma')) return 'Diploma';
-
-  return 'Bachelors';
-}
-
-function getLevelBadgeInfo(level) {
-  const l = String(level || '').trim();
-  if (l === 'PG Diploma') {
-    return {
-      label: 'PG Diploma',
-      shortLabel: 'PG Diploma',
-      color: '#FFB020',
-      bg: 'rgba(255, 176, 32, 0.12)',
-      border: 'rgba(255, 176, 32, 0.35)',
-      icon: '📜',
-    };
-  }
-  if (l === 'PG Certificate') {
-    return {
-      label: 'PG Certificate',
-      shortLabel: 'PG Certificate',
-      color: '#FB923C',
-      bg: 'rgba(251, 146, 60, 0.12)',
-      border: 'rgba(251, 146, 60, 0.35)',
-      icon: '📜',
-    };
-  }
-  if (l === 'Diploma' || l === 'UG Diploma') {
-    return {
-      label: 'Diploma',
-      shortLabel: 'Diploma',
-      color: '#00F296',
-      bg: 'rgba(0, 242, 150, 0.12)',
-      border: 'rgba(0, 242, 150, 0.35)',
-      icon: '📜',
-    };
-  }
-  if (l === 'Masters' || l === 'PG' || l.toLowerCase().includes('master')) {
-    return {
-      label: 'Masters',
-      shortLabel: 'Masters',
-      color: '#A855F7',
-      bg: 'rgba(168, 85, 247, 0.12)',
-      border: 'rgba(168, 85, 247, 0.35)',
-      icon: '🎓',
-    };
-  }
-  if (l === 'PhD' || l.toLowerCase().includes('doctor')) {
-    return {
-      label: 'PhD / Doctorate',
-      shortLabel: 'PhD',
-      color: '#FF3366',
-      bg: 'rgba(255, 51, 102, 0.12)',
-      border: 'rgba(255, 51, 102, 0.35)',
-      icon: '🔬',
-    };
-  }
-  // Default: Bachelors
-  return {
-    label: 'Bachelors',
-    shortLabel: 'Bachelors',
-    color: '#38BDF8',
-    bg: 'rgba(56, 189, 248, 0.12)',
-    border: 'rgba(56, 189, 248, 0.35)',
-    icon: '🎓',
   };
 }
 
@@ -3939,6 +3965,9 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
                     </option>
                     <option value="Diploma" style={{ background: '#0B0E14', color: '#00F296' }}>
                       📜 Force All: Diploma (Undergraduate Diploma / Vocational / Associate Degree)
+                    </option>
+                    <option value="Certificate" style={{ background: '#0B0E14', color: '#10B981' }}>
+                      📜 Force All: Certificate (Undergraduate / Vocational Certificate)
                     </option>
                     <option value="PG Diploma" style={{ background: '#0B0E14', color: '#FFB020' }}>
                       📜 Force All: PG Diploma (Postgraduate Diploma / PGDip)
