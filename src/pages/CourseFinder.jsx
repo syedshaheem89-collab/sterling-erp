@@ -1105,6 +1105,34 @@ export default function CourseFinder({ setCurrentPage }) {
             <span>Upload Course Data (Excel)</span>
           </button>
 
+          {/* Reset / Clear Uploads */}
+          <button
+            onClick={() => {
+              if (window.confirm('Reset catalog to default and clear any uploaded spreadsheet courses?')) {
+                localStorage.removeItem('sterling_course_catalog');
+                setCourses(DEFAULT_COURSES);
+                toast.success('Course catalog reset to verified default!');
+              }
+            }}
+            style={{
+              background: 'rgba(255, 75, 107, 0.12)',
+              border: '1px solid rgba(255, 75, 107, 0.35)',
+              color: '#FF6B8B',
+              padding: '8px 14px',
+              borderRadius: '10px',
+              fontSize: '12px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+            title="Clear uploaded spreadsheet courses and restore default catalog"
+          >
+            <span>🔄</span>
+            <span>Reset Catalog</span>
+          </button>
+
           {/* Download Filtered Excel */}
           <button
             onClick={() => setShowDownloadPrefModal(true)}
@@ -2069,9 +2097,14 @@ export default function CourseFinder({ setCurrentPage }) {
         <ExcelCourseUploaderModal
           isOpen={showUploadModal}
           onClose={() => setShowUploadModal(false)}
-          onCoursesImported={(newCourses) => {
-            setCourses((prev) => [...newCourses, ...prev]);
-            toast.success(`Successfully imported ${newCourses.length} courses into Sterling Course Finder!`);
+          onCoursesImported={(newCourses, mode = 'merge') => {
+            if (mode === 'replace') {
+              setCourses(newCourses);
+              toast.success(`Catalog updated with ${newCourses.length} courses from your spreadsheet!`);
+            } else {
+              setCourses((prev) => [...newCourses, ...prev]);
+              toast.success(`Successfully imported ${newCourses.length} courses into Sterling Course Finder!`);
+            }
             setShowUploadModal(false);
           }}
         />
@@ -2450,13 +2483,26 @@ function ProgramDetailsModal({ course, onClose, onApplyStudent }) {
 }
 
 // ============================================================================
-// SUB-COMPONENT: SMART EXCEL/CSV UPLOADER WITH COLUMN MAPPER (User Requirement)
+// SUB-COMPONENT: SMART EXCEL/CSV UPLOADER WITH COLUMN MAPPER & LIVE PREVIEW
 // ============================================================================
 function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
   const [file, setFile] = useState(null);
-  const [rawRows, setRawRows] = useState([]);
+  const [workbook, setWorkbook] = useState(null);
+  const [availableSheets, setAvailableSheets] = useState([]);
+  const [selectedSheet, setSelectedSheet] = useState('');
+  
+  // 2D grid: array of arrays (rows)
+  const [sheetGrid, setSheetGrid] = useState([]);
+  const [candidateHeaderRows, setCandidateHeaderRows] = useState([]);
+  const [headerRowIndex, setHeaderRowIndex] = useState(0);
+  
   const [detectedHeaders, setDetectedHeaders] = useState([]);
+  const [dataRows, setDataRows] = useState([]);
+  
   const [defaultCountry, setDefaultCountry] = useState('Malta');
+  const [defaultUniversity, setDefaultUniversity] = useState('');
+  const [importMode, setImportMode] = useState('merge'); // 'merge' | 'replace'
+  
   const [columnMapping, setColumnMapping] = useState({
     university: '',
     programName: '',
@@ -2473,7 +2519,172 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
     websiteUrl: '',
   });
 
-  const [step, setStep] = useState('file'); // 'file' | 'mapping' | 'preview'
+  const [step, setStep] = useState('file'); // 'file' | 'mapping'
+
+  // Apply a specific header row to the raw grid
+  const applyHeaderRow = (grid, headerIdx, activeFileName = '') => {
+    if (!grid || grid.length <= headerIdx) return;
+
+    const rawHeaderRow = grid[headerIdx] || [];
+    // Clean and normalize header strings
+    const headers = rawHeaderRow.map((cell, colIdx) => {
+      const s = String(cell ?? '').replace(/[\r\n\t]+/g, ' ').trim();
+      return s || `Column_${colIdx + 1}`;
+    });
+
+    // Build data rows starting from row immediately after header
+    const rows = [];
+    for (let r = headerIdx + 1; r < grid.length; r++) {
+      const rowArr = grid[r] || [];
+      const hasContent = rowArr.some((c) => String(c ?? '').trim().length > 0);
+      if (!hasContent) continue;
+
+      const obj = {};
+      headers.forEach((h, colIdx) => {
+        obj[h] = rowArr[colIdx] !== undefined ? String(rowArr[colIdx] ?? '').trim() : '';
+      });
+      rows.push(obj);
+    }
+
+    setDetectedHeaders(headers);
+    setDataRows(rows);
+
+    // Auto-match headers using comprehensive regexes
+    const findHeader = (pattern, excludePattern = null) => {
+      return (
+        headers.find((h) => {
+          if (!pattern.test(h)) return false;
+          if (excludePattern && excludePattern.test(h)) return false;
+          return true;
+        }) || ''
+      );
+    };
+
+    let progCol = findHeader(
+      /course|program|programme|degree|qualification|specialization|discipline|major|stream|study\s*title/i,
+      /fee|duration|level|intake|country|campus|requirement|ielts|pte/i
+    );
+
+    // Secondary fallback: simple titles
+    if (!progCol) {
+      progCol = findHeader(
+        /^(title|subject|name|course_name|programme_name|qualification\s*title)$/i,
+        /university|institution|college|provider|student/i
+      );
+    }
+
+    // Tertiary content fallback: if no header name matched, inspect actual row contents!
+    if (!progCol && rows.length > 0) {
+      const degreeWords = ['bachelor', 'master', 'bsc', 'msc', 'ba', 'ma', 'mba', 'diploma', 'engineering', 'business', 'management', 'science', 'arts', 'computing', 'technology', 'health', 'finance', 'law'];
+      let bestContentCol = '';
+      let bestContentScore = -1;
+      for (const h of headers) {
+        let sc = 0;
+        for (let i = 0; i < Math.min(rows.length, 25); i++) {
+          const val = String(rows[i]?.[h] || '').toLowerCase();
+          for (const dw of degreeWords) {
+            if (val.includes(dw)) sc += 2;
+          }
+        }
+        if (sc > bestContentScore) {
+          bestContentScore = sc;
+          bestContentCol = h;
+        }
+      }
+      if (bestContentScore > 0) {
+        progCol = bestContentCol;
+      }
+    }
+
+    const uniCol = findHeader(
+      /university|institution|college|school|provider|institute|academy|awarding/i,
+      /fee|duration|level/i
+    );
+
+    // Suggest default university from file name if no university column in file
+    if (!uniCol && activeFileName) {
+      const cleanName = activeFileName
+        .replace(/\.[^/.]+$/, '')
+        .replace(/[_-]/g, ' ')
+        .replace(/\b(courses|course|list|fee|fees|malta|germany|uk|erp|sterling|2026|2027)\b/gi, '')
+        .trim();
+      if (cleanName.length > 2) {
+        setDefaultUniversity(cleanName);
+      }
+    }
+
+    setColumnMapping({
+      programName: progCol,
+      university: uniCol,
+      level: findHeader(/level|award|type|qualification/i, /fee|duration/i),
+      country: findHeader(/country|nation|destination/i),
+      campus: findHeader(/campus|city|location|province|state|region/i),
+      duration: findHeader(/duration|length|period|years|months|semesters|ects/i),
+      yearlyTuition: findHeader(/tuition|fee|fees|cost|annual|yearly|price|amount/i, /app|application|reg/i),
+      applicationFee: findHeader(/app\s*fee|application\s*fee|registration\s*fee/i),
+      expectedCommission: findHeader(/commission|agent\s*fee|payout|incentive/i),
+      intakes: findHeader(/intake|starts|session|terms|month/i),
+      requirements: findHeader(/requirement|eligibility|criteria/i, /english|ielts|pte/i),
+      englishRequirements: findHeader(/english|ielts|pte|toefl|language|moi/i),
+      websiteUrl: findHeader(/website|url|link|portal/i),
+    });
+  };
+
+  // Process raw worksheet
+  const processWorksheet = (ws, fileName = '') => {
+    const grid = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+    if (!grid || grid.length === 0) {
+      toast.error('The selected sheet has no data');
+      return;
+    }
+
+    setSheetGrid(grid);
+
+    // Find candidate header rows
+    const candidates = [];
+    const keywords = [
+      'course', 'programme', 'program', 'degree', 'title', 'name',
+      'university', 'institution', 'college', 'tuition', 'fee', 'fees',
+      'duration', 'intake', 'level', 'award', 'eligibility', 'requirement',
+      'ielts', 'pte', 'ects', 'credits', 'campus', 'country', 'city', 'stream'
+    ];
+
+    let bestScore = -1;
+    let autoHeaderIdx = 0;
+
+    const maxScan = Math.min(grid.length, 15);
+    for (let r = 0; r < maxScan; r++) {
+      const rowArr = grid[r] || [];
+      const cells = rowArr.map((c) => String(c ?? '').replace(/[\r\n\t]+/g, ' ').trim()).filter(Boolean);
+      if (cells.length === 0) continue;
+
+      let score = 0;
+      for (const cell of cells) {
+        const lower = cell.toLowerCase();
+        for (const kw of keywords) {
+          if (lower.includes(kw)) score += 3;
+        }
+      }
+      if (cells.length >= 3) score += 2;
+      if (cells.length >= 5) score += 2;
+
+      candidates.push({
+        index: r,
+        label: `Row ${r + 1}: ${cells.slice(0, 4).join(' | ').slice(0, 55)}${cells.length > 4 ? '...' : ''}`,
+        cellCount: cells.length,
+        score,
+      });
+
+      if (score > bestScore) {
+        bestScore = score;
+        autoHeaderIdx = r;
+      }
+    }
+
+    setCandidateHeaderRows(candidates);
+    setHeaderRowIndex(autoHeaderIdx);
+    applyHeaderRow(grid, autoHeaderIdx, fileName);
+  };
 
   const handleFileChange = (e) => {
     const selectedFile = e.target.files?.[0];
@@ -2485,37 +2696,15 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
       try {
         const bstr = evt.target.result;
         const wb = XLSX.read(bstr, { type: 'binary' });
-        const sheetName = wb.SheetNames[0];
-        const ws = wb.Sheets[sheetName];
-        const data = XLSX.utils.sheet_to_json(ws, { defval: '' });
-
-        if (data.length === 0) {
-          toast.error('The uploaded file is empty');
-          return;
-        }
-
-        const headers = Object.keys(data[0] || {});
-        setDetectedHeaders(headers);
-        setRawRows(data);
-
-        // Auto-match headers to canonical course fields
-        const autoMap = {
-          university: headers.find((h) => /university|uni|institution|college|school|provider/i.test(h)) || '',
-          programName: headers.find((h) => /program|course|degree|title|name|major/i.test(h)) || '',
-          level: headers.find((h) => /level|award|type/i.test(h)) || '',
-          country: headers.find((h) => /country|nation|destination/i.test(h)) || '',
-          campus: headers.find((h) => /campus|city|location|state|province/i.test(h)) || '',
-          duration: headers.find((h) => /duration|length|period|years|months/i.test(h)) || '',
-          yearlyTuition: headers.find((h) => /tuition|fee|cost|annual/i.test(h)) || '',
-          applicationFee: headers.find((h) => /app fee|application fee|reg fee/i.test(h)) || '',
-          expectedCommission: headers.find((h) => /commission|agent fee|payout/i.test(h)) || '',
-          intakes: headers.find((h) => /intake|starts|session|terms/i.test(h)) || '',
-          requirements: headers.find((h) => /requirement|eligibility|criteria/i.test(h)) || '',
-          englishRequirements: headers.find((h) => /english|ielts|pte|toefl|language/i.test(h)) || '',
-          websiteUrl: headers.find((h) => /website|url|link|portal/i.test(h)) || '',
-        };
-
-        setColumnMapping(autoMap);
+        setWorkbook(wb);
+        setAvailableSheets(wb.SheetNames);
+        
+        // Pick best sheet
+        const initialSheet = wb.SheetNames[0];
+        setSelectedSheet(initialSheet);
+        
+        const ws = wb.Sheets[initialSheet];
+        processWorksheet(ws, selectedFile.name);
         setStep('mapping');
       } catch (err) {
         console.error('File parsing error:', err);
@@ -2525,52 +2714,213 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
     reader.readAsBinaryString(selectedFile);
   };
 
+  const handleSheetSwitch = (sheetName) => {
+    if (!workbook || !workbook.Sheets[sheetName]) return;
+    setSelectedSheet(sheetName);
+    const ws = workbook.Sheets[sheetName];
+    processWorksheet(ws, file?.name || '');
+  };
+
+  const handleHeaderRowChange = (idx) => {
+    setHeaderRowIndex(idx);
+    applyHeaderRow(sheetGrid, idx, file?.name || '');
+  };
+
+  // Real-time live preview of top 4 rows using current mapping
+  const previewRows = useMemo(() => {
+    return dataRows.slice(0, 4).map((row, idx) => {
+      // 1. Program Name
+      let prog = columnMapping.programName ? String(row[columnMapping.programName] || '').trim() : '';
+      if (!prog) {
+        for (const k of Object.keys(row)) {
+          const v = String(row[k] || '').trim();
+          if (v.length >= 4 && /bachelor|master|bsc|msc|ba|ma|mba|diploma|business|computing|management|science|arts/i.test(v)) {
+            prog = v;
+            break;
+          }
+        }
+      }
+      if (!prog) {
+        const textVals = Object.values(row).map((v) => String(v || '').trim()).filter((v) => v.length > 5 && isNaN(Number(v)));
+        if (textVals.length > 0) prog = textVals[0];
+      }
+
+      // 2. University Name
+      let uni = columnMapping.university ? String(row[columnMapping.university] || '').trim() : '';
+      if (!uni) uni = defaultUniversity.trim() || 'Partner Institution';
+
+      // 3. Level
+      let lvl = columnMapping.level ? String(row[columnMapping.level] || '').trim() : '';
+      if (!lvl) {
+        const lower = (prog || '').toLowerCase();
+        if (lower.includes('master') || lower.includes('msc') || lower.includes('mba')) lvl = 'PG';
+        else if (lower.includes('diploma')) lvl = 'Diploma';
+        else lvl = 'UG';
+      }
+
+      // 4. Tuition
+      let tFee = columnMapping.yearlyTuition ? String(row[columnMapping.yearlyTuition] || '').trim() : '';
+      if (!tFee) tFee = 'EUR 6,000';
+
+      // 5. Duration
+      let dur = columnMapping.duration ? String(row[columnMapping.duration] || '').trim() : '';
+      if (!dur) dur = '36 months';
+
+      // 6. Intakes
+      let itk = columnMapping.intakes ? String(row[columnMapping.intakes] || '').trim() : 'Sep, Jan';
+
+      return {
+        idx: idx + 1,
+        uni,
+        prog: prog || '⚠️ Not detected',
+        lvl,
+        tFee,
+        dur,
+        itk,
+        hasProg: Boolean(prog),
+      };
+    });
+  }, [dataRows, columnMapping, defaultUniversity]);
+
+  // Final Ingestion with Robust Fallbacks
   const handleProcessImport = () => {
-    if (!columnMapping.programName && !columnMapping.university) {
-      toast.error('Please map at least the Program Name or University column');
+    if (dataRows.length === 0) {
+      toast.error('No valid data rows found to import');
       return;
     }
 
-    const imported = rawRows.map((row, idx) => {
-      const uni = String(row[columnMapping.university] || 'Partner Institution').trim();
-      const prog = String(row[columnMapping.programName] || 'Degree Programme').trim();
-      const ctry = String(row[columnMapping.country] || defaultCountry).trim();
-      const lvl = String(row[columnMapping.level] || (prog.toLowerCase().includes('master') || prog.toLowerCase().includes('msc') || prog.toLowerCase().includes('mba') ? 'PG' : 'UG')).trim();
-      const dur = String(row[columnMapping.duration] || '36 months').trim();
-      const tFee = String(row[columnMapping.yearlyTuition] || 'EUR 6,000').trim();
-      const aFee = String(row[columnMapping.applicationFee] || 'No Application Fee').trim();
-      const comm = String(row[columnMapping.expectedCommission] || 'Standard Agency Commission').trim();
-      const itkRaw = String(row[columnMapping.intakes] || 'Sep, Jan').trim();
-      const intakes = itkRaw.split(/[,/|]/).map((s) => s.trim()).filter(Boolean);
-      const reqs = String(row[columnMapping.requirements] || '').trim();
-      const engReqs = String(row[columnMapping.englishRequirements] || '').trim();
-      const web = String(row[columnMapping.websiteUrl] || '').trim();
+    const imported = dataRows.map((row, idx) => {
+      // 1. Program Name extraction with aggressive multi-layer fallbacks
+      let prog = columnMapping.programName ? String(row[columnMapping.programName] || '').trim() : '';
+
+      if (!prog) {
+        // Fallback layer 1: search keys for typical degree / major keywords
+        for (const k of Object.keys(row)) {
+          const v = String(row[k] || '').trim();
+          if (v.length >= 4 && /bachelor|master|bsc|msc|ba|ma|mba|diploma|certificate|business|management|computing|engineering|science|arts|health|design|law/i.test(v)) {
+            prog = v;
+            break;
+          }
+        }
+      }
+
+      if (!prog) {
+        // Fallback layer 2: pick the longest non-numeric text column
+        const textCols = Object.values(row)
+          .map((v) => String(v || '').trim())
+          .filter((v) => v.length > 5 && isNaN(Number(v)) && !v.includes('http') && !v.includes('@'));
+        if (textCols.length > 0) prog = textCols[0];
+      }
+
+      if (!prog) {
+        prog = `Course #${idx + 1}`;
+      }
+
+      // 2. University extraction
+      let uni = columnMapping.university ? String(row[columnMapping.university] || '').trim() : '';
+      if (!uni) {
+        uni = defaultUniversity.trim() || 'Partner Institution';
+      }
+
+      // 3. Country extraction
+      let ctry = columnMapping.country ? String(row[columnMapping.country] || '').trim() : '';
+      if (!ctry) {
+        ctry = defaultCountry.trim() || 'Malta';
+      }
+
+      // 4. Level extraction
+      let lvl = columnMapping.level ? String(row[columnMapping.level] || '').trim() : '';
+      if (!lvl) {
+        const lowerProg = prog.toLowerCase();
+        if (
+          lowerProg.includes('master') ||
+          lowerProg.includes('msc') ||
+          lowerProg.includes('ma ') ||
+          lowerProg.includes('mba') ||
+          lowerProg.includes('postgraduate') ||
+          lowerProg.includes('pg ')
+        ) {
+          lvl = 'PG';
+        } else if (lowerProg.includes('phd') || lowerProg.includes('doctorate')) {
+          lvl = 'PhD';
+        } else if (lowerProg.includes('diploma') || lowerProg.includes('certificate')) {
+          lvl = 'PG Diploma/Certificate';
+        } else {
+          lvl = 'UG';
+        }
+      }
+
+      // 5. Duration
+      let dur = columnMapping.duration ? String(row[columnMapping.duration] || '').trim() : '';
+      if (!dur) {
+        for (const k of Object.keys(row)) {
+          const v = String(row[k] || '').trim();
+          if (/\b(year|years|month|months|semester|semesters|ects)\b/i.test(v)) {
+            dur = v;
+            break;
+          }
+        }
+      }
+      if (!dur) dur = '36 months';
+
+      // 6. Tuition Fee
+      let tFee = columnMapping.yearlyTuition ? String(row[columnMapping.yearlyTuition] || '').trim() : '';
+      if (!tFee || tFee === '0') {
+        for (const k of Object.keys(row)) {
+          const v = String(row[k] || '').trim();
+          if (/[€$£₹]|\bEUR\b|\bUSD\b|\bGBP\b/i.test(v)) {
+            tFee = v;
+            break;
+          }
+        }
+      }
+      if (!tFee) tFee = 'EUR 6,000';
+
+      // 7. Intakes
+      const itkRaw = columnMapping.intakes ? String(row[columnMapping.intakes] || 'Sep, Jan').trim() : 'Sep, Jan';
+      const intakes = itkRaw.split(/[,/|;]/).map((s) => s.trim()).filter(Boolean);
+
+      // 8. Requirements & English
+      const reqs = columnMapping.requirements ? String(row[columnMapping.requirements] || '').trim() : '';
+      const engReqs = columnMapping.englishRequirements ? String(row[columnMapping.englishRequirements] || '').trim() : '';
+      const appFee = columnMapping.applicationFee ? String(row[columnMapping.applicationFee] || 'No Application Fee').trim() : 'No Application Fee';
+      const comm = columnMapping.expectedCommission ? String(row[columnMapping.expectedCommission] || 'Standard Agency Commission').trim() : 'Standard Agency Commission';
+      const web = columnMapping.websiteUrl ? String(row[columnMapping.websiteUrl] || '').trim() : '';
+      const campus = columnMapping.campus ? String(row[columnMapping.campus] || 'Main Campus').trim() : 'Main Campus';
+
+      const tuitionNum = parseInt(tFee.replace(/\D/g, '')) || 6000;
 
       return {
-        id: `import-${Date.now()}-${idx}`,
+        id: `import-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 6)}`,
         university: uni,
         logo: uni.slice(0, 3).toUpperCase(),
         logoColor: '#36D1DC',
         country: ctry,
-        countryFlag: '🌍',
-        region: String(row[columnMapping.campus] || ctry).trim(),
-        campus: String(row[columnMapping.campus] || 'Main Campus').trim(),
+        countryFlag: ctry.toLowerCase().includes('malta')
+          ? '🇲🇹'
+          : ctry.toLowerCase().includes('germany')
+          ? '🇩🇪'
+          : ctry.toLowerCase().includes('uk') || ctry.toLowerCase().includes('united kingdom')
+          ? '🇬🇧'
+          : '🌍',
+        region: campus,
+        campus: campus,
         websiteUrl: web,
         portalUrl: '',
         fasterOfferTAT: true,
-        affordable: tFee.toLowerCase().includes('eur') && parseInt(tFee.replace(/\D/g, '')) < 10000,
+        affordable: tuitionNum < 10000,
         highAcceptance: true,
-        scholarshipAvailable: reqs.toLowerCase().includes('scholarship'),
+        scholarshipAvailable: reqs.toLowerCase().includes('scholarship') || tFee.toLowerCase().includes('scholarship'),
         programName: prog,
         level: lvl,
         studyArea: 'General Academic Studies',
         disciplineArea: 'Higher Education',
         duration: dur,
-        durationYears: dur.includes('1') ? '1 - 2 Years' : '2 - 3 Years',
+        durationYears: dur.includes('1') ? '1 - 2 Years' : dur.includes('2') ? '2 - 3 Years' : '3 - 4 Years',
         yearlyTuition: tFee,
-        tuitionNumeric: parseInt(tFee.replace(/\D/g, '')) || 5000,
+        tuitionNumeric: tuitionNum,
         tuitionCurrency: tFee.includes('$') ? 'USD' : tFee.includes('£') ? 'GBP' : 'EUR',
-        applicationFee: aFee,
+        applicationFee: appFee,
         expectedCommission: comm,
         commissionNumeric: 800,
         intakes: intakes.length > 0 ? intakes : ['Sep', 'Jan'],
@@ -2593,7 +2943,7 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
       };
     });
 
-    onCoursesImported(imported);
+    onCoursesImported(imported, importMode);
   };
 
   return (
@@ -2601,8 +2951,8 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
       style={{
         position: 'fixed',
         inset: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.82)',
-        backdropFilter: 'blur(8px)',
+        backgroundColor: 'rgba(0, 0, 0, 0.85)',
+        backdropFilter: 'blur(10px)',
         zIndex: 1100,
         display: 'flex',
         alignItems: 'center',
@@ -2614,12 +2964,12 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
       <div
         style={{
           width: '100%',
-          maxWidth: '860px',
-          maxHeight: '90vh',
+          maxWidth: '920px',
+          maxHeight: '92vh',
           backgroundColor: '#0F1423',
-          border: '1px solid rgba(0, 229, 160, 0.3)',
+          border: '1px solid rgba(0, 229, 160, 0.35)',
           borderRadius: '16px',
-          boxShadow: '0 24px 60px rgba(0, 0, 0, 0.8)',
+          boxShadow: '0 24px 70px rgba(0, 0, 0, 0.85)',
           overflowY: 'auto',
           display: 'flex',
           flexDirection: 'column',
@@ -2634,6 +2984,7 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
+            background: 'rgba(8, 10, 18, 0.5)',
           }}
         >
           <div>
@@ -2642,7 +2993,7 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
               <span>Upload Custom Course Spreadsheet</span>
             </h3>
             <p style={{ fontSize: '12px', color: '#8E9BB5', margin: '4px 0 0' }}>
-              Works with Excel (.xlsx, .xls) and CSV from any country with different column headers.
+              Smart multi-sheet parser & header auto-detector. Previews your exact course names before importing.
             </p>
           </div>
           <button
@@ -2669,19 +3020,20 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
               style={{
                 border: '2px dashed rgba(0, 229, 160, 0.35)',
                 borderRadius: '12px',
-                padding: '40px 20px',
+                padding: '45px 20px',
                 textAlign: 'center',
                 background: 'rgba(0, 229, 160, 0.03)',
                 cursor: 'pointer',
+                transition: 'all 0.2s ease',
               }}
               onClick={() => document.getElementById('cf-excel-upload-input')?.click()}
             >
-              <div style={{ fontSize: '42px', marginBottom: '10px' }}>📊</div>
-              <div style={{ fontSize: '15px', fontWeight: 700, color: '#fff', marginBottom: '6px' }}>
-                Click to Select or Drag Excel / CSV File Here
+              <div style={{ fontSize: '46px', marginBottom: '12px' }}>📊</div>
+              <div style={{ fontSize: '16px', fontWeight: 700, color: '#fff', marginBottom: '6px' }}>
+                Click to Select or Drag Excel (.xlsx, .xls) / CSV File Here
               </div>
-              <div style={{ fontSize: '12px', color: '#8E9BB5' }}>
-                Supports .xlsx, .xls, and .csv files with custom country headers
+              <div style={{ fontSize: '12px', color: '#8E9BB5', maxWidth: '480px', margin: '0 auto' }}>
+                Works seamlessly with university sheets, partner brochures, or custom multi-column fee lists from Malta, Germany, UK, etc.
               </div>
               <input
                 id="cf-excel-upload-input"
@@ -2692,67 +3044,198 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
               />
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.04)', padding: '10px 14px', borderRadius: '8px' }}>
-                <span style={{ fontSize: '13px', color: '#EDEFFA', fontWeight: 600 }}>
-                  📄 <strong>{file?.name}</strong> ({rawRows.length} rows detected)
-                </span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+              {/* File Info Bar */}
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  background: 'rgba(255,255,255,0.04)',
+                  padding: '12px 16px',
+                  borderRadius: '10px',
+                  border: '1px solid rgba(255, 255, 255, 0.06)',
+                }}
+              >
+                <div>
+                  <span style={{ fontSize: '14px', color: '#EDEFFA', fontWeight: 700 }}>
+                    📄 {file?.name}
+                  </span>
+                  <span style={{ fontSize: '12px', color: '#00E5A0', marginLeft: '10px', fontWeight: 600 }}>
+                    ({dataRows.length} course rows detected)
+                  </span>
+                </div>
                 <button
                   onClick={() => setStep('file')}
-                  style={{ background: 'transparent', border: 'none', color: '#38BDF8', fontSize: '12px', cursor: 'pointer' }}
+                  style={{
+                    background: 'rgba(56, 189, 248, 0.15)',
+                    border: '1px solid rgba(56, 189, 248, 0.3)',
+                    color: '#38BDF8',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    padding: '4px 12px',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                  }}
                 >
                   Change File
                 </button>
               </div>
 
-              {/* Default Country Selector (If file lacks Country column) */}
-              <div>
-                <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#8E9BB5', marginBottom: '6px' }}>
-                  Default Country for this Spreadsheet (Used if no country column found)
-                </label>
-                <select
-                  value={defaultCountry}
-                  onChange={(e) => setDefaultCountry(e.target.value)}
-                  style={{
-                    width: '100%',
-                    background: 'rgba(8, 10, 18, 0.9)',
-                    border: '1px solid rgba(148, 163, 225, 0.22)',
-                    borderRadius: '8px',
-                    padding: '8px 12px',
-                    color: '#fff',
-                    fontSize: '13px',
-                    outline: 'none',
-                  }}
-                >
-                  {['Malta', 'Germany', 'United Kingdom', 'United States of America', 'Canada', 'Australia', 'Ireland', 'Lithuania', 'France', 'Poland', 'United Arab Emirates', 'Singapore', 'Other'].map((c) => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
+              {/* Sheet & Header Row Selectors (Fixes merged title rows & multi-tab workbooks) */}
+              <div style={{ display: 'grid', gridTemplateColumns: availableSheets.length > 1 ? '1fr 2fr' : '1fr', gap: '12px' }}>
+                {availableSheets.length > 1 && (
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#8E9BB5', marginBottom: '6px' }}>
+                      Workbook Sheet
+                    </label>
+                    <select
+                      value={selectedSheet}
+                      onChange={(e) => handleSheetSwitch(e.target.value)}
+                      style={{
+                        width: '100%',
+                        background: 'rgba(8, 10, 18, 0.9)',
+                        border: '1px solid rgba(148, 163, 225, 0.22)',
+                        borderRadius: '8px',
+                        padding: '8px 12px',
+                        color: '#fff',
+                        fontSize: '12px',
+                        outline: 'none',
+                      }}
+                    >
+                      {availableSheets.map((s) => (
+                        <option key={s} value={s}>
+                          📑 {s}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: 700, color: '#8E9BB5' }}>
+                      Header Row in Spreadsheet
+                    </label>
+                    <span style={{ fontSize: '10px', color: '#00E5A0', fontWeight: 700 }}>
+                      ✨ Auto-detected: Row {headerRowIndex + 1}
+                    </span>
+                  </div>
+                  <select
+                    value={headerRowIndex}
+                    onChange={(e) => handleHeaderRowChange(parseInt(e.target.value))}
+                    style={{
+                      width: '100%',
+                      background: 'rgba(8, 10, 18, 0.9)',
+                      border: '1px solid rgba(0, 229, 160, 0.4)',
+                      borderRadius: '8px',
+                      padding: '8px 12px',
+                      color: '#00E5A0',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      outline: 'none',
+                    }}
+                  >
+                    {candidateHeaderRows.map((c) => (
+                      <option key={c.index} value={c.index}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
-              {/* Smart Column Mapping Table */}
+              {/* Default University & Country (Used if columns are not present in file) */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#8E9BB5', marginBottom: '6px' }}>
+                    Default University / Institution Name (Used if no university column in file)
+                  </label>
+                  <input
+                    type="text"
+                    value={defaultUniversity}
+                    onChange={(e) => setDefaultUniversity(e.target.value)}
+                    placeholder="e.g. Global College Malta / GBS Malta"
+                    style={{
+                      width: '100%',
+                      background: 'rgba(8, 10, 18, 0.9)',
+                      border: '1px solid rgba(148, 163, 225, 0.22)',
+                      borderRadius: '8px',
+                      padding: '8px 12px',
+                      color: '#fff',
+                      fontSize: '13px',
+                      outline: 'none',
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#8E9BB5', marginBottom: '6px' }}>
+                    Default Country (Used if no country column in file)
+                  </label>
+                  <select
+                    value={defaultCountry}
+                    onChange={(e) => setDefaultCountry(e.target.value)}
+                    style={{
+                      width: '100%',
+                      background: 'rgba(8, 10, 18, 0.9)',
+                      border: '1px solid rgba(148, 163, 225, 0.22)',
+                      borderRadius: '8px',
+                      padding: '8px 12px',
+                      color: '#fff',
+                      fontSize: '13px',
+                      outline: 'none',
+                    }}
+                  >
+                    {[
+                      'Malta',
+                      'Germany',
+                      'United Kingdom',
+                      'United States of America',
+                      'Canada',
+                      'Australia',
+                      'Ireland',
+                      'Lithuania',
+                      'France',
+                      'Poland',
+                      'United Arab Emirates',
+                      'Singapore',
+                      'Other',
+                    ].map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Column Mapping Section */}
               <div>
-                <div style={{ fontSize: '12px', fontWeight: 800, color: '#00E5A0', letterSpacing: '0.04em', marginBottom: '8px' }}>
-                  MATCH HEADINGS FROM YOUR SPREADSHEET
+                <div style={{ fontSize: '12px', fontWeight: 800, color: '#00E5A0', letterSpacing: '0.04em', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>🎯</span>
+                  <span>MATCH SPREADSHEET COLUMNS TO COURSE FIELDS</span>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                   {[
-                    { key: 'university', label: 'University / Institution Name *' },
-                    { key: 'programName', label: 'Program / Course Title *' },
-                    { key: 'country', label: 'Country Column (Optional)' },
-                    { key: 'campus', label: 'Campus / City / Province' },
+                    { key: 'programName', label: 'Program / Course Title * (Critical)', required: true },
+                    { key: 'university', label: 'University / Institution Name' },
                     { key: 'level', label: 'Degree Level (UG, PG, Diploma)' },
-                    { key: 'duration', label: 'Duration (e.g. 36 months, 3 yrs)' },
                     { key: 'yearlyTuition', label: 'Yearly Tuition Fee' },
-                    { key: 'applicationFee', label: 'Application Fee' },
-                    { key: 'expectedCommission', label: 'Expected Commission' },
+                    { key: 'duration', label: 'Duration (e.g. 36 months, 3 yrs)' },
                     { key: 'intakes', label: 'Intakes / Start Dates' },
+                    { key: 'country', label: 'Country Column' },
+                    { key: 'campus', label: 'Campus / City / Province' },
                     { key: 'requirements', label: 'Entry Requirements / Eligibility' },
                     { key: 'englishRequirements', label: 'IELTS / PTE / English Test' },
-                    { key: 'websiteUrl', label: 'Official Website / Portal URL' },
+                    { key: 'applicationFee', label: 'Application Fee' },
+                    { key: 'expectedCommission', label: 'Expected Commission' },
+                    { key: 'websiteUrl', label: 'Official Website / Course URL' },
                   ].map((field) => (
                     <div key={field.key} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <span style={{ fontSize: '11px', color: '#8E9BB5', fontWeight: 600 }}>{field.label}</span>
+                      <span style={{ fontSize: '11px', color: field.required ? '#00E5A0' : '#8E9BB5', fontWeight: 700 }}>
+                        {field.label}
+                      </span>
                       <select
                         value={columnMapping[field.key] || ''}
                         onChange={(e) => setColumnMapping({ ...columnMapping, [field.key]: e.target.value })}
@@ -2766,14 +3249,126 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
                           outline: 'none',
                         }}
                       >
-                        <option value="">-- Not in file / Ignore --</option>
-                        {detectedHeaders.map((h) => (
-                          <option key={h} value={h}>{h} (Row 1: {String(rawRows[0]?.[h] || '').slice(0, 24)})</option>
-                        ))}
+                        <option value="">-- Not in file / Auto fallback --</option>
+                        {detectedHeaders.map((h) => {
+                          const sampleVal = String(dataRows[0]?.[h] || '').slice(0, 25);
+                          return (
+                            <option key={h} value={h}>
+                              {h} {sampleVal ? `(e.g. "${sampleVal}")` : ''}
+                            </option>
+                          );
+                        })}
                       </select>
                     </div>
                   ))}
                 </div>
+              </div>
+
+              {/* LIVE DATA PREVIEW (Crucial: Shows exact extracted course names before importing) */}
+              <div
+                style={{
+                  background: 'rgba(8, 10, 18, 0.75)',
+                  border: '1px solid rgba(148, 163, 225, 0.18)',
+                  borderRadius: '12px',
+                  padding: '14px',
+                  marginTop: '4px',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 800, color: '#38BDF8', letterSpacing: '0.04em' }}>
+                    🔍 LIVE DATA PREVIEW (First {previewRows.length} Rows with Current Mapping)
+                  </div>
+                  {previewRows[0]?.hasProg ? (
+                    <span style={{ fontSize: '11px', color: '#00E5A0', fontWeight: 700 }}>
+                      ✓ Course Names Validated
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: '11px', color: '#FFB020', fontWeight: 700 }}>
+                      ⚠️ Pick "Program / Course Title" above
+                    </span>
+                  )}
+                </div>
+
+                {!previewRows[0]?.hasProg && (
+                  <div
+                    style={{
+                      background: 'rgba(255, 176, 32, 0.12)',
+                      border: '1px solid rgba(255, 176, 32, 0.35)',
+                      color: '#FFB020',
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                      marginBottom: '10px',
+                    }}
+                  >
+                    ⚠️ <strong>Notice:</strong> Course Name column was not automatically identified. Please select your program name column from the dropdown above so your courses display their actual titles instead of defaults!
+                  </div>
+                )}
+
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.1)', color: '#8E9BB5', textAlign: 'left' }}>
+                        <th style={{ padding: '6px 8px', width: '30px' }}>#</th>
+                        <th style={{ padding: '6px 8px', color: '#00E5A0' }}>University</th>
+                        <th style={{ padding: '6px 8px', color: '#38BDF8' }}>Course / Program Name</th>
+                        <th style={{ padding: '6px 8px' }}>Level</th>
+                        <th style={{ padding: '6px 8px' }}>Tuition/Yr</th>
+                        <th style={{ padding: '6px 8px' }}>Duration</th>
+                        <th style={{ padding: '6px 8px' }}>Intakes</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {previewRows.map((r) => (
+                        <tr key={r.idx} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                          <td style={{ padding: '6px 8px', color: '#8E9BB5' }}>{r.idx}</td>
+                          <td style={{ padding: '6px 8px', color: '#EDEFFA', fontWeight: 600 }}>{r.uni}</td>
+                          <td style={{ padding: '6px 8px', color: r.hasProg ? '#38BDF8' : '#FFB020', fontWeight: 700 }}>
+                            {r.prog}
+                          </td>
+                          <td style={{ padding: '6px 8px', color: '#EDEFFA' }}>{r.lvl}</td>
+                          <td style={{ padding: '6px 8px', color: '#00E5A0' }}>{r.tFee}</td>
+                          <td style={{ padding: '6px 8px', color: '#8E9BB5' }}>{r.dur}</td>
+                          <td style={{ padding: '6px 8px', color: '#8E9BB5' }}>{r.itk}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Import Mode: Merge vs Replace */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '20px',
+                  background: 'rgba(255, 255, 255, 0.03)',
+                  padding: '10px 14px',
+                  borderRadius: '8px',
+                }}
+              >
+                <span style={{ fontSize: '11px', color: '#8E9BB5', fontWeight: 700 }}>Import Action:</span>
+                <label style={{ fontSize: '12px', color: '#EDEFFA', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                  <input
+                    type="radio"
+                    name="importMode"
+                    value="merge"
+                    checked={importMode === 'merge'}
+                    onChange={() => setImportMode('merge')}
+                  />
+                  <span>Merge with existing course catalog</span>
+                </label>
+                <label style={{ fontSize: '12px', color: '#EDEFFA', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                  <input
+                    type="radio"
+                    name="importMode"
+                    value="replace"
+                    checked={importMode === 'replace'}
+                    onChange={() => setImportMode('replace')}
+                  />
+                  <span style={{ color: '#FFB020' }}>Replace entire catalog with this spreadsheet</span>
+                </label>
               </div>
             </div>
           )}
@@ -2786,7 +3381,7 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
             borderTop: '1px solid rgba(255, 255, 255, 0.08)',
             display: 'flex',
             justifyContent: 'flex-end',
-            gap: '10px',
+            gap: '12px',
             background: 'rgba(8, 10, 18, 0.6)',
           }}
         >
@@ -2796,7 +3391,7 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
               background: 'rgba(255, 255, 255, 0.08)',
               border: 'none',
               color: '#EDEFFA',
-              padding: '8px 16px',
+              padding: '8px 18px',
               borderRadius: '8px',
               fontSize: '12px',
               fontWeight: 700,
@@ -2813,15 +3408,19 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
                 background: 'linear-gradient(135deg, #00E5A0, #00C885)',
                 border: 'none',
                 color: '#080A12',
-                padding: '8px 24px',
+                padding: '10px 26px',
                 borderRadius: '8px',
                 fontSize: '13px',
                 fontWeight: 800,
                 cursor: 'pointer',
                 boxShadow: '0 4px 14px rgba(0, 229, 160, 0.3)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
               }}
             >
-              Import {rawRows.length} Courses to Portal 🚀
+              <span>🚀</span>
+              <span>Import {dataRows.length} Courses to Portal</span>
             </button>
           )}
         </div>
