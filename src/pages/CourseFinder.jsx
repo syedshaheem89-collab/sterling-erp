@@ -1064,16 +1064,6 @@ export default function CourseFinder({ setCurrentPage }) {
         return false;
       }
 
-      // 4. Study Area Filter
-      if (selectedStudyArea !== 'All' && c.studyArea !== selectedStudyArea) {
-        return false;
-      }
-
-      // 5. Duration Filter
-      if (selectedDuration !== 'All' && c.durationYears !== selectedDuration) {
-        return false;
-      }
-
       // 4. Simplified 7 Program Levels (Bachelors, Masters, UG Diploma, PG Diploma, UG Certificate, PG Certificate, Bridging Course)
       if (selectedLevel !== 'All') {
         const curLevel = detectProgramLevel(c.programName, c.level, c.duration);
@@ -1092,8 +1082,6 @@ export default function CourseFinder({ setCurrentPage }) {
     searchQuery,
     selectedIntakes,
     selectedCountry,
-    selectedStudyArea,
-    selectedDuration,
     selectedLevel,
     quickFilter,
   ]);
@@ -1149,10 +1137,6 @@ export default function CourseFinder({ setCurrentPage }) {
     setSelectedLevel('All');
     setSelectedCountry('All');
     setSelectedIntakes([]);
-    setSelectedStudyArea('All');
-    setSelectedDuration('All');
-    setSelectedProvince('');
-    setSelectedDiscipline('');
     setQuickFilter(null);
     toast('Filters reset to default', { icon: '🔄' });
   };
