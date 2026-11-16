@@ -26,8 +26,79 @@ function formatIndianCurrency(amount) {
   return `₹${num.toLocaleString('en-IN')}`;
 }
 
-export default function Overview({ setCurrentPage }) {
+// ============================================================================
+// THEME ADAPTATION HOOK FOR EXECUTIVE OVERVIEW & COUNTRY ANALYTICS
+// ============================================================================
+function useOverviewTheme() {
+  const [isLight, setIsLight] = useState(() => {
+    return document.documentElement.getAttribute('data-theme') === 'light';
+  });
+
+  useEffect(() => {
+    const handleSync = () => {
+      setIsLight(document.documentElement.getAttribute('data-theme') === 'light');
+    };
+    handleSync();
+    const observer = new MutationObserver(handleSync);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme'],
+    });
+    return () => observer.disconnect();
+  }, []);
+
+  return useMemo(() => {
+    return {
+      isLight,
+      pageBg: isLight ? '#F4F6FC' : '#080A12',
+      cardBg: isLight ? '#FFFFFF' : 'rgba(15, 20, 35, 0.85)',
+      cardBgSolid: isLight ? '#FFFFFF' : '#0F1528',
+      cardBorder: isLight ? '1px solid rgba(120, 135, 185, 0.22)' : '1px solid rgba(148, 163, 225, 0.14)',
+      cardBorderHover: isLight ? '#6366F1' : '#7C6FFF',
+      textPrimary: isLight ? '#0E1326' : '#FFFFFF',
+      textSecondary: isLight ? '#334155' : '#EDEFFA',
+      textMuted: isLight ? '#64748B' : '#8E9BB5',
+      subtleBg: isLight ? '#F1F5F9' : 'rgba(255, 255, 255, 0.06)',
+      subtleBorder: isLight ? '1px solid #CBD5E1' : '1px solid rgba(255, 255, 255, 0.12)',
+      hoverBg: isLight ? 'rgba(99, 102, 241, 0.08)' : 'rgba(255, 255, 255, 0.04)',
+      inputBg: isLight ? '#FFFFFF' : 'rgba(255, 255, 255, 0.05)',
+      inputBorder: isLight ? '#CBD5E1' : 'rgba(148, 163, 225, 0.18)',
+      divider: isLight ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.08)',
+      shadow: isLight ? '0 4px 18px rgba(0, 0, 0, 0.06)' : '0 8px 24px rgba(0, 0, 0, 0.4)',
+
+      // Chart theme colors
+      chartGrid: isLight ? 'rgba(0, 0, 0, 0.06)' : 'rgba(148, 163, 225, 0.08)',
+      chartTicks: isLight ? '#64748B' : '#8E9BB5',
+      chartTooltipBg: isLight ? '#FFFFFF' : '#0F1528',
+      chartTooltipTitle: isLight ? '#0E1326' : '#EDEFFA',
+      chartTooltipBody: isLight ? '#334155' : '#8E9BB5',
+      chartPointBorder: isLight ? '#FFFFFF' : '#0B0F1C',
+
+      // Donut theme colors
+      donutTrack: isLight ? '#E2E8F0' : 'rgba(255, 255, 255, 0.05)',
+      donutText: isLight ? '#0E1326' : '#FFFFFF',
+      donutSubtext: isLight ? '#64748B' : '#8E9BB5',
+
+      // Breakdown cards
+      fullPaymentCardBg: isLight ? '#F0FDF4' : 'rgba(0, 229, 160, 0.08)',
+      fullPaymentCardBorder: isLight ? '1px solid #86EFAC' : '1px solid rgba(0, 229, 160, 0.25)',
+      partialPaymentCardBg: isLight ? '#FFFBEB' : 'rgba(255, 176, 32, 0.08)',
+      partialPaymentCardBorder: isLight ? '1px solid #FDE68A' : '1px solid rgba(255, 176, 32, 0.25)',
+
+      // Modal theme
+      modalBg: isLight ? '#FFFFFF' : '#0F1528',
+      modalBorder: isLight ? '1px solid rgba(0, 0, 0, 0.12)' : '1px solid rgba(148, 163, 225, 0.25)',
+      modalShadow: isLight
+        ? '0 20px 50px rgba(0, 0, 0, 0.15), 0 0 30px rgba(124, 111, 255, 0.1)'
+        : '0 20px 50px rgba(0, 0, 0, 0.8), 0 0 30px rgba(124, 111, 255, 0.2)',
+      modalOptionBg: isLight ? '#FFFFFF' : '#0F1528',
+    };
+  }, [isLight]);
+}
+
+export default function Overview({ setCurrentPage, initialView }) {
   const { user, profile, role, companyId, isCounselor } = useAuth();
+  const t = useOverviewTheme();
 
   const [loading, setLoading] = useState(true);
   const [studentsData, setStudentsData] = useState([]);
@@ -486,18 +557,22 @@ export default function Overview({ setCurrentPage }) {
           plugins: {
             legend: { display: false },
             tooltip: {
-              backgroundColor: '#0F1528',
+              backgroundColor: t.chartTooltipBg,
+              titleColor: t.chartTooltipTitle,
+              bodyColor: t.chartTooltipBody,
+              borderColor: t.cardBorder,
+              borderWidth: 1,
               callbacks: { label: (ctx) => `Students: ${ctx.raw} (Click to inspect)` },
             },
           },
           scales: {
             x: {
               grid: { display: false },
-              ticks: { color: '#8E9BB5', font: { size: 11 } },
+              ticks: { color: t.chartTicks, font: { size: 11 } },
             },
             y: {
-              grid: { color: 'rgba(148, 163, 225, 0.08)' },
-              ticks: { color: '#8E9BB5', font: { size: 10 }, stepSize: 20 },
+              grid: { color: t.chartGrid },
+              ticks: { color: t.chartTicks, font: { size: 10 }, stepSize: 20 },
             },
           },
         },
@@ -545,18 +620,22 @@ export default function Overview({ setCurrentPage }) {
           plugins: {
             legend: { display: false },
             tooltip: {
-              backgroundColor: '#0F1528',
+              backgroundColor: t.chartTooltipBg,
+              titleColor: t.chartTooltipTitle,
+              bodyColor: t.chartTooltipBody,
+              borderColor: t.cardBorder,
+              borderWidth: 1,
               callbacks: { label: (ctx) => `Count: ${ctx.raw} (Click to inspect)` },
             },
           },
           scales: {
             x: {
               grid: { display: false },
-              ticks: { color: '#8E9BB5', font: { size: 10 } },
+              ticks: { color: t.chartTicks, font: { size: 10 } },
             },
             y: {
-              grid: { color: 'rgba(148, 163, 225, 0.08)' },
-              ticks: { color: '#8E9BB5', font: { size: 10 }, stepSize: 10 },
+              grid: { color: t.chartGrid },
+              ticks: { color: t.chartTicks, font: { size: 10 }, stepSize: 10 },
             },
           },
         },
@@ -607,7 +686,7 @@ export default function Overview({ setCurrentPage }) {
               backgroundColor: grad,
               tension: 0.35,
               pointBackgroundColor: pointColors,
-              pointBorderColor: '#0B0F1C',
+              pointBorderColor: t.chartPointBorder,
               pointBorderWidth: 2,
               pointRadius: 5,
               pointHoverRadius: 8,
@@ -620,9 +699,9 @@ export default function Overview({ setCurrentPage }) {
           plugins: {
             legend: { display: false },
             tooltip: {
-              backgroundColor: '#0F1528',
-              titleColor: '#EDEFFA',
-              bodyColor: '#A8B2C7',
+              backgroundColor: t.chartTooltipBg,
+              titleColor: t.chartTooltipTitle,
+              bodyColor: t.chartTooltipBody,
               borderColor: 'rgba(148, 163, 225, 0.25)',
               borderWidth: 1,
               padding: 10,
@@ -655,12 +734,12 @@ export default function Overview({ setCurrentPage }) {
           scales: {
             x: {
               grid: { display: false },
-              ticks: { color: '#8E9BB5', font: { size: 9 } },
+              ticks: { color: t.chartTicks, font: { size: 9 } },
             },
             y: {
-              grid: { color: 'rgba(148, 163, 225, 0.06)' },
+              grid: { color: t.chartGrid },
               ticks: {
-                color: '#8E9BB5',
+                color: t.chartTicks,
                 font: { size: 9 },
                 callback: (val) => `₹${val} L`,
               },
@@ -722,9 +801,9 @@ export default function Overview({ setCurrentPage }) {
           plugins: {
             legend: { display: false },
             tooltip: {
-              backgroundColor: '#0F1528',
-              titleColor: '#EDEFFA',
-              bodyColor: '#A8B2C7',
+              backgroundColor: t.chartTooltipBg,
+              titleColor: t.chartTooltipTitle,
+              bodyColor: t.chartTooltipBody,
               borderColor: 'rgba(54, 209, 220, 0.3)',
               borderWidth: 1,
               padding: 10,
@@ -757,12 +836,12 @@ export default function Overview({ setCurrentPage }) {
           scales: {
             x: {
               grid: { display: false },
-              ticks: { color: '#8E9BB5', font: { size: 9 } },
+              ticks: { color: t.chartTicks, font: { size: 9 } },
             },
             y: {
-              grid: { color: 'rgba(148, 163, 225, 0.06)' },
+              grid: { color: t.chartGrid },
               ticks: {
-                color: '#8E9BB5',
+                color: t.chartTicks,
                 font: { size: 9 },
                 callback: (val) => `₹${val} L`,
               },
@@ -812,7 +891,7 @@ export default function Overview({ setCurrentPage }) {
               pointRadius: (ctx) => (ctx.raw > 0 ? 4 : 0),
               pointHoverRadius: 6,
               pointBackgroundColor: '#00E5A0',
-              pointBorderColor: '#0B0F1C',
+              pointBorderColor: t.chartPointBorder,
               tension: 0.3,
             },
           ],
@@ -823,9 +902,9 @@ export default function Overview({ setCurrentPage }) {
           plugins: {
             legend: { display: false },
             tooltip: {
-              backgroundColor: '#0F1528',
-              titleColor: '#EDEFFA',
-              bodyColor: '#A8B2C7',
+              backgroundColor: t.chartTooltipBg,
+              titleColor: t.chartTooltipTitle,
+              bodyColor: t.chartTooltipBody,
               borderColor: 'rgba(0, 229, 160, 0.3)',
               borderWidth: 1,
               padding: 10,
@@ -863,12 +942,12 @@ export default function Overview({ setCurrentPage }) {
           scales: {
             x: {
               grid: { display: false },
-              ticks: { color: '#8E9BB5', font: { size: 9 }, maxTicksLimit: 12 },
+              ticks: { color: t.chartTicks, font: { size: 9 }, maxTicksLimit: 12 },
             },
             y: {
               beginAtZero: true,
-              grid: { color: 'rgba(148, 163, 225, 0.06)' },
-              ticks: { color: '#8E9BB5', font: { size: 9 }, stepSize: 1, precision: 0 },
+              grid: { color: t.chartGrid },
+              ticks: { color: t.chartTicks, font: { size: 9 }, stepSize: 1, precision: 0 },
             },
           },
         },
@@ -882,7 +961,7 @@ export default function Overview({ setCurrentPage }) {
       if (monthlyCollectionsChartInstance.current) monthlyCollectionsChartInstance.current.destroy();
       if (dailyTrendChartInstance.current) dailyTrendChartInstance.current.destroy();
     };
-  }, [loading, metrics, appliedMonthlyRange]);
+  }, [loading, metrics, appliedMonthlyRange, t.isLight]);
 
   // SVG Donut Calculations for Collection Status (100% mathematically closed 360° vector ring)
   const donutRadius = 70;
@@ -901,76 +980,120 @@ export default function Overview({ setCurrentPage }) {
         display: 'flex',
         flexDirection: 'column',
         gap: '14px',
-        backgroundColor: '#080A12',
-        color: '#EDEFFA',
+        backgroundColor: t.pageBg,
+        color: t.textPrimary,
         fontFamily: "'Plus Jakarta Sans', sans-serif",
         position: 'relative',
+        transition: 'background-color 0.2s, color 0.2s',
       }}
     >
       {/* =========================================================================
           TOP ACTION BAR (Advanced Filters Button & Master Import)
          ========================================================================= */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '12px' }}>
-        {/* Master Sheet Importer */}
-        <button
-          onClick={() => setIsImportModalOpen(true)}
-          style={{
-            background: 'linear-gradient(135deg, rgba(0, 229, 160, 0.15) 0%, rgba(54, 209, 220, 0.15) 100%)',
-            color: '#00E5A0',
-            border: '1px solid rgba(0, 229, 160, 0.4)',
-            padding: '7px 16px',
-            borderRadius: '10px',
-            fontSize: '12px',
-            fontWeight: 700,
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px',
-          }}
-        >
-          <span>📥</span>
-          <span>Import Google Sheet</span>
-        </button>
-
-        {/* Advanced Filters Button (Matches Image 1 top right) */}
-        <button
-          onClick={() => setShowFiltersModal((prev) => !prev)}
-          style={{
-            background: showFiltersModal ? 'var(--blue, #7C6FFF)' : 'rgba(20, 25, 45, 0.85)',
-            color: '#fff',
-            border: '1px solid rgba(148, 163, 225, 0.25)',
-            padding: '7px 16px',
-            borderRadius: '10px',
-            fontSize: '12px',
-            fontWeight: 700,
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            boxShadow: '0 4px 14px rgba(0, 0, 0, 0.4)',
-          }}
-        >
-          <span>🎛️</span>
-          <span>Advanced Filters</span>
-          {activeFiltersCount > 0 && (
-            <span
+      <div style={{ display: 'flex', justifyContent: initialView === 'country' ? 'space-between' : 'flex-end', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+        {initialView === 'country' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '12px', fontWeight: 700, color: t.textMuted }}>Filter Destination Country:</span>
+            <select
+              value={selectedCountry}
+              onChange={(e) => setSelectedCountry(e.target.value)}
               style={{
-                background: '#7C6FFF',
-                color: '#fff',
-                width: '18px',
-                height: '18px',
-                borderRadius: '50%',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '10px',
-                fontWeight: 800,
+                background: t.cardBg,
+                border: t.cardBorder,
+                borderRadius: '8px',
+                padding: '6px 12px',
+                color: t.textPrimary,
+                fontSize: '12px',
+                fontWeight: 700,
+                outline: 'none',
+                cursor: 'pointer',
               }}
             >
-              {activeFiltersCount}
-            </span>
-          )}
-        </button>
+              <option value="All" style={{ background: t.modalOptionBg, color: t.textPrimary }}>🌍 All Countries</option>
+              {uniqueCountries.map((c) => (
+                <option key={c} value={c} style={{ background: t.modalOptionBg, color: t.textPrimary }}>{c}</option>
+              ))}
+            </select>
+            {selectedCountry !== 'All' && (
+              <button
+                onClick={() => setSelectedCountry('All')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#6366F1',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Clear Filter ✕
+              </button>
+            )}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {/* Master Sheet Importer */}
+          <button
+            onClick={() => setIsImportModalOpen(true)}
+            style={{
+              background: t.isLight ? 'rgba(0, 180, 126, 0.1)' : 'linear-gradient(135deg, rgba(0, 229, 160, 0.15) 0%, rgba(54, 209, 220, 0.15) 100%)',
+              color: t.isLight ? '#047857' : '#00E5A0',
+              border: t.isLight ? '1px solid rgba(0, 180, 126, 0.35)' : '1px solid rgba(0, 229, 160, 0.4)',
+              padding: '7px 16px',
+              borderRadius: '10px',
+              fontSize: '12px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+          >
+            <span>📥</span>
+            <span>Import Google Sheet</span>
+          </button>
+
+          {/* Advanced Filters Button */}
+          <button
+            onClick={() => setShowFiltersModal((prev) => !prev)}
+            style={{
+              background: showFiltersModal ? 'var(--blue, #7C6FFF)' : t.cardBg,
+              color: showFiltersModal ? '#fff' : t.textPrimary,
+              border: t.cardBorder,
+              padding: '7px 16px',
+              borderRadius: '10px',
+              fontSize: '12px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              boxShadow: t.shadow,
+            }}
+          >
+            <span>🎛️</span>
+            <span>Advanced Filters</span>
+            {activeFiltersCount > 0 && (
+              <span
+                style={{
+                  background: '#7C6FFF',
+                  color: '#fff',
+                  width: '18px',
+                  height: '18px',
+                  borderRadius: '50%',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '10px',
+                  fontWeight: 800,
+                }}
+              >
+                {activeFiltersCount}
+              </span>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* =========================================================================
@@ -994,13 +1117,14 @@ export default function Overview({ setCurrentPage }) {
             })
           }
           style={{
-            background: 'rgba(15, 20, 35, 0.85)',
-            border: '1px solid rgba(148, 163, 225, 0.14)',
+            background: t.cardBg,
+            border: t.cardBorder,
             borderRadius: '12px',
             padding: '12px 16px',
             position: 'relative',
             cursor: 'pointer',
             transition: 'all 0.2s ease',
+            boxShadow: t.shadow,
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.borderColor = '#A78BFA';
@@ -1008,17 +1132,17 @@ export default function Overview({ setCurrentPage }) {
             e.currentTarget.style.boxShadow = '0 8px 24px rgba(167, 139, 250, 0.2)';
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = 'rgba(148, 163, 225, 0.14)';
+            e.currentTarget.style.borderColor = t.isLight ? 'rgba(120, 135, 185, 0.22)' : 'rgba(148, 163, 225, 0.14)';
             e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = 'none';
+            e.currentTarget.style.boxShadow = t.shadow;
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '11px', color: '#8E9BB5', fontWeight: 600 }}>Total Applications</span>
+            <span style={{ fontSize: '11px', color: t.textMuted, fontWeight: 600 }}>Total Applications</span>
             <span style={{ fontSize: '10px', color: '#7C6FFF', fontWeight: 700 }}>Inspect ↗</span>
           </div>
 
-          <div style={{ fontSize: '26px', fontWeight: 800, color: '#A78BFA', marginTop: '2px' }}>
+          <div style={{ fontSize: '26px', fontWeight: 800, color: t.isLight ? '#6366F1' : '#A78BFA', marginTop: '2px' }}>
             {metrics.totalApps}
           </div>
 
@@ -1035,15 +1159,16 @@ export default function Overview({ setCurrentPage }) {
                 });
               }}
               style={{
-                background: 'rgba(255, 255, 255, 0.06)',
+                background: t.subtleBg,
+                border: t.subtleBorder,
                 padding: '2px 7px',
                 borderRadius: '6px',
                 fontSize: '10px',
-                color: '#A8B2C7',
+                color: t.textSecondary,
                 cursor: 'pointer',
               }}
             >
-              Full <strong style={{ color: '#00E5A0' }}>{metrics.fullPaymentCount}</strong>
+              Full <strong style={{ color: t.isLight ? '#047857' : '#00E5A0' }}>{metrics.fullPaymentCount}</strong>
             </span>
 
             <span
@@ -1058,15 +1183,16 @@ export default function Overview({ setCurrentPage }) {
                 });
               }}
               style={{
-                background: 'rgba(255, 255, 255, 0.06)',
+                background: t.subtleBg,
+                border: t.subtleBorder,
                 padding: '2px 7px',
                 borderRadius: '6px',
                 fontSize: '10px',
-                color: '#A8B2C7',
+                color: t.textSecondary,
                 cursor: 'pointer',
               }}
             >
-              Partial <strong style={{ color: '#FFB020' }}>{metrics.partialPaymentCount}</strong>
+              Partial <strong style={{ color: t.isLight ? '#D97706' : '#FFB020' }}>{metrics.partialPaymentCount}</strong>
             </span>
           </div>
         </div>
@@ -1083,14 +1209,15 @@ export default function Overview({ setCurrentPage }) {
             })
           }
           style={{
-            background: 'rgba(15, 20, 35, 0.85)',
-            border: '1px solid rgba(148, 163, 225, 0.14)',
+            background: t.cardBg,
+            border: t.cardBorder,
             borderTop: '2px solid #00E5A0',
             borderRadius: '12px',
             padding: '12px 16px',
             position: 'relative',
             cursor: 'pointer',
             transition: 'all 0.2s ease',
+            boxShadow: t.shadow,
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.borderColor = '#00E5A0';
@@ -1098,21 +1225,22 @@ export default function Overview({ setCurrentPage }) {
             e.currentTarget.style.boxShadow = '0 8px 24px rgba(0, 229, 160, 0.2)';
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = 'rgba(148, 163, 225, 0.14)';
+            e.currentTarget.style.borderColor = t.isLight ? 'rgba(120, 135, 185, 0.22)' : 'rgba(148, 163, 225, 0.14)';
+            e.currentTarget.style.borderTopColor = '#00E5A0';
             e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = 'none';
+            e.currentTarget.style.boxShadow = t.shadow;
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '11px', color: '#8E9BB5', fontWeight: 600 }}>Total Collected</span>
-            <span style={{ fontSize: '10px', color: '#00E5A0', fontWeight: 700 }}>Inspect ↗</span>
+            <span style={{ fontSize: '11px', color: t.textMuted, fontWeight: 600 }}>Total Collected</span>
+            <span style={{ fontSize: '10px', color: t.isLight ? '#047857' : '#00E5A0', fontWeight: 700 }}>Inspect ↗</span>
           </div>
-          <div style={{ fontSize: '26px', fontWeight: 800, color: '#00E5A0', marginTop: '2px' }}>
+          <div style={{ fontSize: '26px', fontWeight: 800, color: t.isLight ? '#047857' : '#00E5A0', marginTop: '2px' }}>
             {formatIndianCurrency(metrics.totalCollected)}
           </div>
         </div>
 
-        {/* Card 3: Collection Efficiency (Total % collected against committed) */}
+        {/* Card 3: Collection Efficiency */}
         <div
           onClick={() =>
             openDrilldown({
@@ -1123,13 +1251,14 @@ export default function Overview({ setCurrentPage }) {
             })
           }
           style={{
-            background: 'rgba(15, 20, 35, 0.85)',
-            border: '1px solid rgba(148, 163, 225, 0.14)',
+            background: t.cardBg,
+            border: t.cardBorder,
             borderRadius: '12px',
             padding: '12px 16px',
             position: 'relative',
             cursor: 'pointer',
             transition: 'all 0.2s ease',
+            boxShadow: t.shadow,
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.borderColor = '#36D1DC';
@@ -1137,22 +1266,22 @@ export default function Overview({ setCurrentPage }) {
             e.currentTarget.style.boxShadow = '0 8px 24px rgba(54, 209, 220, 0.2)';
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = 'rgba(148, 163, 225, 0.14)';
+            e.currentTarget.style.borderColor = t.isLight ? 'rgba(120, 135, 185, 0.22)' : 'rgba(148, 163, 225, 0.14)';
             e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = 'none';
+            e.currentTarget.style.boxShadow = t.shadow;
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '11px', color: '#8E9BB5', fontWeight: 600 }}>Collection Efficiency</span>
+            <span style={{ fontSize: '11px', color: t.textMuted, fontWeight: 600 }}>Collection Efficiency</span>
             <span style={{ fontSize: '10px', color: '#36D1DC', fontWeight: 700 }}>Inspect ↗</span>
           </div>
-          <div style={{ fontSize: '26px', fontWeight: 800, color: '#00E5A0', marginTop: '2px' }}>
+          <div style={{ fontSize: '26px', fontWeight: 800, color: t.isLight ? '#047857' : '#00E5A0', marginTop: '2px' }}>
             {metrics.efficiency}%
           </div>
           <div
             style={{
               height: '4px',
-              background: 'rgba(255, 255, 255, 0.08)',
+              background: t.isLight ? '#E2E8F0' : 'rgba(255, 255, 255, 0.08)',
               borderRadius: '2px',
               marginTop: '10px',
               overflow: 'hidden',
@@ -1162,14 +1291,14 @@ export default function Overview({ setCurrentPage }) {
               style={{
                 width: `${Math.min(100, Number(metrics.efficiency))}%`,
                 height: '100%',
-                background: '#00E5A0',
+                background: t.isLight ? '#059669' : '#00E5A0',
                 borderRadius: '2px',
               }}
             />
           </div>
         </div>
 
-        {/* Card 4: Committed Pipeline (Total commitment & Live = Active pipeline) */}
+        {/* Card 4: Committed Pipeline */}
         <div
           onClick={() =>
             openDrilldown({
@@ -1180,14 +1309,15 @@ export default function Overview({ setCurrentPage }) {
             })
           }
           style={{
-            background: 'rgba(15, 20, 35, 0.85)',
-            border: '1px solid rgba(148, 163, 225, 0.14)',
+            background: t.cardBg,
+            border: t.cardBorder,
             borderTop: '2px solid #36D1DC',
             borderRadius: '12px',
             padding: '12px 16px',
             position: 'relative',
             cursor: 'pointer',
             transition: 'all 0.2s ease',
+            boxShadow: t.shadow,
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.borderColor = '#7C6FFF';
@@ -1195,27 +1325,28 @@ export default function Overview({ setCurrentPage }) {
             e.currentTarget.style.boxShadow = '0 8px 24px rgba(124, 111, 255, 0.2)';
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = 'rgba(148, 163, 225, 0.14)';
+            e.currentTarget.style.borderColor = t.isLight ? 'rgba(120, 135, 185, 0.22)' : 'rgba(148, 163, 225, 0.14)';
+            e.currentTarget.style.borderTopColor = '#36D1DC';
             e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = 'none';
+            e.currentTarget.style.boxShadow = t.shadow;
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '11px', color: '#8E9BB5', fontWeight: 600 }}>Committed Pipeline</span>
+            <span style={{ fontSize: '11px', color: t.textMuted, fontWeight: 600 }}>Committed Pipeline</span>
             <span style={{ fontSize: '10px', color: '#7C6FFF', fontWeight: 700 }}>Inspect ↗</span>
           </div>
-          <div style={{ fontSize: '26px', fontWeight: 800, color: '#7C6FFF', marginTop: '2px' }}>
+          <div style={{ fontSize: '26px', fontWeight: 800, color: t.isLight ? '#4F46E5' : '#7C6FFF', marginTop: '2px' }}>
             {formatIndianCurrency(metrics.totalCommitted)}
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
-            <span style={{ fontSize: '10px', color: '#36D1DC', fontWeight: 600 }}>Live (Active)</span>
-            <span style={{ fontSize: '10px', color: '#36D1DC', fontWeight: 700 }}>
+            <span style={{ fontSize: '10px', color: t.isLight ? '#0284C7' : '#36D1DC', fontWeight: 600 }}>Live (Active)</span>
+            <span style={{ fontSize: '10px', color: t.isLight ? '#0284C7' : '#36D1DC', fontWeight: 700 }}>
               {formatIndianCurrency(metrics.activeCommitted)}
             </span>
           </div>
         </div>
 
-        {/* Card 5: Total Remaining (Active remaining to be collected) */}
+        {/* Card 5: Total Remaining */}
         <div
           onClick={() =>
             openDrilldown({
@@ -1227,14 +1358,15 @@ export default function Overview({ setCurrentPage }) {
             })
           }
           style={{
-            background: 'rgba(15, 20, 35, 0.85)',
-            border: '1px solid rgba(148, 163, 225, 0.14)',
+            background: t.cardBg,
+            border: t.cardBorder,
             borderTop: '2px solid #FF6F8E',
             borderRadius: '12px',
             padding: '12px 16px',
             position: 'relative',
             cursor: 'pointer',
             transition: 'all 0.2s ease',
+            boxShadow: t.shadow,
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.borderColor = '#FF6F8E';
@@ -1242,16 +1374,17 @@ export default function Overview({ setCurrentPage }) {
             e.currentTarget.style.boxShadow = '0 8px 24px rgba(255, 111, 142, 0.2)';
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = 'rgba(148, 163, 225, 0.14)';
+            e.currentTarget.style.borderColor = t.isLight ? 'rgba(120, 135, 185, 0.22)' : 'rgba(148, 163, 225, 0.14)';
+            e.currentTarget.style.borderTopColor = '#FF6F8E';
             e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = 'none';
+            e.currentTarget.style.boxShadow = t.shadow;
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '11px', color: '#8E9BB5', fontWeight: 600 }}>Total Remaining</span>
+            <span style={{ fontSize: '11px', color: t.textMuted, fontWeight: 600 }}>Total Remaining</span>
             <span style={{ fontSize: '10px', color: '#FF6F8E', fontWeight: 700 }}>Inspect ↗</span>
           </div>
-          <div style={{ fontSize: '26px', fontWeight: 800, color: '#FF6F8E', marginTop: '2px' }}>
+          <div style={{ fontSize: '26px', fontWeight: 800, color: t.isLight ? '#DC2626' : '#FF6F8E', marginTop: '2px' }}>
             {formatIndianCurrency(metrics.totalRemaining)}
           </div>
         </div>
@@ -1271,26 +1404,28 @@ export default function Overview({ setCurrentPage }) {
         {/* Left: LEAD SOURCE — STATUS */}
         <div
           style={{
-            background: 'rgba(15, 20, 35, 0.85)',
-            border: '1px solid rgba(148, 163, 225, 0.14)',
+            background: t.cardBg,
+            border: t.cardBorder,
             borderRadius: '14px',
             padding: '16px 20px',
             display: 'flex',
             flexDirection: 'column',
+            boxShadow: t.shadow,
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '12px', fontWeight: 800, color: '#EDEFFA', letterSpacing: '0.04em' }}>
+              <span style={{ fontSize: '12px', fontWeight: 800, color: t.textPrimary, letterSpacing: '0.04em' }}>
                 LEAD SOURCE &mdash; STATUS
               </span>
               <span
                 style={{
-                  background: 'rgba(255, 255, 255, 0.08)',
+                  background: t.subtleBg,
+                  border: t.subtleBorder,
                   padding: '2px 8px',
                   borderRadius: '10px',
                   fontSize: '11px',
-                  color: '#8E9BB5',
+                  color: t.textMuted,
                   fontWeight: 600,
                 }}
               >
@@ -1301,17 +1436,17 @@ export default function Overview({ setCurrentPage }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span
                 style={{
-                  background: 'rgba(255, 255, 255, 0.06)',
-                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  background: t.subtleBg,
+                  border: t.subtleBorder,
                   padding: '3px 8px',
                   borderRadius: '6px',
                   fontSize: '11px',
-                  color: '#A8B2C7',
+                  color: t.textMuted,
                 }}
               >
                 Day
               </span>
-              <span style={{ fontSize: '14px', color: '#64748B', cursor: 'pointer' }}>✕</span>
+              <span style={{ fontSize: '14px', color: t.textMuted, cursor: 'pointer' }}>✕</span>
             </div>
           </div>
 
@@ -1345,7 +1480,7 @@ export default function Overview({ setCurrentPage }) {
                   transition: 'background 0.15s ease',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)';
+                  e.currentTarget.style.background = t.hoverBg;
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.background = 'transparent';
@@ -1353,15 +1488,15 @@ export default function Overview({ setCurrentPage }) {
                 title="Click to view students from this source"
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '4px' }}>
-                  <span style={{ color: '#EDEFFA', fontWeight: 600 }}>{item.name}</span>
-                  <span style={{ color: '#8E9BB5' }}>
-                    <strong style={{ color: '#fff' }}>{item.count}</strong> ({item.pct}%)
+                  <span style={{ color: t.textPrimary, fontWeight: 600 }}>{item.name}</span>
+                  <span style={{ color: t.textMuted }}>
+                    <strong style={{ color: t.textPrimary }}>{item.count}</strong> ({item.pct}%)
                   </span>
                 </div>
                 <div
                   style={{
                     height: '5px',
-                    background: 'rgba(255, 255, 255, 0.06)',
+                    background: t.isLight ? '#E2E8F0' : 'rgba(255, 255, 255, 0.06)',
                     borderRadius: '3px',
                     overflow: 'hidden',
                   }}
@@ -1383,35 +1518,36 @@ export default function Overview({ setCurrentPage }) {
         {/* Right: COLLECTION STATUS (100% Vector 360° Closed Donut Ring) */}
         <div
           style={{
-            background: 'rgba(15, 20, 35, 0.85)',
-            border: '1px solid rgba(148, 163, 225, 0.14)',
+            background: t.cardBg,
+            border: t.cardBorder,
             borderRadius: '14px',
             padding: '16px 20px',
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'space-between',
+            boxShadow: t.shadow,
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '12px', fontWeight: 800, color: '#EDEFFA', letterSpacing: '0.04em' }}>
+              <span style={{ fontSize: '12px', fontWeight: 800, color: t.textPrimary, letterSpacing: '0.04em' }}>
                 COLLECTION STATUS
               </span>
               <span
                 style={{
-                  background: 'rgba(0, 229, 160, 0.12)',
-                  border: '1px solid rgba(0, 229, 160, 0.3)',
+                  background: t.isLight ? 'rgba(4, 120, 87, 0.1)' : 'rgba(0, 229, 160, 0.12)',
+                  border: t.isLight ? '1px solid rgba(4, 120, 87, 0.3)' : '1px solid rgba(0, 229, 160, 0.3)',
                   padding: '2px 8px',
                   borderRadius: '10px',
                   fontSize: '11px',
                   fontWeight: 700,
-                  color: '#00E5A0',
+                  color: t.isLight ? '#047857' : '#00E5A0',
                 }}
               >
                 {metrics.efficiency}% Realized
               </span>
             </div>
-            <span style={{ fontSize: '14px', color: '#64748B', cursor: 'pointer' }}>✕</span>
+            <span style={{ fontSize: '14px', color: t.textMuted, cursor: 'pointer' }}>✕</span>
           </div>
 
           {/* 100% CLOSED VECTOR 360° DONUT RING (ZERO GAPS, INTERACTIVE DRILLDOWN) */}
@@ -1440,7 +1576,7 @@ export default function Overview({ setCurrentPage }) {
                   cy="100"
                   r={donutRadius}
                   fill="none"
-                  stroke="rgba(255, 255, 255, 0.05)"
+                  stroke={t.donutTrack}
                   strokeWidth="16"
                 />
 
@@ -1486,7 +1622,7 @@ export default function Overview({ setCurrentPage }) {
                       cy="100"
                       r={donutRadius}
                       fill="none"
-                      stroke="#00E5A0"
+                      stroke={t.isLight ? '#059669' : '#00E5A0'}
                       strokeWidth={hoveredDonutSlice === 'full' ? 20 : 16}
                       strokeDasharray={`${donutArcFull} ${donutCirc}`}
                       strokeDashoffset={0}
@@ -1526,10 +1662,10 @@ export default function Overview({ setCurrentPage }) {
                   pointerEvents: 'none',
                 }}
               >
-                <div style={{ fontSize: '32px', fontWeight: 900, color: '#fff', lineHeight: 1 }}>
+                <div style={{ fontSize: '32px', fontWeight: 900, color: t.donutText, lineHeight: 1 }}>
                   {metrics.totalApps}
                 </div>
-                <div style={{ fontSize: '10px', fontWeight: 700, color: '#8E9BB5', textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: '4px' }}>
+                <div style={{ fontSize: '10px', fontWeight: 700, color: t.donutSubtext, textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: '4px' }}>
                   Total Students
                 </div>
                 {hoveredDonutSlice && (
@@ -1537,7 +1673,7 @@ export default function Overview({ setCurrentPage }) {
                     style={{
                       fontSize: '10px',
                       fontWeight: 800,
-                      color: hoveredDonutSlice === 'full' ? '#00E5A0' : '#FFB020',
+                      color: hoveredDonutSlice === 'full' ? (t.isLight ? '#047857' : '#00E5A0') : (t.isLight ? '#D97706' : '#FFB020'),
                       marginTop: '2px',
                     }}
                   >
@@ -1564,32 +1700,32 @@ export default function Overview({ setCurrentPage }) {
                 })
               }
               style={{
-                background: 'rgba(0, 229, 160, 0.08)',
-                border: '1px solid rgba(0, 229, 160, 0.25)',
+                background: t.fullPaymentCardBg,
+                border: t.fullPaymentCardBorder,
                 borderRadius: '10px',
                 padding: '10px 12px',
                 cursor: 'pointer',
                 transition: 'all 0.15s ease',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'rgba(0, 229, 160, 0.16)';
+                e.currentTarget.style.background = t.isLight ? '#DCFCE7' : 'rgba(0, 229, 160, 0.16)';
                 e.currentTarget.style.borderColor = 'rgba(0, 229, 160, 0.5)';
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(0, 229, 160, 0.08)';
-                e.currentTarget.style.borderColor = 'rgba(0, 229, 160, 0.25)';
+                e.currentTarget.style.background = t.fullPaymentCardBg;
+                e.currentTarget.style.borderColor = t.isLight ? '#86EFAC' : 'rgba(0, 229, 160, 0.25)';
               }}
               title="Click to view full payment students"
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' }}>
                 <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#00E5A0', boxShadow: '0 0 6px #00E5A0' }} />
-                <span style={{ fontSize: '11px', fontWeight: 700, color: '#EDEFFA' }}>Full Payment</span>
+                <span style={{ fontSize: '11px', fontWeight: 700, color: t.textPrimary }}>Full Payment</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '18px', fontWeight: 800, color: '#00E5A0' }}>
+                <span style={{ fontSize: '18px', fontWeight: 800, color: t.isLight ? '#047857' : '#00E5A0' }}>
                   {metrics.fullPaymentCount}
                 </span>
-                <span style={{ fontSize: '11px', fontWeight: 600, color: '#8E9BB5' }}>
+                <span style={{ fontSize: '11px', fontWeight: 600, color: t.textMuted }}>
                   {metrics.totalApps > 0 ? ((metrics.fullPaymentCount / metrics.totalApps) * 100).toFixed(1) : 0}%
                 </span>
               </div>
@@ -1607,32 +1743,32 @@ export default function Overview({ setCurrentPage }) {
                 })
               }
               style={{
-                background: 'rgba(255, 176, 32, 0.08)',
-                border: '1px solid rgba(255, 176, 32, 0.25)',
+                background: t.partialPaymentCardBg,
+                border: t.partialPaymentCardBorder,
                 borderRadius: '10px',
                 padding: '10px 12px',
                 cursor: 'pointer',
                 transition: 'all 0.15s ease',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'rgba(255, 176, 32, 0.16)';
+                e.currentTarget.style.background = t.isLight ? '#FEF3C7' : 'rgba(255, 176, 32, 0.16)';
                 e.currentTarget.style.borderColor = 'rgba(255, 176, 32, 0.5)';
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(255, 176, 32, 0.08)';
-                e.currentTarget.style.borderColor = 'rgba(255, 176, 32, 0.25)';
+                e.currentTarget.style.background = t.partialPaymentCardBg;
+                e.currentTarget.style.borderColor = t.isLight ? '#FDE68A' : 'rgba(255, 176, 32, 0.25)';
               }}
               title="Click to view partial/pending students"
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' }}>
                 <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#FFB020', boxShadow: '0 0 6px #FFB020' }} />
-                <span style={{ fontSize: '11px', fontWeight: 700, color: '#EDEFFA' }}>Partial / Due</span>
+                <span style={{ fontSize: '11px', fontWeight: 700, color: t.textPrimary }}>Partial / Due</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '18px', fontWeight: 800, color: '#FFB020' }}>
+                <span style={{ fontSize: '18px', fontWeight: 800, color: t.isLight ? '#D97706' : '#FFB020' }}>
                   {metrics.partialPaymentCount}
                 </span>
-                <span style={{ fontSize: '11px', fontWeight: 600, color: '#8E9BB5' }}>
+                <span style={{ fontSize: '11px', fontWeight: 600, color: t.textMuted }}>
                   {metrics.totalApps > 0 ? ((metrics.partialPaymentCount / metrics.totalApps) * 100).toFixed(1) : 0}%
                 </span>
               </div>
@@ -1654,32 +1790,34 @@ export default function Overview({ setCurrentPage }) {
         {/* Left: INTAKE BREAKDOWN */}
         <div
           style={{
-            background: 'rgba(15, 20, 35, 0.85)',
-            border: '1px solid rgba(148, 163, 225, 0.14)',
+            background: t.cardBg,
+            border: t.cardBorder,
             borderRadius: '14px',
             padding: '16px 20px',
             display: 'flex',
             flexDirection: 'column',
+            boxShadow: t.shadow,
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '12px', fontWeight: 800, color: '#EDEFFA', letterSpacing: '0.04em' }}>
+              <span style={{ fontSize: '12px', fontWeight: 800, color: t.textPrimary, letterSpacing: '0.04em' }}>
                 INTAKE BREAKDOWN
               </span>
               <span
                 style={{
-                  background: 'rgba(255, 255, 255, 0.08)',
+                  background: t.subtleBg,
+                  border: t.subtleBorder,
                   padding: '2px 8px',
                   borderRadius: '6px',
                   fontSize: '10px',
-                  color: '#8E9BB5',
+                  color: t.textMuted,
                 }}
               >
                 Count
               </span>
             </div>
-            <span style={{ fontSize: '14px', color: '#64748B', cursor: 'pointer' }}>✕</span>
+            <span style={{ fontSize: '14px', color: t.textMuted, cursor: 'pointer' }}>✕</span>
           </div>
 
           <div style={{ position: 'relative', height: '160px', width: '100%', cursor: 'pointer' }} title="Click any bar to view students">
@@ -1690,32 +1828,34 @@ export default function Overview({ setCurrentPage }) {
         {/* Right: PAYMENT STAGES */}
         <div
           style={{
-            background: 'rgba(15, 20, 35, 0.85)',
-            border: '1px solid rgba(148, 163, 225, 0.14)',
+            background: t.cardBg,
+            border: t.cardBorder,
             borderRadius: '14px',
             padding: '16px 20px',
             display: 'flex',
             flexDirection: 'column',
+            boxShadow: t.shadow,
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '12px', fontWeight: 800, color: '#EDEFFA', letterSpacing: '0.04em' }}>
+              <span style={{ fontSize: '12px', fontWeight: 800, color: t.textPrimary, letterSpacing: '0.04em' }}>
                 PAYMENT STAGES
               </span>
               <span
                 style={{
-                  background: 'rgba(255, 255, 255, 0.08)',
+                  background: t.subtleBg,
+                  border: t.subtleBorder,
                   padding: '2px 8px',
                   borderRadius: '6px',
                   fontSize: '10px',
-                  color: '#8E9BB5',
+                  color: t.textMuted,
                 }}
               >
                 Count
               </span>
             </div>
-            <span style={{ fontSize: '14px', color: '#64748B', cursor: 'pointer' }}>✕</span>
+            <span style={{ fontSize: '14px', color: t.textMuted, cursor: 'pointer' }}>✕</span>
           </div>
 
           <div style={{ position: 'relative', height: '160px', width: '100%', cursor: 'pointer' }} title="Click any bar to view students">
@@ -1737,22 +1877,23 @@ export default function Overview({ setCurrentPage }) {
         {/* Left: MONTHLY GROWTH TREND */}
         <div
           style={{
-            background: 'rgba(15, 20, 35, 0.85)',
-            border: '1px solid rgba(148, 163, 225, 0.14)',
+            background: t.cardBg,
+            border: t.cardBorder,
             borderRadius: '14px',
             padding: '18px 20px',
             display: 'flex',
             flexDirection: 'column',
+            boxShadow: t.shadow,
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
             <div>
-              <div style={{ fontSize: '12px', fontWeight: 800, color: '#EDEFFA', letterSpacing: '0.04em' }}>
+              <div style={{ fontSize: '12px', fontWeight: 800, color: t.textPrimary, letterSpacing: '0.04em' }}>
                 MONTHLY GROWTH TREND
               </div>
-              <div style={{ fontSize: '10px', color: '#8E9BB5' }}>Month-over-month performance</div>
+              <div style={{ fontSize: '10px', color: t.textMuted }}>Month-over-month performance</div>
             </div>
-            <span style={{ fontSize: '14px', color: '#64748B', cursor: 'pointer' }}>✕</span>
+            <span style={{ fontSize: '14px', color: t.textMuted, cursor: 'pointer' }}>✕</span>
           </div>
 
           {/* Line Chart */}
@@ -1773,10 +1914,10 @@ export default function Overview({ setCurrentPage }) {
                   padding: '2px 0',
                 }}
               >
-                <span style={{ color: '#8E9BB5' }}>{row.label}</span>
+                <span style={{ color: t.textMuted }}>{row.label}</span>
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  <span style={{ color: '#fff', fontWeight: 600 }}>{row.amount}</span>
-                  <span style={{ color: row.isUp ? '#00E5A0' : '#FF6F8E', fontWeight: 700 }}>{row.pct}</span>
+                  <span style={{ color: t.textPrimary, fontWeight: 600 }}>{row.amount}</span>
+                  <span style={{ color: row.isUp ? (t.isLight ? '#047857' : '#00E5A0') : '#FF6F8E', fontWeight: 700 }}>{row.pct}</span>
                 </div>
               </div>
             ))}
@@ -1786,49 +1927,50 @@ export default function Overview({ setCurrentPage }) {
         {/* Middle: MONTHLY COLLECTIONS (With Date Filter Controls) */}
         <div
           style={{
-            background: 'rgba(15, 20, 35, 0.85)',
-            border: '1px solid rgba(148, 163, 225, 0.14)',
+            background: t.cardBg,
+            border: t.cardBorder,
             borderRadius: '14px',
             padding: '18px 20px',
             display: 'flex',
             flexDirection: 'column',
+            boxShadow: t.shadow,
           }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
             <div>
-              <div style={{ fontSize: '12px', fontWeight: 800, color: '#EDEFFA', letterSpacing: '0.04em' }}>
+              <div style={{ fontSize: '12px', fontWeight: 800, color: t.textPrimary, letterSpacing: '0.04em' }}>
                 MONTHLY COLLECTIONS
               </div>
-              <div style={{ fontSize: '10px', color: '#8E9BB5' }}>Amount collected per month</div>
+              <div style={{ fontSize: '10px', color: t.textMuted }}>Amount collected per month</div>
             </div>
 
             {/* Date Pickers Inline Controls */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ fontSize: '10px', color: '#8E9BB5' }}>From:</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '10px', color: t.textMuted }}>From:</span>
               <input
                 type="date"
                 value={monthlyFromDate}
                 onChange={(e) => setMonthlyFromDate(e.target.value)}
                 style={{
-                  background: 'rgba(255, 255, 255, 0.06)',
-                  border: '1px solid rgba(148, 163, 225, 0.2)',
+                  background: t.inputBg,
+                  border: `1px solid ${t.inputBorder}`,
                   borderRadius: '6px',
-                  color: '#fff',
+                  color: t.textPrimary,
                   fontSize: '11px',
                   padding: '3px 6px',
                 }}
               />
 
-              <span style={{ fontSize: '10px', color: '#8E9BB5' }}>To:</span>
+              <span style={{ fontSize: '10px', color: t.textMuted }}>To:</span>
               <input
                 type="date"
                 value={monthlyToDate}
                 onChange={(e) => setMonthlyToDate(e.target.value)}
                 style={{
-                  background: 'rgba(255, 255, 255, 0.06)',
-                  border: '1px solid rgba(148, 163, 225, 0.2)',
+                  background: t.inputBg,
+                  border: `1px solid ${t.inputBorder}`,
                   borderRadius: '6px',
-                  color: '#fff',
+                  color: t.textPrimary,
                   fontSize: '11px',
                   padding: '3px 6px',
                 }}
@@ -1857,9 +1999,9 @@ export default function Overview({ setCurrentPage }) {
                   setAppliedMonthlyRange({ from: '2025-12-01', to: todayStr });
                 }}
                 style={{
-                  background: 'transparent',
-                  color: '#8E9BB5',
-                  border: '1px solid rgba(148, 163, 225, 0.2)',
+                  background: t.subtleBg,
+                  color: t.textMuted,
+                  border: t.subtleBorder,
                   borderRadius: '6px',
                   padding: '4px 8px',
                   fontSize: '11px',
@@ -1880,24 +2022,25 @@ export default function Overview({ setCurrentPage }) {
         {/* Right: DAILY TREND */}
         <div
           style={{
-            background: 'rgba(15, 20, 35, 0.85)',
-            border: '1px solid rgba(148, 163, 225, 0.14)',
+            background: t.cardBg,
+            border: t.cardBorder,
             borderRadius: '14px',
             padding: '18px 20px',
             display: 'flex',
             flexDirection: 'column',
+            boxShadow: t.shadow,
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
             <div>
-              <div style={{ fontSize: '12px', fontWeight: 800, color: '#EDEFFA', letterSpacing: '0.04em' }}>
+              <div style={{ fontSize: '12px', fontWeight: 800, color: t.textPrimary, letterSpacing: '0.04em' }}>
                 DAILY TREND
               </div>
-              <div style={{ fontSize: '10px', color: '#8E9BB5' }}>
+              <div style={{ fontSize: '10px', color: t.textMuted }}>
                 {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
               </div>
             </div>
-            <span style={{ fontSize: '14px', color: '#64748B', cursor: 'pointer' }}>✕</span>
+            <span style={{ fontSize: '14px', color: t.textMuted, cursor: 'pointer' }}>✕</span>
           </div>
 
           <div style={{ position: 'relative', height: '240px', width: '100%', cursor: 'pointer' }} title="Click any day to inspect students">
@@ -1915,7 +2058,7 @@ export default function Overview({ setCurrentPage }) {
             position: 'fixed',
             inset: 0,
             zIndex: 999,
-            background: 'rgba(0, 0, 0, 0.5)',
+            background: t.isLight ? 'rgba(15, 23, 42, 0.45)' : 'rgba(0, 0, 0, 0.6)',
             backdropFilter: 'blur(4px)',
             display: 'flex',
             justifyContent: 'flex-end',
@@ -1927,11 +2070,11 @@ export default function Overview({ setCurrentPage }) {
             onClick={(e) => e.stopPropagation()}
             style={{
               width: '320px',
-              background: '#0F1528',
-              border: '1px solid rgba(148, 163, 225, 0.25)',
+              background: t.modalBg,
+              border: t.modalBorder,
               borderRadius: '18px',
               padding: '24px',
-              boxShadow: '0 20px 50px rgba(0, 0, 0, 0.8), 0 0 30px rgba(124, 111, 255, 0.2)',
+              boxShadow: t.modalShadow,
               display: 'flex',
               flexDirection: 'column',
               gap: '18px',
@@ -1942,14 +2085,14 @@ export default function Overview({ setCurrentPage }) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ fontSize: '16px' }}>🎛️</span>
-                <span style={{ fontSize: '16px', fontWeight: 800, color: '#fff' }}>Advanced Filters</span>
+                <span style={{ fontSize: '16px', fontWeight: 800, color: t.textPrimary }}>Advanced Filters</span>
               </div>
               <button
                 onClick={() => setShowFiltersModal(false)}
                 style={{
                   background: 'none',
                   border: 'none',
-                  color: '#8E9BB5',
+                  color: t.textMuted,
                   fontSize: '16px',
                   cursor: 'pointer',
                 }}
@@ -1968,18 +2111,18 @@ export default function Overview({ setCurrentPage }) {
                 onChange={(e) => setSelectedYear(e.target.value)}
                 style={{
                   width: '100%',
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(148, 163, 225, 0.18)',
+                  background: t.inputBg,
+                  border: `1px solid ${t.inputBorder}`,
                   borderRadius: '10px',
                   padding: '10px 12px',
-                  color: '#fff',
+                  color: t.textPrimary,
                   fontSize: '13px',
                   outline: 'none',
                 }}
               >
-                <option value="All" style={{ background: '#0F1528' }}>All Years</option>
+                <option value="All" style={{ background: t.modalOptionBg, color: t.textPrimary }}>All Years</option>
                 {uniqueYears.map((y) => (
-                  <option key={y} value={y} style={{ background: '#0F1528' }}>{y}</option>
+                  <option key={y} value={y} style={{ background: t.modalOptionBg, color: t.textPrimary }}>{y}</option>
                 ))}
               </select>
             </div>
@@ -1994,18 +2137,18 @@ export default function Overview({ setCurrentPage }) {
                 onChange={(e) => setSelectedIntake(e.target.value)}
                 style={{
                   width: '100%',
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(148, 163, 225, 0.18)',
+                  background: t.inputBg,
+                  border: `1px solid ${t.inputBorder}`,
                   borderRadius: '10px',
                   padding: '10px 12px',
-                  color: '#fff',
+                  color: t.textPrimary,
                   fontSize: '13px',
                   outline: 'none',
                 }}
               >
-                <option value="All" style={{ background: '#0F1528' }}>All Intakes</option>
+                <option value="All" style={{ background: t.modalOptionBg, color: t.textPrimary }}>All Intakes</option>
                 {uniqueIntakes.map((itk) => (
-                  <option key={itk} value={itk} style={{ background: '#0F1528' }}>{itk}</option>
+                  <option key={itk} value={itk} style={{ background: t.modalOptionBg, color: t.textPrimary }}>{itk}</option>
                 ))}
               </select>
             </div>
@@ -2022,9 +2165,9 @@ export default function Overview({ setCurrentPage }) {
                   type="button"
                   onClick={handleSelectAllStudents}
                   style={{
-                    background: statusFilterType === 'all' ? '#7C6FFF' : 'rgba(255, 255, 255, 0.05)',
-                    color: statusFilterType === 'all' ? '#fff' : '#8E9BB5',
-                    border: '1px solid rgba(148, 163, 225, 0.18)',
+                    background: statusFilterType === 'all' ? '#7C6FFF' : t.subtleBg,
+                    color: statusFilterType === 'all' ? '#fff' : t.textMuted,
+                    border: t.subtleBorder,
                     borderRadius: '8px',
                     padding: '8px 10px',
                     fontSize: '12px',
@@ -2039,9 +2182,9 @@ export default function Overview({ setCurrentPage }) {
                   type="button"
                   onClick={handleSelectActiveEnrolled}
                   style={{
-                    background: statusFilterType === 'active_enrolled' ? '#7C6FFF' : 'rgba(255, 255, 255, 0.05)',
-                    color: statusFilterType === 'active_enrolled' ? '#fff' : '#8E9BB5',
-                    border: '1px solid rgba(148, 163, 225, 0.18)',
+                    background: statusFilterType === 'active_enrolled' ? '#7C6FFF' : t.subtleBg,
+                    color: statusFilterType === 'active_enrolled' ? '#fff' : t.textMuted,
+                    border: t.subtleBorder,
                     borderRadius: '8px',
                     padding: '8px 10px',
                     fontSize: '12px',
@@ -2059,9 +2202,9 @@ export default function Overview({ setCurrentPage }) {
                   type="button"
                   onClick={() => handleToggleStatus('Active')}
                   style={{
-                    background: selectedStatuses.has('Active') ? '#00E5A0' : 'rgba(255, 255, 255, 0.05)',
-                    color: selectedStatuses.has('Active') ? '#080A12' : '#8E9BB5',
-                    border: 'none',
+                    background: selectedStatuses.has('Active') ? (t.isLight ? 'rgba(4, 120, 87, 0.15)' : '#00E5A0') : t.subtleBg,
+                    color: selectedStatuses.has('Active') ? (t.isLight ? '#047857' : '#080A12') : t.textMuted,
+                    border: selectedStatuses.has('Active') ? (t.isLight ? '1px solid #059669' : 'none') : t.subtleBorder,
                     borderRadius: '8px',
                     padding: '8px 10px',
                     fontSize: '12px',
@@ -2073,7 +2216,7 @@ export default function Overview({ setCurrentPage }) {
                     gap: '6px',
                   }}
                 >
-                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: selectedStatuses.has('Active') ? '#080A12' : '#00E5A0' }} />
+                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: selectedStatuses.has('Active') ? (t.isLight ? '#047857' : '#080A12') : '#00E5A0' }} />
                   Active
                 </button>
 
@@ -2081,9 +2224,9 @@ export default function Overview({ setCurrentPage }) {
                   type="button"
                   onClick={() => handleToggleStatus('Enrolled')}
                   style={{
-                    background: selectedStatuses.has('Enrolled') ? '#7C6FFF' : 'rgba(255, 255, 255, 0.05)',
-                    color: '#fff',
-                    border: 'none',
+                    background: selectedStatuses.has('Enrolled') ? '#7C6FFF' : t.subtleBg,
+                    color: selectedStatuses.has('Enrolled') ? '#fff' : t.textMuted,
+                    border: selectedStatuses.has('Enrolled') ? 'none' : t.subtleBorder,
                     borderRadius: '8px',
                     padding: '8px 10px',
                     fontSize: '12px',
@@ -2103,9 +2246,9 @@ export default function Overview({ setCurrentPage }) {
                   type="button"
                   onClick={() => handleToggleStatus('Dropped')}
                   style={{
-                    background: selectedStatuses.has('Dropped') ? 'rgba(255, 111, 142, 0.2)' : 'rgba(255, 255, 255, 0.05)',
-                    color: selectedStatuses.has('Dropped') ? '#FF6F8E' : '#8E9BB5',
-                    border: selectedStatuses.has('Dropped') ? '1px solid #FF6F8E' : '1px solid rgba(148, 163, 225, 0.18)',
+                    background: selectedStatuses.has('Dropped') ? (t.isLight ? 'rgba(239, 68, 68, 0.12)' : 'rgba(255, 111, 142, 0.2)') : t.subtleBg,
+                    color: selectedStatuses.has('Dropped') ? (t.isLight ? '#DC2626' : '#FF6F8E') : t.textMuted,
+                    border: selectedStatuses.has('Dropped') ? (t.isLight ? '1px solid #EF4444' : '1px solid #FF6F8E') : t.subtleBorder,
                     borderRadius: '8px',
                     padding: '8px 10px',
                     fontSize: '12px',
@@ -2125,9 +2268,9 @@ export default function Overview({ setCurrentPage }) {
                   type="button"
                   onClick={() => handleToggleStatus('Refund')}
                   style={{
-                    background: selectedStatuses.has('Refund') ? 'rgba(255, 176, 32, 0.2)' : 'rgba(255, 255, 255, 0.05)',
-                    color: selectedStatuses.has('Refund') ? '#FFB020' : '#8E9BB5',
-                    border: selectedStatuses.has('Refund') ? '1px solid #FFB020' : '1px solid rgba(148, 163, 225, 0.18)',
+                    background: selectedStatuses.has('Refund') ? (t.isLight ? 'rgba(245, 158, 11, 0.12)' : 'rgba(255, 176, 32, 0.2)') : t.subtleBg,
+                    color: selectedStatuses.has('Refund') ? (t.isLight ? '#D97706' : '#FFB020') : t.textMuted,
+                    border: selectedStatuses.has('Refund') ? (t.isLight ? '1px solid #F59E0B' : '1px solid #FFB020') : t.subtleBorder,
                     borderRadius: '8px',
                     padding: '8px 10px',
                     fontSize: '12px',
@@ -2155,18 +2298,18 @@ export default function Overview({ setCurrentPage }) {
                 onChange={(e) => setSelectedCountry(e.target.value)}
                 style={{
                   width: '100%',
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(148, 163, 225, 0.18)',
+                  background: t.inputBg,
+                  border: `1px solid ${t.inputBorder}`,
                   borderRadius: '10px',
                   padding: '10px 12px',
-                  color: '#fff',
+                  color: t.textPrimary,
                   fontSize: '13px',
                   outline: 'none',
                 }}
               >
-                <option value="All" style={{ background: '#0F1528' }}>All Countries</option>
+                <option value="All" style={{ background: t.modalOptionBg, color: t.textPrimary }}>All Countries</option>
                 {uniqueCountries.map((c) => (
-                  <option key={c} value={c} style={{ background: '#0F1528' }}>{c}</option>
+                  <option key={c} value={c} style={{ background: t.modalOptionBg, color: t.textPrimary }}>{c}</option>
                 ))}
               </select>
             </div>
@@ -2183,11 +2326,11 @@ export default function Overview({ setCurrentPage }) {
                   onChange={(e) => setFilterStartDate(e.target.value)}
                   style={{
                     width: '100%',
-                    background: 'rgba(255, 255, 255, 0.05)',
-                    border: '1px solid rgba(148, 163, 225, 0.18)',
+                    background: t.inputBg,
+                    border: `1px solid ${t.inputBorder}`,
                     borderRadius: '8px',
                     padding: '8px 10px',
-                    color: '#fff',
+                    color: t.textPrimary,
                     fontSize: '12px',
                   }}
                 />
@@ -2197,11 +2340,11 @@ export default function Overview({ setCurrentPage }) {
                   onChange={(e) => setFilterEndDate(e.target.value)}
                   style={{
                     width: '100%',
-                    background: 'rgba(255, 255, 255, 0.05)',
-                    border: '1px solid rgba(148, 163, 225, 0.18)',
+                    background: t.inputBg,
+                    border: `1px solid ${t.inputBorder}`,
                     borderRadius: '8px',
                     padding: '8px 10px',
-                    color: '#fff',
+                    color: t.textPrimary,
                     fontSize: '12px',
                   }}
                 />
@@ -2213,8 +2356,8 @@ export default function Overview({ setCurrentPage }) {
               onClick={handleResetFilters}
               style={{
                 width: '100%',
-                background: 'rgba(124, 111, 255, 0.15)',
-                color: '#fff',
+                background: t.isLight ? 'rgba(124, 111, 255, 0.12)' : 'rgba(124, 111, 255, 0.15)',
+                color: t.isLight ? '#4F46E5' : '#fff',
                 border: '1px solid rgba(124, 111, 255, 0.3)',
                 borderRadius: '10px',
                 padding: '12px',

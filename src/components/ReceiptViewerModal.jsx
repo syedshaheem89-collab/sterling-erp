@@ -84,14 +84,14 @@ export default function ReceiptViewerModal({
           width: '100%',
           maxWidth: '680px',
           maxHeight: '92vh',
-          background: '#0B0F1C',
-          border: '1px solid rgba(124, 111, 255, 0.35)',
+          background: 'var(--bg2solid, #0B0F1C)',
+          border: '1px solid var(--border-strong, rgba(124, 111, 255, 0.35))',
           borderRadius: '18px',
-          boxShadow: '0 30px 80px rgba(0, 0, 0, 0.85), 0 0 40px rgba(0, 229, 160, 0.15)',
+          boxShadow: '0 30px 80px rgba(0, 0, 0, 0.5), 0 0 40px rgba(0, 229, 160, 0.15)',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
-          color: '#EDEFFA',
+          color: 'var(--text, #EDEFFA)',
           fontFamily: "'Plus Jakarta Sans', sans-serif",
         }}
       >
