@@ -929,6 +929,77 @@ export default function CourseFinder({ setCurrentPage }) {
   const [showPortalsModal, setShowPortalsModal] = useState(false);
   const [showDownloadPrefModal, setShowDownloadPrefModal] = useState(false);
   const [showAddPortalModal, setShowAddPortalModal] = useState(false);
+  const [showFileManagerModal, setShowFileManagerModal] = useState(false);
+
+  // Group courses by their uploaded spreadsheet file or data batch
+  const sourceGroups = useMemo(() => {
+    const groups = {};
+    courses.forEach((c) => {
+      let key;
+      let name;
+      let isDefault = false;
+
+      if (c.sourceFileName) {
+        key = c.sourceFileName;
+        name = c.sourceFileName;
+      } else if (c.id?.startsWith('import-') || c.tags?.includes('Custom Upload')) {
+        key = `upload-${c.university || 'General'}-${c.country || 'Custom'}`;
+        name = c.university ? `${c.university} (Uploaded Excel)` : `Custom Upload (${c.country || 'International'})`;
+      } else {
+        key = 'default-catalog';
+        name = 'Default Verified System Catalog';
+        isDefault = true;
+      }
+
+      if (!groups[key]) {
+        groups[key] = {
+          key,
+          name,
+          isDefault,
+          country: c.country,
+          flag: c.countryFlag || getCountryFlag(c.country),
+          university: c.university,
+          uploadedAt: c.uploadedAt || (isDefault ? 'System Verified' : 'Session Import'),
+          count: 0,
+          ids: [],
+          sampleCourses: [],
+        };
+      }
+      groups[key].count++;
+      groups[key].ids.push(c.id);
+      if (groups[key].sampleCourses.length < 4) {
+        groups[key].sampleCourses.push(c.programName);
+      }
+    });
+
+    return Object.values(groups);
+  }, [courses]);
+
+  const customGroupsCount = useMemo(() => {
+    return sourceGroups.filter((g) => !g.isDefault).length;
+  }, [sourceGroups]);
+
+  const handleRemoveGroup = (group) => {
+    if (window.confirm(`Are you sure you want to remove all ${group.count} courses from "${group.name}"?`)) {
+      setCourses((prev) => {
+        const remaining = prev.filter((c) => !group.ids.includes(c.id));
+        setSelectedCourseIds((sel) => {
+          const next = new Set(sel);
+          group.ids.forEach((id) => next.delete(id));
+          return next;
+        });
+        return remaining;
+      });
+      toast.success(`Removed ${group.count} courses from "${group.name}"`);
+    }
+  };
+
+  const handleResetAllUploads = () => {
+    localStorage.removeItem('sterling_course_catalog');
+    setCourses(DEFAULT_COURSES);
+    setSelectedCourseIds(new Set());
+    toast.success('All custom uploaded files removed! Restored default catalog.');
+  };
 
   // Quick Filters Active Flag
   const [quickFilter, setQuickFilter] = useState(null); // 'faster_tat' | 'scholarship' | 'high_acceptance'
@@ -1277,13 +1348,34 @@ export default function CourseFinder({ setCurrentPage }) {
             <span>Upload Course Data (Excel)</span>
           </button>
 
+          {/* Manage Uploaded Excel Files & Datasets */}
+          <button
+            onClick={() => setShowFileManagerModal(true)}
+            style={{
+              background: customGroupsCount > 0 ? 'rgba(255, 176, 32, 0.16)' : 'rgba(255, 255, 255, 0.08)',
+              border: customGroupsCount > 0 ? '1px solid rgba(255, 176, 32, 0.5)' : '1px solid rgba(255, 255, 255, 0.18)',
+              color: customGroupsCount > 0 ? '#FFB020' : '#EDEFFA',
+              padding: '8px 14px',
+              borderRadius: '10px',
+              fontSize: '12px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              boxShadow: customGroupsCount > 0 ? '0 0 16px rgba(255, 176, 32, 0.15)' : 'none',
+            }}
+            title="Inspect and remove any particular uploaded Excel spreadsheet file or dataset"
+          >
+            <span>📁</span>
+            <span>Manage Uploaded Files {customGroupsCount > 0 ? `(${customGroupsCount})` : ''}</span>
+          </button>
+
           {/* Reset / Clear Uploads */}
           <button
             onClick={() => {
               if (window.confirm('Reset catalog to default and clear any uploaded spreadsheet courses?')) {
-                localStorage.removeItem('sterling_course_catalog');
-                setCourses(DEFAULT_COURSES);
-                toast.success('Course catalog reset to verified default!');
+                handleResetAllUploads();
               }
             }}
             style={{
@@ -2097,8 +2189,8 @@ export default function CourseFinder({ setCurrentPage }) {
                           </div>
                         </div>
 
-                        {/* Quick View Button */}
-                        <div style={{ display: 'flex', gap: '8px' }}>
+                        {/* Quick View & Delete Buttons */}
+                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                           <button
                             onClick={() => setActiveCourseDetails(prog)}
                             style={{
@@ -2113,6 +2205,43 @@ export default function CourseFinder({ setCurrentPage }) {
                             }}
                           >
                             View Details ↗
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (window.confirm(`Are you sure you want to remove "${prog.programName}" from the portal?`)) {
+                                setCourses((prev) => prev.filter((c) => c.id !== prog.id));
+                                setSelectedCourseIds((prev) => {
+                                  const next = new Set(prev);
+                                  next.delete(prog.id);
+                                  return next;
+                                });
+                                toast.success(`Removed "${prog.programName}"`);
+                              }
+                            }}
+                            title="Remove this course from the portal"
+                            style={{
+                              background: 'rgba(255, 75, 107, 0.1)',
+                              border: '1px solid rgba(255, 75, 107, 0.3)',
+                              color: '#FF6B8B',
+                              padding: '5px 8px',
+                              borderRadius: '6px',
+                              fontSize: '11px',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.35)';
+                              e.currentTarget.style.color = '#fff';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'rgba(255, 75, 107, 0.1)';
+                              e.currentTarget.style.color = '#FF6B8B';
+                            }}
+                          >
+                            🗑️
                           </button>
                         </div>
                       </div>
@@ -2294,6 +2423,42 @@ export default function CourseFinder({ setCurrentPage }) {
           >
             <span>Download Top 25</span>
           </button>
+
+          {/* Bulk Remove Selected Button */}
+          <button
+            onClick={() => {
+              const count = selectedCourseIds.size;
+              if (window.confirm(`Are you sure you want to remove the ${count} selected program(s) from the portal?`)) {
+                setCourses((prev) => prev.filter((c) => !selectedCourseIds.has(c.id)));
+                setSelectedCourseIds(new Set());
+                toast.success(`Removed ${count} program(s) from the portal`);
+              }
+            }}
+            style={{
+              background: 'rgba(255, 75, 107, 0.2)',
+              border: '1px solid rgba(255, 75, 107, 0.55)',
+              color: '#FF6B8B',
+              borderRadius: '8px',
+              padding: '7px 14px',
+              fontSize: '12px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.4)';
+              e.currentTarget.style.color = '#fff';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 75, 107, 0.2)';
+              e.currentTarget.style.color = '#FF6B8B';
+            }}
+          >
+            <span>🗑️</span>
+            <span>Remove Selected ({selectedCourseIds.size})</span>
+          </button>
         </div>
       )}
 
@@ -2310,6 +2475,15 @@ export default function CourseFinder({ setCurrentPage }) {
               setCurrentPage('students');
               toast.success(`Navigating to register student for ${prog.programName}`);
             }
+          }}
+          onRemoveCourse={(courseId) => {
+            setCourses((prev) => prev.filter((c) => c.id !== courseId));
+            setSelectedCourseIds((prev) => {
+              const next = new Set(prev);
+              next.delete(courseId);
+              return next;
+            });
+            toast.success('Course removed from the portal');
           }}
         />
       )}
@@ -2373,6 +2547,309 @@ export default function CourseFinder({ setCurrentPage }) {
           onConfirm={executeDownload}
         />
       )}
+
+      {/* =========================================================================
+          MODAL 6: MANAGE & REMOVE UPLOADED EXCEL DATASETS (User Requirement)
+         ========================================================================= */}
+      {showFileManagerModal && (
+        <ManageFilesModal
+          isOpen={showFileManagerModal}
+          onClose={() => setShowFileManagerModal(false)}
+          sourceGroups={sourceGroups}
+          onRemoveGroup={handleRemoveGroup}
+          onResetAll={handleResetAllUploads}
+        />
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
+// SUB-COMPONENT: MANAGE UPLOADED FILES & DATASETS MODAL (User Requirement)
+// ============================================================================
+function ManageFilesModal({ isOpen, onClose, sourceGroups, onRemoveGroup, onResetAll }) {
+  if (!isOpen) return null;
+
+  const customGroups = (sourceGroups || []).filter((g) => !g.isDefault);
+  const totalCustomCourses = customGroups.reduce((acc, g) => acc + g.count, 0);
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.85)',
+        backdropFilter: 'blur(10px)',
+        zIndex: 1100,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '20px',
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          background: 'linear-gradient(145deg, #0E131F 0%, #080A12 100%)',
+          border: '1px solid rgba(255, 75, 107, 0.35)',
+          borderRadius: '16px',
+          width: '100%',
+          maxWidth: '740px',
+          maxHeight: '90vh',
+          display: 'flex',
+          flexDirection: 'column',
+          boxShadow: '0 24px 60px rgba(0, 0, 0, 0.8), 0 0 40px rgba(255, 75, 107, 0.1)',
+          overflow: 'hidden',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div
+          style={{
+            padding: '18px 24px',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '24px' }}>📁</span>
+            <div>
+              <h2 style={{ fontSize: '16px', fontWeight: 800, color: '#fff', margin: 0 }}>
+                Manage Uploaded Excel Files & Datasets
+              </h2>
+              <p style={{ fontSize: '12px', color: '#8E9BB5', margin: '2px 0 0 0' }}>
+                View and remove any specific uploaded Excel spreadsheet, university import, or batch.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'rgba(255, 255, 255, 0.06)',
+              border: 'none',
+              color: '#8E9BB5',
+              fontSize: '18px',
+              cursor: 'pointer',
+              width: '32px',
+              height: '32px',
+              borderRadius: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Content Body */}
+        <div style={{ padding: '20px 24px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          {customGroups.length === 0 ? (
+            <div
+              style={{
+                textAlign: 'center',
+                padding: '40px 20px',
+                background: 'rgba(255, 255, 255, 0.02)',
+                borderRadius: '12px',
+                border: '1px dashed rgba(255, 255, 255, 0.1)',
+              }}
+            >
+              <div style={{ fontSize: '36px', marginBottom: '8px' }}>📂</div>
+              <div style={{ fontSize: '15px', fontWeight: 700, color: '#fff' }}>No Custom Excel Files in Portal</div>
+              <div style={{ fontSize: '12px', color: '#8E9BB5', marginTop: '6px', maxWidth: '460px', margin: '6px auto 0' }}>
+                All custom spreadsheets have been removed or none have been uploaded yet. Currently using the verified core default catalog.
+              </div>
+            </div>
+          ) : (
+            <>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '12px', fontWeight: 800, color: '#38BDF8', letterSpacing: '0.04em' }}>
+                  {customGroups.length} UPLOADED EXCEL DATASET{customGroups.length > 1 ? 'S' : ''} ({totalCustomCourses} COURSES)
+                </span>
+                <button
+                  onClick={() => {
+                    if (window.confirm(`Are you sure you want to remove ALL ${customGroups.length} uploaded Excel datasets (${totalCustomCourses} courses)?`)) {
+                      onResetAll();
+                      onClose();
+                    }
+                  }}
+                  style={{
+                    background: 'rgba(255, 75, 107, 0.15)',
+                    border: '1px solid rgba(255, 75, 107, 0.4)',
+                    color: '#FF6B8B',
+                    padding: '5px 12px',
+                    borderRadius: '6px',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  🗑️ Purge All Uploaded Spreadsheets
+                </button>
+              </div>
+
+              {customGroups.map((group) => (
+                <div
+                  key={group.key}
+                  style={{
+                    background: 'rgba(15, 20, 35, 0.85)',
+                    border: '1px solid rgba(148, 163, 225, 0.2)',
+                    borderRadius: '12px',
+                    padding: '16px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ fontSize: '26px' }}>📊</span>
+                      <div>
+                        <div style={{ fontSize: '14px', fontWeight: 800, color: '#fff' }}>
+                          {group.name}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '3px', fontSize: '11.5px', color: '#8E9BB5' }}>
+                          <span style={{ color: '#00E5A0', fontWeight: 700 }}>
+                            {group.flag} {group.country}
+                          </span>
+                          <span>•</span>
+                          <span>{group.university}</span>
+                          <span>•</span>
+                          <span style={{ color: '#C084FC', fontWeight: 700 }}>{group.count} Courses</span>
+                          <span>•</span>
+                          <span style={{ color: '#8E9BB5' }}>{group.uploadedAt}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => onRemoveGroup(group)}
+                      style={{
+                        background: 'linear-gradient(135deg, rgba(255, 75, 107, 0.25) 0%, rgba(239, 68, 68, 0.3) 100%)',
+                        border: '1px solid rgba(255, 75, 107, 0.6)',
+                        color: '#FF6B8B',
+                        padding: '8px 14px',
+                        borderRadius: '8px',
+                        fontSize: '12px',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        whiteSpace: 'nowrap',
+                        boxShadow: '0 2px 10px rgba(255, 75, 107, 0.15)',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'rgba(239, 68, 68, 0.45)';
+                        e.currentTarget.style.color = '#fff';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'linear-gradient(135deg, rgba(255, 75, 107, 0.25) 0%, rgba(239, 68, 68, 0.3) 100%)';
+                        e.currentTarget.style.color = '#FF6B8B';
+                      }}
+                    >
+                      <span>🗑️</span>
+                      <span>Remove This Excel ({group.count} courses)</span>
+                    </button>
+                  </div>
+
+                  {/* Sample Courses Preview */}
+                  <div
+                    style={{
+                      background: 'rgba(8, 10, 18, 0.6)',
+                      borderRadius: '8px',
+                      padding: '8px 12px',
+                      fontSize: '11px',
+                      color: '#8E9BB5',
+                    }}
+                  >
+                    <span style={{ color: '#38BDF8', fontWeight: 700 }}>Sample Courses from this file: </span>
+                    {group.sampleCourses.join(' • ')}
+                    {group.count > group.sampleCourses.length && ` + ${group.count - group.sampleCourses.length} more`}
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+
+          {/* System Default Catalog Card */}
+          <div
+            style={{
+              background: 'rgba(8, 10, 18, 0.5)',
+              border: '1px dashed rgba(255, 255, 255, 0.12)',
+              borderRadius: '12px',
+              padding: '14px 16px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginTop: '4px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{ fontSize: '20px' }}>🛡️</span>
+              <div>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: '#EDEFFA' }}>
+                  System Core Verified Catalog ({DEFAULT_COURSES.length} Courses)
+                </div>
+                <div style={{ fontSize: '11px', color: '#8E9BB5' }}>
+                  Includes verified programs for Malta, Germany, UK, Canada, Australia, and Ireland.
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                if (window.confirm('Restore system default courses? (Uploaded files will be kept)')) {
+                  setCourses((prev) => {
+                    const custom = prev.filter((c) => c.id?.startsWith('import-') || c.sourceFileName);
+                    return [...DEFAULT_COURSES, ...custom];
+                  });
+                  toast.success('Core verified courses restored!');
+                }
+              }}
+              style={{
+                background: 'rgba(0, 229, 160, 0.1)',
+                border: '1px solid rgba(0, 229, 160, 0.3)',
+                color: '#00E5A0',
+                padding: '6px 12px',
+                borderRadius: '6px',
+                fontSize: '11px',
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              Restore Core Defaults
+            </button>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div
+          style={{
+            padding: '14px 24px',
+            borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+            display: 'flex',
+            justifyContent: 'flex-end',
+          }}
+        >
+          <button
+            onClick={onClose}
+            style={{
+              background: 'rgba(255, 255, 255, 0.1)',
+              border: 'none',
+              color: '#fff',
+              padding: '8px 20px',
+              borderRadius: '8px',
+              fontSize: '12px',
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            Done
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -2380,7 +2857,7 @@ export default function CourseFinder({ setCurrentPage }) {
 // ============================================================================
 // SUB-COMPONENT: PROGRAM DETAILS MODAL (Matching Image 7 View)
 // ============================================================================
-function ProgramDetailsModal({ course, onClose, onApplyStudent }) {
+function ProgramDetailsModal({ course, onClose, onApplyStudent, onRemoveCourse }) {
   return (
     <div
       style={{
@@ -2686,7 +3163,32 @@ function ProgramDetailsModal({ course, onClose, onApplyStudent }) {
             </a>
           ) : <div />}
 
-          <div style={{ display: 'flex', gap: '10px' }}>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <button
+              onClick={() => {
+                if (window.confirm(`Are you sure you want to remove "${course.programName}" from the portal?`)) {
+                  if (onRemoveCourse) onRemoveCourse(course.id);
+                  onClose();
+                }
+              }}
+              style={{
+                background: 'rgba(255, 75, 107, 0.12)',
+                border: '1px solid rgba(255, 75, 107, 0.35)',
+                color: '#FF6B8B',
+                padding: '8px 14px',
+                borderRadius: '8px',
+                fontSize: '12px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+            >
+              <span>🗑️</span>
+              <span>Remove Course</span>
+            </button>
+
             <button
               onClick={onClose}
               style={{
@@ -3618,6 +4120,9 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
         entryRequirements: reqs || '12 years secondary or equivalent bachelor degree.',
         remarks: engReqs ? `Language requirements: ${engReqs}` : `Imported for destination country ${cFlag} ${ctry}.`,
         tags: ['Custom Upload', ctry],
+        sourceFileName: file?.name || `${uni} (${ctry}) Spreadsheet`,
+        sourceFileId: `file-${(file?.name || 'spreadsheet').replace(/[^a-zA-Z0-9]/g, '_')}-${Date.now()}`,
+        uploadedAt: new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }),
       };
     });
 
