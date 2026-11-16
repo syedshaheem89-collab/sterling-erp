@@ -944,6 +944,59 @@ export default function CourseFinder({ setCurrentPage }) {
     return counts;
   }, [courses]);
 
+  // Real-time Theme Listener (Light / Dark / AMOLED)
+  const [theme, setTheme] = useState(() => {
+    return document.documentElement.getAttribute('data-theme') || localStorage.getItem('sterling_theme') || 'dark';
+  });
+
+  useEffect(() => {
+    const handleThemeSync = () => {
+      const cur = document.documentElement.getAttribute('data-theme') || localStorage.getItem('sterling_theme') || 'dark';
+      setTheme(cur);
+    };
+
+    handleThemeSync();
+
+    const observer = new MutationObserver(() => {
+      handleThemeSync();
+    });
+
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme'],
+    });
+
+    window.addEventListener('storage', handleThemeSync);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('storage', handleThemeSync);
+    };
+  }, []);
+
+  const isLight = theme === 'light';
+
+  // Dynamic Theme-Aware Tokens for CourseFinder
+  const t = {
+    isLight,
+    pageBg: isLight ? '#F4F6FC' : '#080A12',
+    cardBg: isLight ? '#FFFFFF' : 'rgba(15, 20, 35, 0.85)',
+    cardBgAlt: isLight ? '#F8FAFC' : 'rgba(8, 10, 18, 0.65)',
+    inputBg: isLight ? '#FFFFFF' : 'rgba(8, 10, 18, 0.9)',
+    cardBorder: isLight ? 'rgba(0, 0, 0, 0.08)' : 'rgba(148, 163, 225, 0.14)',
+    innerBorder: isLight ? 'rgba(0, 0, 0, 0.08)' : 'rgba(148, 163, 225, 0.12)',
+    inputBorder: isLight ? '#CBD5E1' : 'rgba(148, 163, 225, 0.22)',
+    textPrimary: isLight ? '#0F172A' : '#FFFFFF',
+    textSecondary: isLight ? '#334155' : '#EDEFFA',
+    textMuted: isLight ? '#64748B' : '#8E9BB5',
+    divider: isLight ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.08)',
+    pillBgInactive: isLight ? 'rgba(0, 0, 0, 0.04)' : 'rgba(255, 255, 255, 0.04)',
+    pillBorderInactive: isLight ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.12)',
+    pillTextInactive: isLight ? '#475569' : '#94A3B8',
+    cardShadow: isLight ? '0 4px 20px rgba(0, 0, 0, 0.05)' : '0 8px 30px rgba(0, 0, 0, 0.4)',
+    itemShadow: isLight ? '0 1px 3px rgba(0, 0, 0, 0.05)' : 'none',
+  };
+
   // Selection & Actions
   const [selectedCourseIds, setSelectedCourseIds] = useState(new Set());
   const [activeCourseDetails, setActiveCourseDetails] = useState(null);
@@ -1220,11 +1273,12 @@ export default function CourseFinder({ setCurrentPage }) {
         display: 'flex',
         flexDirection: 'column',
         gap: '16px',
-        backgroundColor: '#080A12',
-        color: '#EDEFFA',
+        backgroundColor: t.pageBg,
+        color: t.textSecondary,
         fontFamily: "'Plus Jakarta Sans', sans-serif",
         position: 'relative',
         minHeight: '100vh',
+        transition: 'background-color 0.2s ease, color 0.2s ease',
       }}
     >
       {/* =========================================================================
@@ -1237,29 +1291,30 @@ export default function CourseFinder({ setCurrentPage }) {
           justifyContent: 'space-between',
           alignItems: 'center',
           gap: '14px',
-          background: 'rgba(15, 20, 35, 0.85)',
-          border: '1px solid rgba(148, 163, 225, 0.14)',
+          background: t.cardBg,
+          border: `1px solid ${t.cardBorder}`,
           borderRadius: '14px',
           padding: '14px 20px',
-          boxShadow: '0 8px 30px rgba(0, 0, 0, 0.4)',
+          boxShadow: t.cardShadow,
+          transition: 'background 0.2s ease, border-color 0.2s ease',
         }}
       >
         {/* Left: Summary Metrics */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
           <div>
-            <div style={{ fontSize: '10px', color: '#8E9BB5', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.05em' }}>
+            <div style={{ fontSize: '10px', color: t.textMuted, textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.05em' }}>
               Programs Available
             </div>
-            <div style={{ fontSize: '22px', fontWeight: 900, color: '#36D1DC', display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+            <div style={{ fontSize: '22px', fontWeight: 900, color: isLight ? '#0284C7' : '#36D1DC', display: 'flex', alignItems: 'baseline', gap: '6px' }}>
               <span>{courses.length}</span>
-              <span style={{ fontSize: '11px', color: '#8E9BB5', fontWeight: 600 }}>({filteredCourses.length} filtered)</span>
+              <span style={{ fontSize: '11px', color: t.textMuted, fontWeight: 600 }}>({filteredCourses.length} filtered)</span>
             </div>
           </div>
 
-          <div style={{ width: '1px', height: '32px', background: 'rgba(255, 255, 255, 0.1)' }} />
+          <div style={{ width: '1px', height: '32px', background: t.divider }} />
 
           <div>
-            <div style={{ fontSize: '10px', color: '#8E9BB5', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.05em' }}>
+            <div style={{ fontSize: '10px', color: t.textMuted, textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.05em' }}>
               Partner Universities
             </div>
             <div style={{ fontSize: '22px', fontWeight: 900, color: '#00E5A0' }}>
@@ -1267,10 +1322,10 @@ export default function CourseFinder({ setCurrentPage }) {
             </div>
           </div>
 
-          <div style={{ width: '1px', height: '32px', background: 'rgba(255, 255, 255, 0.1)' }} />
+          <div style={{ width: '1px', height: '32px', background: t.divider }} />
 
           <div>
-            <div style={{ fontSize: '10px', color: '#8E9BB5', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.05em' }}>
+            <div style={{ fontSize: '10px', color: t.textMuted, textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.05em' }}>
               Countries
             </div>
             <div style={{ fontSize: '22px', fontWeight: 900, color: '#A78BFA' }}>
@@ -1287,7 +1342,7 @@ export default function CourseFinder({ setCurrentPage }) {
             style={{
               background: 'rgba(124, 111, 255, 0.12)',
               border: '1px solid rgba(124, 111, 255, 0.35)',
-              color: '#A78BFA',
+              color: isLight ? '#6D28D9' : '#A78BFA',
               padding: '8px 14px',
               borderRadius: '10px',
               fontSize: '12px',
@@ -1310,7 +1365,7 @@ export default function CourseFinder({ setCurrentPage }) {
             style={{
               background: 'linear-gradient(135deg, rgba(0, 229, 160, 0.18) 0%, rgba(54, 209, 220, 0.18) 100%)',
               border: '1px solid rgba(0, 229, 160, 0.45)',
-              color: '#00E5A0',
+              color: isLight ? '#047857' : '#00E5A0',
               padding: '8px 16px',
               borderRadius: '10px',
               fontSize: '12px',
@@ -1331,9 +1386,9 @@ export default function CourseFinder({ setCurrentPage }) {
           <button
             onClick={() => setShowFileManagerModal(true)}
             style={{
-              background: customGroupsCount > 0 ? 'rgba(255, 176, 32, 0.16)' : 'rgba(255, 255, 255, 0.08)',
-              border: customGroupsCount > 0 ? '1px solid rgba(255, 176, 32, 0.5)' : '1px solid rgba(255, 255, 255, 0.18)',
-              color: customGroupsCount > 0 ? '#FFB020' : '#EDEFFA',
+              background: customGroupsCount > 0 ? (isLight ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255, 176, 32, 0.16)') : (isLight ? '#F1F5F9' : 'rgba(255, 255, 255, 0.08)'),
+              border: customGroupsCount > 0 ? '1px solid rgba(245, 158, 11, 0.5)' : (isLight ? '1px solid #CBD5E1' : '1px solid rgba(255, 255, 255, 0.18)'),
+              color: customGroupsCount > 0 ? (isLight ? '#B45309' : '#FFB020') : t.textPrimary,
               padding: '8px 14px',
               borderRadius: '10px',
               fontSize: '12px',
@@ -1358,9 +1413,9 @@ export default function CourseFinder({ setCurrentPage }) {
               }
             }}
             style={{
-              background: 'rgba(255, 75, 107, 0.12)',
-              border: '1px solid rgba(255, 75, 107, 0.35)',
-              color: '#FF6B8B',
+              background: isLight ? 'rgba(239, 68, 68, 0.1)' : 'rgba(255, 75, 107, 0.12)',
+              border: isLight ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(255, 75, 107, 0.35)',
+              color: isLight ? '#DC2626' : '#FF6B8B',
               padding: '8px 14px',
               borderRadius: '10px',
               fontSize: '12px',
@@ -1380,9 +1435,9 @@ export default function CourseFinder({ setCurrentPage }) {
           <button
             onClick={() => setShowDownloadPrefModal(true)}
             style={{
-              background: 'rgba(255, 255, 255, 0.08)',
-              border: '1px solid rgba(255, 255, 255, 0.18)',
-              color: '#EDEFFA',
+              background: isLight ? '#F1F5F9' : 'rgba(255, 255, 255, 0.08)',
+              border: isLight ? '1px solid #CBD5E1' : '1px solid rgba(255, 255, 255, 0.18)',
+              color: t.textPrimary,
               padding: '8px 14px',
               borderRadius: '10px',
               fontSize: '12px',
@@ -1405,23 +1460,25 @@ export default function CourseFinder({ setCurrentPage }) {
          ========================================================================= */}
       <div
         style={{
-          background: 'rgba(15, 20, 35, 0.85)',
-          border: '1px solid rgba(148, 163, 225, 0.14)',
+          background: t.cardBg,
+          border: `1px solid ${t.cardBorder}`,
           borderRadius: '14px',
           padding: '16px 20px',
           display: 'flex',
           flexDirection: 'column',
           gap: '12px',
+          boxShadow: t.cardShadow,
+          transition: 'background 0.2s ease, border-color 0.2s ease',
         }}
       >
         <div style={{ display: 'grid', gridTemplateColumns: '2.5fr 1.5fr 1.5fr auto', gap: '12px', alignItems: 'flex-end' }}>
           {/* 1. Search Program / University */}
           <div>
-            <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#8E9BB5', marginBottom: '6px' }}>
+            <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: t.textMuted, marginBottom: '6px' }}>
               Search Programs
             </label>
             <div style={{ position: 'relative' }}>
-              <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#8E9BB5' }}>
+              <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: t.textMuted }}>
                 🏛️
               </span>
               <input
@@ -1431,11 +1488,11 @@ export default function CourseFinder({ setCurrentPage }) {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 style={{
                   width: '100%',
-                  background: 'rgba(8, 10, 18, 0.9)',
-                  border: '1px solid rgba(148, 163, 225, 0.22)',
+                  background: t.inputBg,
+                  border: `1px solid ${t.inputBorder}`,
                   borderRadius: '10px',
                   padding: '9px 12px 9px 36px',
-                  color: '#fff',
+                  color: t.textPrimary,
                   fontSize: '13px',
                   outline: 'none',
                 }}
@@ -1445,7 +1502,7 @@ export default function CourseFinder({ setCurrentPage }) {
 
           {/* 2. Country */}
           <div>
-            <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#8E9BB5', marginBottom: '6px' }}>
+            <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: t.textMuted, marginBottom: '6px' }}>
               Country
             </label>
             <select
@@ -1453,25 +1510,27 @@ export default function CourseFinder({ setCurrentPage }) {
               onChange={(e) => setSelectedCountry(e.target.value)}
               style={{
                 width: '100%',
-                background: 'rgba(8, 10, 18, 0.9)',
-                border: '1px solid rgba(148, 163, 225, 0.22)',
+                background: t.inputBg,
+                border: `1px solid ${t.inputBorder}`,
                 borderRadius: '10px',
                 padding: '9px 12px',
-                color: '#EDEFFA',
+                color: t.textPrimary,
                 fontSize: '13px',
                 outline: 'none',
                 cursor: 'pointer',
               }}
             >
               {availableCountries.map((c) => (
-                <option key={c} value={c}>{c === 'All' ? '🌍 All Countries' : `${getCountryFlag(c)} ${c}`}</option>
+                <option key={c} value={c} style={{ background: isLight ? '#FFFFFF' : '#0B0E14', color: isLight ? '#0F172A' : '#EDEFFA' }}>
+                  {c === 'All' ? '🌍 All Countries' : `${getCountryFlag(c)} ${c}`}
+                </option>
               ))}
             </select>
           </div>
 
           {/* 3. Intake */}
           <div>
-            <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#8E9BB5', marginBottom: '6px' }}>
+            <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: t.textMuted, marginBottom: '6px' }}>
               Intake
             </label>
             <select
@@ -1482,19 +1541,23 @@ export default function CourseFinder({ setCurrentPage }) {
               }}
               style={{
                 width: '100%',
-                background: 'rgba(8, 10, 18, 0.9)',
-                border: '1px solid rgba(148, 163, 225, 0.22)',
+                background: t.inputBg,
+                border: `1px solid ${t.inputBorder}`,
                 borderRadius: '10px',
                 padding: '9px 12px',
-                color: '#EDEFFA',
+                color: t.textPrimary,
                 fontSize: '13px',
                 outline: 'none',
                 cursor: 'pointer',
               }}
             >
-              <option value="All">📅 All Intakes (Jan - Dec)</option>
+              <option value="All" style={{ background: isLight ? '#FFFFFF' : '#0B0E14', color: isLight ? '#0F172A' : '#EDEFFA' }}>
+                📅 All Intakes (Jan - Dec)
+              </option>
               {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((m) => (
-                <option key={m} value={m}>{m} Intake</option>
+                <option key={m} value={m} style={{ background: isLight ? '#FFFFFF' : '#0B0E14', color: isLight ? '#0F172A' : '#EDEFFA' }}>
+                  {m} Intake
+                </option>
               ))}
             </select>
           </div>
@@ -1526,9 +1589,9 @@ export default function CourseFinder({ setCurrentPage }) {
             <button
               onClick={clearAllFilters}
               style={{
-                background: 'rgba(255, 255, 255, 0.06)',
-                border: '1px solid rgba(255, 255, 255, 0.15)',
-                color: '#8E9BB5',
+                background: isLight ? '#F1F5F9' : 'rgba(255, 255, 255, 0.06)',
+                border: isLight ? '1px solid #CBD5E1' : '1px solid rgba(255, 255, 255, 0.15)',
+                color: t.textMuted,
                 borderRadius: '10px',
                 padding: '9px 12px',
                 fontSize: '12px',
@@ -1552,14 +1615,14 @@ export default function CourseFinder({ setCurrentPage }) {
             gap: '8px',
             flexWrap: 'wrap',
             paddingTop: '8px',
-            borderTop: '1px solid rgba(148, 163, 225, 0.1)',
+            borderTop: `1px solid ${t.divider}`,
           }}
         >
           <span
             style={{
               fontSize: '11px',
               fontWeight: 800,
-              color: '#8E9BB5',
+              color: t.textMuted,
               textTransform: 'uppercase',
               letterSpacing: '0.05em',
               marginRight: '4px',
@@ -1577,14 +1640,14 @@ export default function CourseFinder({ setCurrentPage }) {
                 onClick={() => setSelectedLevel(lvl)}
                 style={{
                   background: isAct
-                    ? (badge ? badge.bg : 'rgba(56, 189, 248, 0.22)')
-                    : 'rgba(255, 255, 255, 0.04)',
+                    ? (badge ? badge.bg : (isLight ? 'rgba(56, 189, 248, 0.18)' : 'rgba(56, 189, 248, 0.22)'))
+                    : t.pillBgInactive,
                   border: isAct
-                    ? `1.5px solid ${badge ? badge.color : '#38BDF8'}`
-                    : '1px solid rgba(255, 255, 255, 0.12)',
+                    ? `1.5px solid ${badge ? badge.color : (isLight ? '#0284C7' : '#38BDF8')}`
+                    : `1px solid ${t.pillBorderInactive}`,
                   color: isAct
-                    ? (badge ? badge.color : '#38BDF8')
-                    : '#94A3B8',
+                    ? (badge ? (isLight && badge.color === '#00F296' ? '#047857' : badge.color) : (isLight ? '#0284C7' : '#38BDF8'))
+                    : t.pillTextInactive,
                   padding: '6px 14px',
                   borderRadius: '20px',
                   fontSize: '12px',
@@ -1603,8 +1666,10 @@ export default function CourseFinder({ setCurrentPage }) {
                     fontSize: '10.5px',
                     padding: '1px 6px',
                     borderRadius: '10px',
-                    background: isAct ? 'rgba(255, 255, 255, 0.22)' : 'rgba(255, 255, 255, 0.08)',
-                    color: isAct ? '#fff' : '#64748B',
+                    background: isAct
+                      ? (isLight ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.22)')
+                      : (isLight ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.08)'),
+                    color: isAct ? (isLight ? '#0F172A' : '#fff') : t.textMuted,
                     fontWeight: 700,
                   }}
                 >
@@ -1623,18 +1688,19 @@ export default function CourseFinder({ setCurrentPage }) {
         {groupedByUniversity.length === 0 ? (
           <div
             style={{
-              background: 'rgba(15, 20, 35, 0.85)',
-              border: '1px solid rgba(148, 163, 225, 0.14)',
+              background: t.cardBg,
+              border: `1px solid ${t.cardBorder}`,
               borderRadius: '14px',
               padding: '48px 24px',
               textAlign: 'center',
+              boxShadow: t.cardShadow,
             }}
           >
             <div style={{ fontSize: '36px', marginBottom: '10px' }}>🔍</div>
-            <div style={{ fontSize: '16px', fontWeight: 800, color: '#fff', marginBottom: '6px' }}>
+            <div style={{ fontSize: '16px', fontWeight: 800, color: t.textPrimary, marginBottom: '6px' }}>
               No Programs Found Matching Your Query
             </div>
-            <p style={{ fontSize: '13px', color: '#8E9BB5', maxWidth: '420px', margin: '0 auto 16px' }}>
+            <p style={{ fontSize: '13px', color: t.textMuted, maxWidth: '420px', margin: '0 auto 16px' }}>
               Try broadening your filters, or upload your university spreadsheet to ingest more country programs.
             </p>
             <button
@@ -1658,14 +1724,15 @@ export default function CourseFinder({ setCurrentPage }) {
             <div
               key={uni.name}
               style={{
-                background: 'rgba(15, 20, 35, 0.85)',
-                border: '1px solid rgba(148, 163, 225, 0.14)',
+                background: t.cardBg,
+                border: `1px solid ${t.cardBorder}`,
                 borderRadius: '14px',
                 padding: '20px 24px',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '16px',
-                boxShadow: '0 8px 24px rgba(0, 0, 0, 0.35)',
+                boxShadow: t.cardShadow,
+                transition: 'background 0.2s ease, border-color 0.2s ease',
               }}
             >
               {/* University Header Row */}
@@ -1677,7 +1744,7 @@ export default function CourseFinder({ setCurrentPage }) {
                       width: '46px',
                       height: '46px',
                       borderRadius: '10px',
-                      background: 'rgba(255, 255, 255, 0.06)',
+                      background: isLight ? '#F1F5F9' : 'rgba(255, 255, 255, 0.06)',
                       border: `1px solid ${uni.logoColor}40`,
                       display: 'flex',
                       alignItems: 'center',
@@ -1693,7 +1760,7 @@ export default function CourseFinder({ setCurrentPage }) {
 
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#fff', margin: 0 }}>
+                      <h3 style={{ fontSize: '16px', fontWeight: 800, color: t.textPrimary, margin: 0 }}>
                         {uni.name}
                       </h3>
                       {uni.portalUrl && (
@@ -1703,12 +1770,12 @@ export default function CourseFinder({ setCurrentPage }) {
                           rel="noreferrer"
                           style={{
                             fontSize: '11px',
-                            color: '#38BDF8',
+                            color: isLight ? '#0284C7' : '#38BDF8',
                             textDecoration: 'none',
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '4px',
-                            background: 'rgba(56, 189, 248, 0.1)',
+                            background: isLight ? 'rgba(2, 132, 199, 0.1)' : 'rgba(56, 189, 248, 0.1)',
                             padding: '2px 8px',
                             borderRadius: '6px',
                           }}
@@ -1719,7 +1786,7 @@ export default function CourseFinder({ setCurrentPage }) {
                       )}
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#8E9BB5', marginTop: '3px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: t.textMuted, marginTop: '3px' }}>
                       <span>{uni.region}</span>
                       <span>{uni.countryFlag}</span>
                     </div>
@@ -1731,9 +1798,9 @@ export default function CourseFinder({ setCurrentPage }) {
                   {uni.fasterOfferTAT && (
                     <span
                       style={{
-                        background: 'rgba(56, 189, 248, 0.12)',
-                        border: '1px solid rgba(56, 189, 248, 0.3)',
-                        color: '#38BDF8',
+                        background: isLight ? 'rgba(2, 132, 199, 0.12)' : 'rgba(56, 189, 248, 0.12)',
+                        border: isLight ? '1px solid rgba(2, 132, 199, 0.3)' : '1px solid rgba(56, 189, 248, 0.3)',
+                        color: isLight ? '#0369A1' : '#38BDF8',
                         padding: '3px 10px',
                         borderRadius: '6px',
                         fontSize: '11px',
@@ -1746,9 +1813,9 @@ export default function CourseFinder({ setCurrentPage }) {
                   {uni.affordable && (
                     <span
                       style={{
-                        background: 'rgba(0, 229, 160, 0.12)',
-                        border: '1px solid rgba(0, 229, 160, 0.3)',
-                        color: '#00E5A0',
+                        background: isLight ? 'rgba(16, 185, 129, 0.12)' : 'rgba(0, 229, 160, 0.12)',
+                        border: isLight ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(0, 229, 160, 0.3)',
+                        color: isLight ? '#047857' : '#00E5A0',
                         padding: '3px 10px',
                         borderRadius: '6px',
                         fontSize: '11px',
@@ -1761,9 +1828,9 @@ export default function CourseFinder({ setCurrentPage }) {
                   {uni.scholarshipAvailable && (
                     <span
                       style={{
-                        background: 'rgba(167, 139, 250, 0.12)',
-                        border: '1px solid rgba(167, 139, 250, 0.3)',
-                        color: '#A78BFA',
+                        background: isLight ? 'rgba(147, 51, 234, 0.12)' : 'rgba(167, 139, 250, 0.12)',
+                        border: isLight ? '1px solid rgba(147, 51, 234, 0.3)' : '1px solid rgba(167, 139, 250, 0.3)',
+                        color: isLight ? '#7E22CE' : '#A78BFA',
                         padding: '3px 10px',
                         borderRadius: '6px',
                         fontSize: '11px',
@@ -1784,13 +1851,18 @@ export default function CourseFinder({ setCurrentPage }) {
                     <div
                       key={prog.id}
                       style={{
-                        background: isSelected ? 'rgba(56, 189, 248, 0.08)' : 'rgba(8, 10, 18, 0.65)',
-                        border: isSelected ? '1px solid #38BDF8' : '1px solid rgba(148, 163, 225, 0.12)',
+                        background: isSelected
+                          ? (isLight ? 'rgba(2, 132, 199, 0.1)' : 'rgba(56, 189, 248, 0.08)')
+                          : t.cardBgAlt,
+                        border: isSelected
+                          ? `1.5px solid ${isLight ? '#0284C7' : '#38BDF8'}`
+                          : `1px solid ${t.innerBorder}`,
                         borderRadius: '10px',
                         padding: '14px 18px',
                         display: 'flex',
                         flexDirection: 'column',
                         gap: '10px',
+                        boxShadow: t.itemShadow,
                         transition: 'all 0.15s ease',
                       }}
                     >
@@ -1801,19 +1873,19 @@ export default function CourseFinder({ setCurrentPage }) {
                             type="checkbox"
                             checked={isSelected}
                             onChange={() => toggleSelectCourse(prog.id)}
-                            style={{ accentColor: '#38BDF8', width: '16px', height: '16px', cursor: 'pointer' }}
+                            style={{ accentColor: '#1D4ED8', width: '16px', height: '16px', cursor: 'pointer' }}
                           />
                           <span
                             onClick={() => setActiveCourseDetails(prog)}
                             style={{
                               fontSize: '14px',
                               fontWeight: 800,
-                              color: '#fff',
+                              color: t.textPrimary,
                               cursor: 'pointer',
                               transition: 'color 0.15s ease',
                             }}
-                            onMouseEnter={(e) => (e.currentTarget.style.color = '#38BDF8')}
-                            onMouseLeave={(e) => (e.currentTarget.style.color = '#fff')}
+                            onMouseEnter={(e) => (e.currentTarget.style.color = '#1D4ED8')}
+                            onMouseLeave={(e) => (e.currentTarget.style.color = t.textPrimary)}
                           >
                             {prog.programName}
                           </span>
@@ -1827,7 +1899,7 @@ export default function CourseFinder({ setCurrentPage }) {
                                 style={{
                                   background: badge.bg,
                                   border: `1px solid ${badge.border}`,
-                                  color: badge.color,
+                                  color: isLight && badge.color === '#00F296' ? '#047857' : badge.color,
                                   fontSize: '11px',
                                   fontWeight: 700,
                                   padding: '2px 8px',
@@ -1851,9 +1923,9 @@ export default function CourseFinder({ setCurrentPage }) {
                             <span
                               key={itk}
                               style={{
-                                background: 'rgba(0, 229, 160, 0.12)',
-                                color: '#00E5A0',
-                                border: '1px solid rgba(0, 229, 160, 0.25)',
+                                background: isLight ? 'rgba(16, 185, 129, 0.12)' : 'rgba(0, 229, 160, 0.12)',
+                                color: isLight ? '#047857' : '#00E5A0',
+                                border: isLight ? '1px solid rgba(16, 185, 129, 0.25)' : '1px solid rgba(0, 229, 160, 0.25)',
                                 padding: '2px 8px',
                                 borderRadius: '4px',
                                 fontSize: '11px',
@@ -1867,9 +1939,9 @@ export default function CourseFinder({ setCurrentPage }) {
                             <span
                               key={itk}
                               style={{
-                                background: 'rgba(255, 111, 142, 0.12)',
-                                color: '#FF6F8E',
-                                border: '1px solid rgba(255, 111, 142, 0.25)',
+                                background: isLight ? 'rgba(239, 68, 68, 0.12)' : 'rgba(255, 111, 142, 0.12)',
+                                color: isLight ? '#DC2626' : '#FF6F8E',
+                                border: isLight ? '1px solid rgba(239, 68, 68, 0.25)' : '1px solid rgba(255, 111, 142, 0.25)',
                                 padding: '2px 8px',
                                 borderRadius: '4px',
                                 fontSize: '11px',
@@ -1890,12 +1962,12 @@ export default function CourseFinder({ setCurrentPage }) {
                           gap: '16px',
                           alignItems: 'center',
                           paddingTop: '8px',
-                          borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+                          borderTop: `1px solid ${t.divider}`,
                         }}
                       >
                         {/* 1. Degree Level */}
                         <div>
-                          <div style={{ fontSize: '11px', color: '#8E9BB5', fontWeight: 600 }}>Degree Level</div>
+                          <div style={{ fontSize: '11px', color: t.textMuted, fontWeight: 600 }}>Degree Level</div>
                           {(() => {
                             const effLvl = detectProgramLevel(prog.programName, prog.level, prog.duration);
                             const badge = getLevelBadgeInfo(effLvl);
@@ -1904,7 +1976,7 @@ export default function CourseFinder({ setCurrentPage }) {
                                 style={{
                                   fontSize: '12.5px',
                                   fontWeight: 800,
-                                  color: badge.color,
+                                  color: isLight && badge.color === '#00F296' ? '#047857' : badge.color,
                                   display: 'inline-flex',
                                   alignItems: 'center',
                                   gap: '5px',
@@ -1920,22 +1992,22 @@ export default function CourseFinder({ setCurrentPage }) {
 
                         {/* 2. Duration */}
                         <div>
-                          <div style={{ fontSize: '11px', color: '#8E9BB5', fontWeight: 600 }}>Duration</div>
-                          <div style={{ fontSize: '13px', fontWeight: 700, color: '#EDEFFA', marginTop: '2px' }}>{prog.duration}</div>
+                          <div style={{ fontSize: '11px', color: t.textMuted, fontWeight: 600 }}>Duration</div>
+                          <div style={{ fontSize: '13px', fontWeight: 700, color: t.textSecondary, marginTop: '2px' }}>{prog.duration}</div>
                         </div>
 
                         {/* 3. Tuition/yr */}
                         <div>
-                          <div style={{ fontSize: '11px', color: '#8E9BB5', fontWeight: 600 }}>Tuition/yr</div>
-                          <div style={{ fontSize: '13.5px', fontWeight: 800, color: '#fff', marginTop: '2px' }}>
+                          <div style={{ fontSize: '11px', color: t.textMuted, fontWeight: 600 }}>Tuition/yr</div>
+                          <div style={{ fontSize: '13.5px', fontWeight: 800, color: t.textPrimary, marginTop: '2px' }}>
                             {prog.yearlyTuition}
                           </div>
                         </div>
 
                         {/* 4. Application Fee */}
                         <div>
-                          <div style={{ fontSize: '11px', color: '#8E9BB5', fontWeight: 600 }}>Application Fee</div>
-                          <div style={{ fontSize: '13px', fontWeight: 700, color: '#38BDF8', marginTop: '2px' }}>{prog.applicationFee}</div>
+                          <div style={{ fontSize: '11px', color: t.textMuted, fontWeight: 600 }}>Application Fee</div>
+                          <div style={{ fontSize: '13px', fontWeight: 700, color: isLight ? '#0284C7' : '#38BDF8', marginTop: '2px' }}>{prog.applicationFee}</div>
                         </div>
 
                         {/* Quick View & Delete Buttons */}
@@ -1943,9 +2015,9 @@ export default function CourseFinder({ setCurrentPage }) {
                           <button
                             onClick={() => setActiveCourseDetails(prog)}
                             style={{
-                              background: 'rgba(124, 111, 255, 0.15)',
-                              border: '1px solid rgba(124, 111, 255, 0.3)',
-                              color: '#A78BFA',
+                              background: isLight ? '#EFF6FF' : 'rgba(124, 111, 255, 0.15)',
+                              border: isLight ? '1px solid #BFDBFE' : '1px solid rgba(124, 111, 255, 0.3)',
+                              color: isLight ? '#1D4ED8' : '#A78BFA',
                               padding: '5px 12px',
                               borderRadius: '6px',
                               fontSize: '11px',
@@ -1970,9 +2042,9 @@ export default function CourseFinder({ setCurrentPage }) {
                             }}
                             title="Remove this course from the portal"
                             style={{
-                              background: 'rgba(255, 75, 107, 0.1)',
-                              border: '1px solid rgba(255, 75, 107, 0.3)',
-                              color: '#FF6B8B',
+                              background: isLight ? 'rgba(239, 68, 68, 0.08)' : 'rgba(255, 75, 107, 0.1)',
+                              border: isLight ? '1px solid rgba(239, 68, 68, 0.25)' : '1px solid rgba(255, 75, 107, 0.3)',
+                              color: isLight ? '#DC2626' : '#FF6B8B',
                               padding: '5px 8px',
                               borderRadius: '6px',
                               fontSize: '11px',
@@ -1986,8 +2058,8 @@ export default function CourseFinder({ setCurrentPage }) {
                               e.currentTarget.style.color = '#fff';
                             }}
                             onMouseLeave={(e) => {
-                              e.currentTarget.style.background = 'rgba(255, 75, 107, 0.1)';
-                              e.currentTarget.style.color = '#FF6B8B';
+                              e.currentTarget.style.background = isLight ? 'rgba(239, 68, 68, 0.08)' : 'rgba(255, 75, 107, 0.1)';
+                              e.currentTarget.style.color = isLight ? '#DC2626' : '#FF6B8B';
                             }}
                           >
                             🗑️
@@ -2007,7 +2079,7 @@ export default function CourseFinder({ setCurrentPage }) {
           QUICK FILTERS SUGGESTIONS (Exact Match to Image 6 Bottom Carousel)
          ========================================================================= */}
       <div style={{ marginTop: '10px' }}>
-        <div style={{ fontSize: '12px', fontWeight: 800, color: '#38BDF8', letterSpacing: '0.04em', marginBottom: '10px' }}>
+        <div style={{ fontSize: '12px', fontWeight: 800, color: isLight ? '#0284C7' : '#38BDF8', letterSpacing: '0.04em', marginBottom: '10px' }}>
           Quick Filters Suggestions:
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px' }}>
@@ -2015,66 +2087,81 @@ export default function CourseFinder({ setCurrentPage }) {
           <div
             onClick={() => setQuickFilter((prev) => (prev === 'faster_tat' ? null : 'faster_tat'))}
             style={{
-              background: quickFilter === 'faster_tat' ? 'rgba(56, 189, 248, 0.16)' : 'rgba(15, 20, 35, 0.85)',
-              border: quickFilter === 'faster_tat' ? '1px solid #38BDF8' : '1px solid rgba(148, 163, 225, 0.14)',
+              background: quickFilter === 'faster_tat'
+                ? (isLight ? 'rgba(2, 132, 199, 0.14)' : 'rgba(56, 189, 248, 0.16)')
+                : t.cardBg,
+              border: quickFilter === 'faster_tat'
+                ? `1.5px solid ${isLight ? '#0284C7' : '#38BDF8'}`
+                : `1px solid ${t.cardBorder}`,
               borderRadius: '12px',
               padding: '14px 18px',
               cursor: 'pointer',
+              boxShadow: t.cardShadow,
               transition: 'all 0.15s ease',
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: '20px' }}>⏱️</span>
-              <span style={{ fontSize: '11px', color: '#38BDF8', fontWeight: 700 }}>
+              <span style={{ fontSize: '11px', color: isLight ? '#0284C7' : '#38BDF8', fontWeight: 700 }}>
                 {quickFilter === 'faster_tat' ? 'Active ✓' : 'View Universities →'}
               </span>
             </div>
-            <div style={{ fontSize: '13px', fontWeight: 800, color: '#fff', marginTop: '6px' }}>Faster Offer TAT</div>
-            <div style={{ fontSize: '11px', color: '#8E9BB5', marginTop: '2px' }}>Decision on application within 2 weeks.</div>
+            <div style={{ fontSize: '13px', fontWeight: 800, color: t.textPrimary, marginTop: '6px' }}>Faster Offer TAT</div>
+            <div style={{ fontSize: '11px', color: t.textMuted, marginTop: '2px' }}>Decision on application within 2 weeks.</div>
           </div>
 
           {/* Card 2: Scholarship Available */}
           <div
             onClick={() => setQuickFilter((prev) => (prev === 'scholarship' ? null : 'scholarship'))}
             style={{
-              background: quickFilter === 'scholarship' ? 'rgba(167, 139, 250, 0.16)' : 'rgba(15, 20, 35, 0.85)',
-              border: quickFilter === 'scholarship' ? '1px solid #A78BFA' : '1px solid rgba(148, 163, 225, 0.14)',
+              background: quickFilter === 'scholarship'
+                ? (isLight ? 'rgba(147, 51, 234, 0.14)' : 'rgba(167, 139, 250, 0.16)')
+                : t.cardBg,
+              border: quickFilter === 'scholarship'
+                ? `1.5px solid ${isLight ? '#7E22CE' : '#A78BFA'}`
+                : `1px solid ${t.cardBorder}`,
               borderRadius: '12px',
               padding: '14px 18px',
               cursor: 'pointer',
+              boxShadow: t.cardShadow,
               transition: 'all 0.15s ease',
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: '20px' }}>💰</span>
-              <span style={{ fontSize: '11px', color: '#A78BFA', fontWeight: 700 }}>
+              <span style={{ fontSize: '11px', color: isLight ? '#7E22CE' : '#A78BFA', fontWeight: 700 }}>
                 {quickFilter === 'scholarship' ? 'Active ✓' : 'View Universities →'}
               </span>
             </div>
-            <div style={{ fontSize: '13px', fontWeight: 800, color: '#fff', marginTop: '6px' }}>Scholarship Available</div>
-            <div style={{ fontSize: '11px', color: '#8E9BB5', marginTop: '2px' }}>Merit / Early Bird / Bursary Scholarships up to 33%.</div>
+            <div style={{ fontSize: '13px', fontWeight: 800, color: t.textPrimary, marginTop: '6px' }}>Scholarship Available</div>
+            <div style={{ fontSize: '11px', color: t.textMuted, marginTop: '2px' }}>Merit / Early Bird / Bursary Scholarships up to 33%.</div>
           </div>
 
           {/* Card 3: High Offer Acceptance Rate */}
           <div
             onClick={() => setQuickFilter((prev) => (prev === 'high_acceptance' ? null : 'high_acceptance'))}
             style={{
-              background: quickFilter === 'high_acceptance' ? 'rgba(0, 229, 160, 0.16)' : 'rgba(15, 20, 35, 0.85)',
-              border: quickFilter === 'high_acceptance' ? '1px solid #00E5A0' : '1px solid rgba(148, 163, 225, 0.14)',
+              background: quickFilter === 'high_acceptance'
+                ? (isLight ? 'rgba(16, 185, 129, 0.14)' : 'rgba(0, 229, 160, 0.16)')
+                : t.cardBg,
+              border: quickFilter === 'high_acceptance'
+                ? `1.5px solid ${isLight ? '#059669' : '#00E5A0'}`
+                : `1px solid ${t.cardBorder}`,
               borderRadius: '12px',
               padding: '14px 18px',
               cursor: 'pointer',
+              boxShadow: t.cardShadow,
               transition: 'all 0.15s ease',
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: '20px' }}>🎯</span>
-              <span style={{ fontSize: '11px', color: '#00E5A0', fontWeight: 700 }}>
+              <span style={{ fontSize: '11px', color: isLight ? '#059669' : '#00E5A0', fontWeight: 700 }}>
                 {quickFilter === 'high_acceptance' ? 'Active ✓' : 'View Universities →'}
               </span>
             </div>
-            <div style={{ fontSize: '13px', fontWeight: 800, color: '#fff', marginTop: '6px' }}>High Offer Acceptance Rate</div>
-            <div style={{ fontSize: '11px', color: '#8E9BB5', marginTop: '2px' }}>Programs with high offer conversion & smooth visa path.</div>
+            <div style={{ fontSize: '13px', fontWeight: 800, color: t.textPrimary, marginTop: '6px' }}>High Offer Acceptance Rate</div>
+            <div style={{ fontSize: '11px', color: t.textMuted, marginTop: '2px' }}>Programs with high offer conversion & smooth visa path.</div>
           </div>
         </div>
       </div>
@@ -2089,30 +2176,30 @@ export default function CourseFinder({ setCurrentPage }) {
             bottom: '24px',
             left: '50%',
             transform: 'translateX(-50%)',
-            background: 'rgba(15, 20, 35, 0.95)',
-            border: '1px solid rgba(56, 189, 248, 0.4)',
+            background: isLight ? 'rgba(255, 255, 255, 0.98)' : 'rgba(15, 20, 35, 0.95)',
+            border: isLight ? '1px solid #CBD5E1' : '1px solid rgba(56, 189, 248, 0.4)',
             backdropFilter: 'blur(16px)',
             borderRadius: '14px',
             padding: '10px 22px',
             display: 'flex',
             alignItems: 'center',
             gap: '18px',
-            boxShadow: '0 12px 40px rgba(0, 0, 0, 0.7)',
+            boxShadow: isLight ? '0 12px 40px rgba(0, 0, 0, 0.15)' : '0 12px 40px rgba(0, 0, 0, 0.7)',
             zIndex: 999,
           }}
         >
-          <div style={{ fontSize: '13px', fontWeight: 800, color: '#fff' }}>
+          <div style={{ fontSize: '13px', fontWeight: 800, color: t.textPrimary }}>
             {selectedCourseIds.size} Program{selectedCourseIds.size > 1 ? 's' : ''} selected
           </div>
 
-          <div style={{ width: '1px', height: '20px', background: 'rgba(255, 255, 255, 0.15)' }} />
+          <div style={{ width: '1px', height: '20px', background: t.divider }} />
 
           <button
             onClick={handleDeselectAll}
             style={{
               background: 'transparent',
               border: 'none',
-              color: '#8E9BB5',
+              color: t.textMuted,
               fontSize: '12px',
               fontWeight: 600,
               cursor: 'pointer',
@@ -2314,10 +2401,45 @@ export default function CourseFinder({ setCurrentPage }) {
 }
 
 // ============================================================================
+// MODAL THEME ADAPTATION HELPER
+// ============================================================================
+function useModalTheme() {
+  const [isLight, setIsLight] = useState(() => document.documentElement.getAttribute('data-theme') === 'light');
+
+  useEffect(() => {
+    const handleSync = () => {
+      setIsLight(document.documentElement.getAttribute('data-theme') === 'light');
+    };
+    handleSync();
+    const observer = new MutationObserver(handleSync);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => observer.disconnect();
+  }, []);
+
+  return {
+    isLight,
+    backdropBg: isLight ? 'rgba(15, 23, 42, 0.45)' : 'rgba(0, 0, 0, 0.82)',
+    modalBg: isLight ? '#FFFFFF' : '#0F1423',
+    modalBorder: isLight ? '1px solid rgba(0, 0, 0, 0.12)' : '1px solid rgba(148, 163, 225, 0.25)',
+    headerBg: isLight ? '#F8FAFC' : 'rgba(20, 25, 45, 0.95)',
+    sectionBg: isLight ? '#F8FAFC' : 'rgba(255, 255, 255, 0.03)',
+    sectionBorder: isLight ? '1px solid rgba(0, 0, 0, 0.08)' : '1px solid rgba(148, 163, 225, 0.12)',
+    inputBg: isLight ? '#FFFFFF' : 'rgba(8, 10, 18, 0.9)',
+    inputBorder: isLight ? '#CBD5E1' : 'rgba(148, 163, 225, 0.22)',
+    textPrimary: isLight ? '#0F172A' : '#FFFFFF',
+    textSecondary: isLight ? '#334155' : '#EDEFFA',
+    textMuted: isLight ? '#64748B' : '#8E9BB5',
+    divider: isLight ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.08)',
+    shadow: isLight ? '0 24px 60px rgba(0, 0, 0, 0.18)' : '0 24px 60px rgba(0, 0, 0, 0.8)',
+  };
+}
+
+// ============================================================================
 // SUB-COMPONENT: MANAGE UPLOADED FILES & DATASETS MODAL (User Requirement)
 // ============================================================================
 function ManageFilesModal({ isOpen, onClose, sourceGroups, onRemoveGroup, onResetAll }) {
   if (!isOpen) return null;
+  const mt = useModalTheme();
 
   const customGroups = (sourceGroups || []).filter((g) => !g.isDefault);
   const totalCustomCourses = customGroups.reduce((acc, g) => acc + g.count, 0);
@@ -2327,7 +2449,7 @@ function ManageFilesModal({ isOpen, onClose, sourceGroups, onRemoveGroup, onRese
       style={{
         position: 'fixed',
         inset: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.85)',
+        backgroundColor: mt.backdropBg,
         backdropFilter: 'blur(10px)',
         zIndex: 1100,
         display: 'flex',
@@ -2339,15 +2461,15 @@ function ManageFilesModal({ isOpen, onClose, sourceGroups, onRemoveGroup, onRese
     >
       <div
         style={{
-          background: 'linear-gradient(145deg, #0E131F 0%, #080A12 100%)',
-          border: '1px solid rgba(255, 75, 107, 0.35)',
+          background: mt.isLight ? '#FFFFFF' : 'linear-gradient(145deg, #0E131F 0%, #080A12 100%)',
+          border: mt.isLight ? '1px solid #CBD5E1' : '1px solid rgba(255, 75, 107, 0.35)',
           borderRadius: '16px',
           width: '100%',
           maxWidth: '740px',
           maxHeight: '90vh',
           display: 'flex',
           flexDirection: 'column',
-          boxShadow: '0 24px 60px rgba(0, 0, 0, 0.8), 0 0 40px rgba(255, 75, 107, 0.1)',
+          boxShadow: mt.shadow,
           overflow: 'hidden',
         }}
         onClick={(e) => e.stopPropagation()}
@@ -2356,19 +2478,20 @@ function ManageFilesModal({ isOpen, onClose, sourceGroups, onRemoveGroup, onRese
         <div
           style={{
             padding: '18px 24px',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+            borderBottom: `1px solid ${mt.divider}`,
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
+            background: mt.headerBg,
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <span style={{ fontSize: '24px' }}>📁</span>
             <div>
-              <h2 style={{ fontSize: '16px', fontWeight: 800, color: '#fff', margin: 0 }}>
+              <h2 style={{ fontSize: '16px', fontWeight: 800, color: mt.textPrimary, margin: 0 }}>
                 Manage Uploaded Excel Files & Datasets
               </h2>
-              <p style={{ fontSize: '12px', color: '#8E9BB5', margin: '2px 0 0 0' }}>
+              <p style={{ fontSize: '12px', color: mt.textMuted, margin: '2px 0 0 0' }}>
                 View and remove any specific uploaded Excel spreadsheet, university import, or batch.
               </p>
             </div>
@@ -2376,14 +2499,14 @@ function ManageFilesModal({ isOpen, onClose, sourceGroups, onRemoveGroup, onRese
           <button
             onClick={onClose}
             style={{
-              background: 'rgba(255, 255, 255, 0.06)',
+              background: mt.isLight ? '#F1F5F9' : 'rgba(255, 255, 255, 0.06)',
               border: 'none',
-              color: '#8E9BB5',
+              color: mt.textMuted,
               fontSize: '18px',
               cursor: 'pointer',
               width: '32px',
               height: '32px',
-              borderRadius: '8px',
+              borderRadius: '50%',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -2400,21 +2523,21 @@ function ManageFilesModal({ isOpen, onClose, sourceGroups, onRemoveGroup, onRese
               style={{
                 textAlign: 'center',
                 padding: '40px 20px',
-                background: 'rgba(255, 255, 255, 0.02)',
+                background: mt.isLight ? '#F8FAFC' : 'rgba(255, 255, 255, 0.02)',
                 borderRadius: '12px',
-                border: '1px dashed rgba(255, 255, 255, 0.1)',
+                border: mt.isLight ? '1px dashed #CBD5E1' : '1px dashed rgba(255, 255, 255, 0.1)',
               }}
             >
               <div style={{ fontSize: '36px', marginBottom: '8px' }}>📂</div>
-              <div style={{ fontSize: '15px', fontWeight: 700, color: '#fff' }}>No Custom Excel Files in Portal</div>
-              <div style={{ fontSize: '12px', color: '#8E9BB5', marginTop: '6px', maxWidth: '460px', margin: '6px auto 0' }}>
+              <div style={{ fontSize: '15px', fontWeight: 700, color: mt.textPrimary }}>No Custom Excel Files in Portal</div>
+              <div style={{ fontSize: '12px', color: mt.textMuted, marginTop: '6px', maxWidth: '460px', margin: '6px auto 0' }}>
                 All custom spreadsheets have been removed or none have been uploaded yet. Currently using the verified core default catalog.
               </div>
             </div>
           ) : (
             <>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '12px', fontWeight: 800, color: '#38BDF8', letterSpacing: '0.04em' }}>
+                <span style={{ fontSize: '12px', fontWeight: 800, color: mt.isLight ? '#0284C7' : '#38BDF8', letterSpacing: '0.04em' }}>
                   {customGroups.length} UPLOADED EXCEL DATASET{customGroups.length > 1 ? 'S' : ''} ({totalCustomCourses} COURSES)
                 </span>
                 <button
@@ -2425,9 +2548,9 @@ function ManageFilesModal({ isOpen, onClose, sourceGroups, onRemoveGroup, onRese
                     }
                   }}
                   style={{
-                    background: 'rgba(255, 75, 107, 0.15)',
-                    border: '1px solid rgba(255, 75, 107, 0.4)',
-                    color: '#FF6B8B',
+                    background: mt.isLight ? 'rgba(239, 68, 68, 0.1)' : 'rgba(255, 75, 107, 0.15)',
+                    border: mt.isLight ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(255, 75, 107, 0.4)',
+                    color: mt.isLight ? '#DC2626' : '#FF6B8B',
                     padding: '5px 12px',
                     borderRadius: '6px',
                     fontSize: '11px',
@@ -2443,8 +2566,8 @@ function ManageFilesModal({ isOpen, onClose, sourceGroups, onRemoveGroup, onRese
                 <div
                   key={group.key}
                   style={{
-                    background: 'rgba(15, 20, 35, 0.85)',
-                    border: '1px solid rgba(148, 163, 225, 0.2)',
+                    background: mt.sectionBg,
+                    border: mt.sectionBorder,
                     borderRadius: '12px',
                     padding: '16px',
                     display: 'flex',
@@ -2456,19 +2579,19 @@ function ManageFilesModal({ isOpen, onClose, sourceGroups, onRemoveGroup, onRese
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <span style={{ fontSize: '26px' }}>📊</span>
                       <div>
-                        <div style={{ fontSize: '14px', fontWeight: 800, color: '#fff' }}>
+                        <div style={{ fontSize: '14px', fontWeight: 800, color: mt.textPrimary }}>
                           {group.name}
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '3px', fontSize: '11.5px', color: '#8E9BB5' }}>
-                          <span style={{ color: '#00E5A0', fontWeight: 700 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '3px', fontSize: '11.5px', color: mt.textMuted }}>
+                          <span style={{ color: mt.isLight ? '#047857' : '#00E5A0', fontWeight: 700 }}>
                             {group.flag} {group.country}
                           </span>
                           <span>•</span>
                           <span>{group.university}</span>
                           <span>•</span>
-                          <span style={{ color: '#C084FC', fontWeight: 700 }}>{group.count} Courses</span>
+                          <span style={{ color: mt.isLight ? '#7E22CE' : '#C084FC', fontWeight: 700 }}>{group.count} Courses</span>
                           <span>•</span>
-                          <span style={{ color: '#8E9BB5' }}>{group.uploadedAt}</span>
+                          <span style={{ color: mt.textMuted }}>{group.uploadedAt}</span>
                         </div>
                       </div>
                     </div>
@@ -2476,9 +2599,9 @@ function ManageFilesModal({ isOpen, onClose, sourceGroups, onRemoveGroup, onRese
                     <button
                       onClick={() => onRemoveGroup(group)}
                       style={{
-                        background: 'linear-gradient(135deg, rgba(255, 75, 107, 0.25) 0%, rgba(239, 68, 68, 0.3) 100%)',
-                        border: '1px solid rgba(255, 75, 107, 0.6)',
-                        color: '#FF6B8B',
+                        background: mt.isLight ? 'rgba(239, 68, 68, 0.1)' : 'linear-gradient(135deg, rgba(255, 75, 107, 0.25) 0%, rgba(239, 68, 68, 0.3) 100%)',
+                        border: mt.isLight ? '1px solid rgba(239, 68, 68, 0.35)' : '1px solid rgba(255, 75, 107, 0.6)',
+                        color: mt.isLight ? '#DC2626' : '#FF6B8B',
                         padding: '8px 14px',
                         borderRadius: '8px',
                         fontSize: '12px',
@@ -2488,15 +2611,14 @@ function ManageFilesModal({ isOpen, onClose, sourceGroups, onRemoveGroup, onRese
                         alignItems: 'center',
                         gap: '6px',
                         whiteSpace: 'nowrap',
-                        boxShadow: '0 2px 10px rgba(255, 75, 107, 0.15)',
                       }}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.background = 'rgba(239, 68, 68, 0.45)';
                         e.currentTarget.style.color = '#fff';
                       }}
                       onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'linear-gradient(135deg, rgba(255, 75, 107, 0.25) 0%, rgba(239, 68, 68, 0.3) 100%)';
-                        e.currentTarget.style.color = '#FF6B8B';
+                        e.currentTarget.style.background = mt.isLight ? 'rgba(239, 68, 68, 0.1)' : 'linear-gradient(135deg, rgba(255, 75, 107, 0.25) 0%, rgba(239, 68, 68, 0.3) 100%)';
+                        e.currentTarget.style.color = mt.isLight ? '#DC2626' : '#FF6B8B';
                       }}
                     >
                       <span>🗑️</span>
@@ -2507,14 +2629,14 @@ function ManageFilesModal({ isOpen, onClose, sourceGroups, onRemoveGroup, onRese
                   {/* Sample Courses Preview */}
                   <div
                     style={{
-                      background: 'rgba(8, 10, 18, 0.6)',
+                      background: mt.isLight ? '#F1F5F9' : 'rgba(8, 10, 18, 0.6)',
                       borderRadius: '8px',
                       padding: '8px 12px',
                       fontSize: '11px',
-                      color: '#8E9BB5',
+                      color: mt.textMuted,
                     }}
                   >
-                    <span style={{ color: '#38BDF8', fontWeight: 700 }}>Sample Courses from this file: </span>
+                    <span style={{ color: mt.isLight ? '#0284C7' : '#38BDF8', fontWeight: 700 }}>Sample Courses from this file: </span>
                     {group.sampleCourses.join(' • ')}
                     {group.count > group.sampleCourses.length && ` + ${group.count - group.sampleCourses.length} more`}
                   </div>
@@ -2526,8 +2648,8 @@ function ManageFilesModal({ isOpen, onClose, sourceGroups, onRemoveGroup, onRese
           {/* System Default Catalog Card */}
           <div
             style={{
-              background: 'rgba(8, 10, 18, 0.5)',
-              border: '1px dashed rgba(255, 255, 255, 0.12)',
+              background: mt.isLight ? '#F8FAFC' : 'rgba(8, 10, 18, 0.5)',
+              border: mt.isLight ? '1px dashed #CBD5E1' : '1px dashed rgba(255, 255, 255, 0.12)',
               borderRadius: '12px',
               padding: '14px 16px',
               display: 'flex',
@@ -2539,10 +2661,10 @@ function ManageFilesModal({ isOpen, onClose, sourceGroups, onRemoveGroup, onRese
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <span style={{ fontSize: '20px' }}>🛡️</span>
               <div>
-                <div style={{ fontSize: '13px', fontWeight: 700, color: '#EDEFFA' }}>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: mt.textPrimary }}>
                   System Core Verified Catalog ({DEFAULT_COURSES.length} Courses)
                 </div>
-                <div style={{ fontSize: '11px', color: '#8E9BB5' }}>
+                <div style={{ fontSize: '11px', color: mt.textMuted }}>
                   Includes verified programs for Malta, Germany, UK, Canada, Australia, and Ireland.
                 </div>
               </div>
@@ -2558,9 +2680,9 @@ function ManageFilesModal({ isOpen, onClose, sourceGroups, onRemoveGroup, onRese
                 }
               }}
               style={{
-                background: 'rgba(0, 229, 160, 0.1)',
-                border: '1px solid rgba(0, 229, 160, 0.3)',
-                color: '#00E5A0',
+                background: mt.isLight ? 'rgba(16, 185, 129, 0.12)' : 'rgba(0, 229, 160, 0.1)',
+                border: mt.isLight ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(0, 229, 160, 0.3)',
+                color: mt.isLight ? '#047857' : '#00E5A0',
                 padding: '6px 12px',
                 borderRadius: '6px',
                 fontSize: '11px',
@@ -2577,15 +2699,16 @@ function ManageFilesModal({ isOpen, onClose, sourceGroups, onRemoveGroup, onRese
         <div
           style={{
             padding: '14px 24px',
-            borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+            borderTop: `1px solid ${mt.divider}`,
             display: 'flex',
             justifyContent: 'flex-end',
+            background: mt.headerBg,
           }}
         >
           <button
             onClick={onClose}
             style={{
-              background: 'rgba(255, 255, 255, 0.1)',
+              background: '#1D4ED8',
               border: 'none',
               color: '#fff',
               padding: '8px 20px',
@@ -2607,12 +2730,13 @@ function ManageFilesModal({ isOpen, onClose, sourceGroups, onRemoveGroup, onRese
 // SUB-COMPONENT: PROGRAM DETAILS MODAL (Matching Image 7 View)
 // ============================================================================
 function ProgramDetailsModal({ course, onClose, onApplyStudent, onRemoveCourse }) {
+  const mt = useModalTheme();
   return (
     <div
       style={{
         position: 'fixed',
         inset: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        backgroundColor: mt.backdropBg,
         backdropFilter: 'blur(8px)',
         zIndex: 1050,
         display: 'flex',
@@ -2627,10 +2751,10 @@ function ProgramDetailsModal({ course, onClose, onApplyStudent, onRemoveCourse }
           width: '100%',
           maxWidth: '1080px',
           maxHeight: '92vh',
-          backgroundColor: '#0F1423',
-          border: '1px solid rgba(148, 163, 225, 0.25)',
+          backgroundColor: mt.modalBg,
+          border: mt.modalBorder,
           borderRadius: '16px',
-          boxShadow: '0 24px 60px rgba(0, 0, 0, 0.8)',
+          boxShadow: mt.shadow,
           overflowY: 'auto',
           display: 'flex',
           flexDirection: 'column',
@@ -2642,11 +2766,12 @@ function ProgramDetailsModal({ course, onClose, onApplyStudent, onRemoveCourse }
         <div
           style={{
             padding: '20px 28px',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+            borderBottom: `1px solid ${mt.divider}`,
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'flex-start',
             gap: '16px',
+            background: mt.headerBg,
           }}
         >
           <div>
@@ -2656,7 +2781,7 @@ function ProgramDetailsModal({ course, onClose, onApplyStudent, onRemoveCourse }
                 {course.university} &mdash; {course.region || course.country}
               </span>
             </div>
-            <h2 style={{ fontSize: '20px', fontWeight: 900, color: '#fff', margin: 0 }}>
+            <h2 style={{ fontSize: '20px', fontWeight: 900, color: mt.textPrimary, margin: 0 }}>
               {course.programName}
             </h2>
             {course.websiteUrl && (
@@ -2680,9 +2805,9 @@ function ProgramDetailsModal({ course, onClose, onApplyStudent, onRemoveCourse }
           <button
             onClick={onClose}
             style={{
-              background: 'rgba(255, 255, 255, 0.08)',
+              background: mt.isLight ? '#F1F5F9' : 'rgba(255, 255, 255, 0.08)',
               border: 'none',
-              color: '#8E9BB5',
+              color: mt.textMuted,
               width: '32px',
               height: '32px',
               borderRadius: '50%',
@@ -2702,54 +2827,54 @@ function ProgramDetailsModal({ course, onClose, onApplyStudent, onRemoveCourse }
           {/* Section 1: Program Details Grid (Image 7 Top Section) */}
           <div
             style={{
-              background: 'rgba(255, 255, 255, 0.03)',
-              border: '1px solid rgba(148, 163, 225, 0.12)',
+              background: mt.sectionBg,
+              border: mt.sectionBorder,
               borderRadius: '10px',
               padding: '16px 20px',
             }}
           >
-            <div style={{ fontSize: '12px', fontWeight: 800, color: '#38BDF8', letterSpacing: '0.04em', marginBottom: '14px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 800, color: mt.isLight ? '#0284C7' : '#38BDF8', letterSpacing: '0.04em', marginBottom: '14px' }}>
               PROGRAM DETAILS
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
               <div>
-                <div style={{ fontSize: '11px', color: '#8E9BB5' }}>Duration</div>
-                <div style={{ fontSize: '13px', fontWeight: 700, color: '#fff', marginTop: '2px' }}>{course.duration}</div>
+                <div style={{ fontSize: '11px', color: mt.textMuted }}>Duration</div>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: mt.textPrimary, marginTop: '2px' }}>{course.duration}</div>
               </div>
               <div>
-                <div style={{ fontSize: '11px', color: '#8E9BB5' }}>Campus</div>
-                <div style={{ fontSize: '13px', fontWeight: 700, color: '#fff', marginTop: '2px' }}>{course.campus || 'Main Campus'}</div>
+                <div style={{ fontSize: '11px', color: mt.textMuted }}>Campus</div>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: mt.textPrimary, marginTop: '2px' }}>{course.campus || 'Main Campus'}</div>
               </div>
               <div>
-                <div style={{ fontSize: '11px', color: '#8E9BB5' }}>Intakes</div>
-                <div style={{ fontSize: '13px', fontWeight: 700, color: '#fff', marginTop: '2px' }}>
+                <div style={{ fontSize: '11px', color: mt.textMuted }}>Intakes</div>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: mt.textPrimary, marginTop: '2px' }}>
                   {(course.intakes || []).join(', ') || 'Rolling'}
                 </div>
               </div>
               <div>
-                <div style={{ fontSize: '11px', color: '#8E9BB5' }}>Application Deadline</div>
-                <div style={{ fontSize: '12px', fontWeight: 700, color: '#A78BFA', marginTop: '2px' }}>
+                <div style={{ fontSize: '11px', color: mt.textMuted }}>Application Deadline</div>
+                <div style={{ fontSize: '12px', fontWeight: 700, color: mt.isLight ? '#7E22CE' : '#A78BFA', marginTop: '2px' }}>
                   {course.applicationDeadline || 'Check Portal'}
                 </div>
               </div>
 
               <div>
-                <div style={{ fontSize: '11px', color: '#8E9BB5' }}>Application Fee</div>
-                <div style={{ fontSize: '13px', fontWeight: 700, color: '#00E5A0', marginTop: '2px' }}>{course.applicationFee}</div>
+                <div style={{ fontSize: '11px', color: mt.textMuted }}>Application Fee</div>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: mt.isLight ? '#047857' : '#00E5A0', marginTop: '2px' }}>{course.applicationFee}</div>
               </div>
               <div>
-                <div style={{ fontSize: '11px', color: '#8E9BB5' }}>Yearly Tuition Fee</div>
-                <div style={{ fontSize: '14px', fontWeight: 800, color: '#fff', marginTop: '2px' }}>{course.yearlyTuition}</div>
+                <div style={{ fontSize: '11px', color: mt.textMuted }}>Yearly Tuition Fee</div>
+                <div style={{ fontSize: '14px', fontWeight: 800, color: mt.textPrimary, marginTop: '2px' }}>{course.yearlyTuition}</div>
               </div>
               <div>
-                <div style={{ fontSize: '11px', color: '#8E9BB5' }}>Country / Destination</div>
-                <div style={{ fontSize: '13px', fontWeight: 700, color: '#38BDF8', marginTop: '2px' }}>
+                <div style={{ fontSize: '11px', color: mt.textMuted }}>Country / Destination</div>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: mt.isLight ? '#0284C7' : '#38BDF8', marginTop: '2px' }}>
                   {course.countryFlag || '🌍'} {course.country || 'International'}
                 </div>
               </div>
               <div>
-                <div style={{ fontSize: '11px', color: '#8E9BB5' }}>Degree Level</div>
+                <div style={{ fontSize: '11px', color: mt.textMuted }}>Degree Level</div>
                 {(() => {
                   const effLvl = detectProgramLevel(course.programName, course.level, course.duration);
                   const badge = getLevelBadgeInfo(effLvl);
@@ -2758,7 +2883,7 @@ function ProgramDetailsModal({ course, onClose, onApplyStudent, onRemoveCourse }
                       style={{
                         fontSize: '13px',
                         fontWeight: 700,
-                        color: badge.color,
+                        color: mt.isLight && badge.color === '#00F296' ? '#047857' : badge.color,
                         marginTop: '2px',
                         display: 'flex',
                         alignItems: 'center',
@@ -2777,51 +2902,51 @@ function ProgramDetailsModal({ course, onClose, onApplyStudent, onRemoveCourse }
           {/* Section 2: English Proficiency Test Requirements (Image 7 Middle Table) */}
           <div
             style={{
-              background: 'rgba(255, 255, 255, 0.03)',
-              border: '1px solid rgba(148, 163, 225, 0.12)',
+              background: mt.sectionBg,
+              border: mt.sectionBorder,
               borderRadius: '10px',
               padding: '16px 20px',
             }}
           >
-            <div style={{ fontSize: '12px', fontWeight: 800, color: '#38BDF8', letterSpacing: '0.04em', marginBottom: '14px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 800, color: mt.isLight ? '#0284C7' : '#38BDF8', letterSpacing: '0.04em', marginBottom: '14px' }}>
               ENGLISH PROFICIENCY TEST REQUIREMENTS
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                <span style={{ fontSize: '12px', color: '#8E9BB5' }}>PTE Overall</span>
-                <span style={{ fontSize: '12px', fontWeight: 700, color: '#fff' }}>{course.englishRequirements?.pteOverall || '50'}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: `1px solid ${mt.divider}` }}>
+                <span style={{ fontSize: '12px', color: mt.textMuted }}>PTE Overall</span>
+                <span style={{ fontSize: '12px', fontWeight: 700, color: mt.textPrimary }}>{course.englishRequirements?.pteOverall || '50'}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                <span style={{ fontSize: '12px', color: '#8E9BB5' }}>PTE No Bands Less Than</span>
-                <span style={{ fontSize: '12px', fontWeight: 700, color: '#fff' }}>{course.englishRequirements?.pteNoBandLess || '42'}</span>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                <span style={{ fontSize: '12px', color: '#8E9BB5' }}>TOEFL iBT Overall</span>
-                <span style={{ fontSize: '12px', fontWeight: 700, color: '#fff' }}>{course.englishRequirements?.toeflOverall || '76'}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                <span style={{ fontSize: '12px', color: '#8E9BB5' }}>TOEFL iBT No Bands Less Than</span>
-                <span style={{ fontSize: '12px', fontWeight: 700, color: '#fff' }}>{course.englishRequirements?.toeflNoBandLess || '19'}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: `1px solid ${mt.divider}` }}>
+                <span style={{ fontSize: '12px', color: mt.textMuted }}>PTE No Bands Less Than</span>
+                <span style={{ fontSize: '12px', fontWeight: 700, color: mt.textPrimary }}>{course.englishRequirements?.pteNoBandLess || '42'}</span>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                <span style={{ fontSize: '12px', color: '#8E9BB5' }}>IELTS Overall</span>
-                <span style={{ fontSize: '12px', fontWeight: 700, color: '#00E5A0' }}>{course.englishRequirements?.ieltsOverall || '6.0'}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: `1px solid ${mt.divider}` }}>
+                <span style={{ fontSize: '12px', color: mt.textMuted }}>TOEFL iBT Overall</span>
+                <span style={{ fontSize: '12px', fontWeight: 700, color: mt.textPrimary }}>{course.englishRequirements?.toeflOverall || '76'}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                <span style={{ fontSize: '12px', color: '#8E9BB5' }}>IELTS No Band Less Than</span>
-                <span style={{ fontSize: '12px', fontWeight: 700, color: '#fff' }}>{course.englishRequirements?.ieltsNoBandLess || '5.5'}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: `1px solid ${mt.divider}` }}>
+                <span style={{ fontSize: '12px', color: mt.textMuted }}>TOEFL iBT No Bands Less Than</span>
+                <span style={{ fontSize: '12px', fontWeight: 700, color: mt.textPrimary }}>{course.englishRequirements?.toeflNoBandLess || '19'}</span>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                <span style={{ fontSize: '12px', color: '#8E9BB5' }}>DET (Duolingo Score)</span>
-                <span style={{ fontSize: '12px', fontWeight: 700, color: '#fff' }}>{course.englishRequirements?.detScore || '105'}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: `1px solid ${mt.divider}` }}>
+                <span style={{ fontSize: '12px', color: mt.textMuted }}>IELTS Overall</span>
+                <span style={{ fontSize: '12px', fontWeight: 700, color: mt.isLight ? '#047857' : '#00E5A0' }}>{course.englishRequirements?.ieltsOverall || '6.0'}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                <span style={{ fontSize: '12px', color: '#8E9BB5' }}>MOI Accepted</span>
-                <span style={{ fontSize: '12px', fontWeight: 700, color: course.englishRequirements?.moiAccepted ? '#00E5A0' : '#FF6F8E' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: `1px solid ${mt.divider}` }}>
+                <span style={{ fontSize: '12px', color: mt.textMuted }}>IELTS No Band Less Than</span>
+                <span style={{ fontSize: '12px', fontWeight: 700, color: mt.textPrimary }}>{course.englishRequirements?.ieltsNoBandLess || '5.5'}</span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: `1px solid ${mt.divider}` }}>
+                <span style={{ fontSize: '12px', color: mt.textMuted }}>DET (Duolingo Score)</span>
+                <span style={{ fontSize: '12px', fontWeight: 700, color: mt.textPrimary }}>{course.englishRequirements?.detScore || '105'}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: `1px solid ${mt.divider}` }}>
+                <span style={{ fontSize: '12px', color: mt.textMuted }}>MOI Accepted</span>
+                <span style={{ fontSize: '12px', fontWeight: 700, color: course.englishRequirements?.moiAccepted ? (mt.isLight ? '#047857' : '#00E5A0') : (mt.isLight ? '#DC2626' : '#FF6F8E') }}>
                   {course.englishRequirements?.moiAccepted ? 'Yes (Terms Apply)' : 'No'}
                 </span>
               </div>
@@ -2832,32 +2957,32 @@ function ProgramDetailsModal({ course, onClose, onApplyStudent, onRemoveCourse }
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
             <div
               style={{
-                background: 'rgba(255, 255, 255, 0.03)',
-                border: '1px solid rgba(148, 163, 225, 0.12)',
+                background: mt.sectionBg,
+                border: mt.sectionBorder,
                 borderRadius: '10px',
                 padding: '16px 20px',
               }}
             >
-              <div style={{ fontSize: '11px', fontWeight: 800, color: '#38BDF8', letterSpacing: '0.04em', marginBottom: '8px' }}>
+              <div style={{ fontSize: '11px', fontWeight: 800, color: mt.isLight ? '#0284C7' : '#38BDF8', letterSpacing: '0.04em', marginBottom: '8px' }}>
                 STANDARDIZED TEST REQUIREMENTS
               </div>
-              <div style={{ fontSize: '12.5px', color: '#EDEFFA', lineHeight: 1.5 }}>
+              <div style={{ fontSize: '12.5px', color: mt.textSecondary, lineHeight: 1.5 }}>
                 {course.standardizedTests || 'No Standardized Test Required (SAT/ACT/GRE/GMAT Waived).'}
               </div>
             </div>
 
             <div
               style={{
-                background: 'rgba(255, 255, 255, 0.03)',
-                border: '1px solid rgba(148, 163, 225, 0.12)',
+                background: mt.sectionBg,
+                border: mt.sectionBorder,
                 borderRadius: '10px',
                 padding: '16px 20px',
               }}
             >
-              <div style={{ fontSize: '11px', fontWeight: 800, color: '#38BDF8', letterSpacing: '0.04em', marginBottom: '8px' }}>
+              <div style={{ fontSize: '11px', fontWeight: 800, color: mt.isLight ? '#0284C7' : '#38BDF8', letterSpacing: '0.04em', marginBottom: '8px' }}>
                 ENTRY REQUIREMENTS
               </div>
-              <div style={{ fontSize: '12.5px', color: '#EDEFFA', lineHeight: 1.5 }}>
+              <div style={{ fontSize: '12.5px', color: mt.textSecondary, lineHeight: 1.5 }}>
                 {course.entryRequirements || 'Recognised secondary or undergraduate diploma with minimum 50%.'}
               </div>
             </div>
@@ -2866,16 +2991,16 @@ function ProgramDetailsModal({ course, onClose, onApplyStudent, onRemoveCourse }
           {/* Section 4: Remarks */}
           <div
             style={{
-              background: 'rgba(56, 189, 248, 0.05)',
-              border: '1px solid rgba(56, 189, 248, 0.2)',
+              background: mt.isLight ? 'rgba(2, 132, 199, 0.06)' : 'rgba(56, 189, 248, 0.05)',
+              border: mt.isLight ? '1px solid rgba(2, 132, 199, 0.2)' : '1px solid rgba(56, 189, 248, 0.2)',
               borderRadius: '10px',
               padding: '14px 18px',
             }}
           >
-            <div style={{ fontSize: '11px', fontWeight: 800, color: '#38BDF8', letterSpacing: '0.04em', marginBottom: '6px' }}>
+            <div style={{ fontSize: '11px', fontWeight: 800, color: mt.isLight ? '#0284C7' : '#38BDF8', letterSpacing: '0.04em', marginBottom: '6px' }}>
               REMARKS & COUNSELOR ADVISORY
             </div>
-            <div style={{ fontSize: '12px', color: '#EDEFFA', lineHeight: 1.6 }}>
+            <div style={{ fontSize: '12px', color: mt.textSecondary, lineHeight: 1.6 }}>
               {course.remarks || 'Tuition fees are subject to change semester-wise. Students must fulfill university admission interview requirements.'}
             </div>
           </div>
@@ -2885,11 +3010,11 @@ function ProgramDetailsModal({ course, onClose, onApplyStudent, onRemoveCourse }
         <div
           style={{
             padding: '16px 28px',
-            borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+            borderTop: `1px solid ${mt.divider}`,
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            background: 'rgba(8, 10, 18, 0.6)',
+            background: mt.headerBg,
           }}
         >
           {course.websiteUrl ? (
@@ -2898,8 +3023,8 @@ function ProgramDetailsModal({ course, onClose, onApplyStudent, onRemoveCourse }
               target="_blank"
               rel="noreferrer"
               style={{
-                background: 'rgba(255, 255, 255, 0.08)',
-                color: '#fff',
+                background: mt.isLight ? '#F1F5F9' : 'rgba(255, 255, 255, 0.08)',
+                color: mt.textPrimary,
                 padding: '8px 16px',
                 borderRadius: '8px',
                 fontSize: '12px',
@@ -3363,6 +3488,7 @@ function detectCountryFromData(fileName = '', sheetName = '', grid = [], headers
 // SUB-COMPONENT: SMART EXCEL/CSV UPLOADER WITH COLUMN MAPPER & LIVE PREVIEW
 // ============================================================================
 function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
+  const mt = useModalTheme();
   const [file, setFile] = useState(null);
   const [workbook, setWorkbook] = useState(null);
   const [availableSheets, setAvailableSheets] = useState([]);
@@ -3885,7 +4011,7 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
       style={{
         position: 'fixed',
         inset: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.85)',
+        backgroundColor: mt.backdropBg,
         backdropFilter: 'blur(10px)',
         zIndex: 1100,
         display: 'flex',
@@ -3900,10 +4026,10 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
           width: '100%',
           maxWidth: '940px',
           maxHeight: '92vh',
-          backgroundColor: '#0F1423',
-          border: '1px solid rgba(0, 229, 160, 0.35)',
+          backgroundColor: mt.modalBg,
+          border: mt.modalBorder,
           borderRadius: '16px',
-          boxShadow: '0 24px 70px rgba(0, 0, 0, 0.85)',
+          boxShadow: mt.shadow,
           overflowY: 'auto',
           display: 'flex',
           flexDirection: 'column',
@@ -3914,33 +4040,36 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
         <div
           style={{
             padding: '20px 24px',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+            borderBottom: `1px solid ${mt.divider}`,
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            background: 'rgba(8, 10, 18, 0.5)',
+            background: mt.headerBg,
           }}
         >
           <div>
-            <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#00E5A0', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: 800, color: mt.isLight ? '#047857' : '#00E5A0', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span>📥</span>
               <span>Upload Custom Course Spreadsheet</span>
             </h3>
-            <p style={{ fontSize: '12px', color: '#8E9BB5', margin: '4px 0 0' }}>
+            <p style={{ fontSize: '12px', color: mt.textMuted, margin: '4px 0 0' }}>
               Smart multi-sheet parser with <strong>AI Country Detection</strong> and live preview before ingestion.
             </p>
           </div>
           <button
             onClick={onClose}
             style={{
-              background: 'rgba(255, 255, 255, 0.08)',
+              background: mt.isLight ? '#F1F5F9' : 'rgba(255, 255, 255, 0.08)',
               border: 'none',
-              color: '#8E9BB5',
+              color: mt.textMuted,
               width: '32px',
               height: '32px',
               borderRadius: '50%',
               fontSize: '16px',
               cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
           >
             ✕
@@ -3952,21 +4081,21 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
           {step === 'file' ? (
             <div
               style={{
-                border: '2px dashed rgba(0, 229, 160, 0.35)',
+                border: mt.isLight ? '2px dashed #059669' : '2px dashed rgba(0, 229, 160, 0.35)',
                 borderRadius: '12px',
                 padding: '45px 20px',
                 textAlign: 'center',
-                background: 'rgba(0, 229, 160, 0.03)',
+                background: mt.isLight ? '#F0FDF4' : 'rgba(0, 229, 160, 0.03)',
                 cursor: 'pointer',
                 transition: 'all 0.2s ease',
               }}
               onClick={() => document.getElementById('cf-excel-upload-input')?.click()}
             >
               <div style={{ fontSize: '46px', marginBottom: '12px' }}>📊</div>
-              <div style={{ fontSize: '16px', fontWeight: 700, color: '#fff', marginBottom: '6px' }}>
+              <div style={{ fontSize: '16px', fontWeight: 700, color: mt.textPrimary, marginBottom: '6px' }}>
                 Click to Select or Drag Excel (.xlsx, .xls) / CSV File Here
               </div>
-              <div style={{ fontSize: '12px', color: '#8E9BB5', maxWidth: '480px', margin: '0 auto' }}>
+              <div style={{ fontSize: '12px', color: mt.textMuted, maxWidth: '480px', margin: '0 auto' }}>
                 Works with any country format. AI automatically detects the destination country or lets you pick/override it with 1 click.
               </div>
               <input
@@ -3985,26 +4114,26 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
-                  background: 'rgba(255,255,255,0.04)',
+                  background: mt.sectionBg,
                   padding: '12px 16px',
                   borderRadius: '10px',
-                  border: '1px solid rgba(255, 255, 255, 0.06)',
+                  border: mt.sectionBorder,
                 }}
               >
                 <div>
-                  <span style={{ fontSize: '14px', color: '#EDEFFA', fontWeight: 700 }}>
+                  <span style={{ fontSize: '14px', color: mt.textPrimary, fontWeight: 700 }}>
                     📄 {file?.name}
                   </span>
-                  <span style={{ fontSize: '12px', color: '#00E5A0', marginLeft: '10px', fontWeight: 600 }}>
+                  <span style={{ fontSize: '12px', color: mt.isLight ? '#047857' : '#00E5A0', marginLeft: '10px', fontWeight: 600 }}>
                     ({dataRows.length} course rows detected)
                   </span>
                 </div>
                 <button
                   onClick={() => setStep('file')}
                   style={{
-                    background: 'rgba(56, 189, 248, 0.15)',
-                    border: '1px solid rgba(56, 189, 248, 0.3)',
-                    color: '#38BDF8',
+                    background: mt.isLight ? 'rgba(2, 132, 199, 0.12)' : 'rgba(56, 189, 248, 0.15)',
+                    border: mt.isLight ? '1px solid rgba(2, 132, 199, 0.3)' : '1px solid rgba(56, 189, 248, 0.3)',
+                    color: mt.isLight ? '#0284C7' : '#38BDF8',
                     fontSize: '12px',
                     fontWeight: 600,
                     padding: '4px 12px',
@@ -4021,8 +4150,8 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
                  ========================================================================= */}
               <div
                 style={{
-                  background: 'linear-gradient(135deg, rgba(0, 229, 160, 0.08) 0%, rgba(56, 189, 248, 0.08) 100%)',
-                  border: '1px solid rgba(0, 229, 160, 0.35)',
+                  background: mt.isLight ? '#F0FDF4' : 'linear-gradient(135deg, rgba(0, 229, 160, 0.08) 0%, rgba(56, 189, 248, 0.08) 100%)',
+                  border: mt.isLight ? '1px solid #A7F3D0' : '1px solid rgba(0, 229, 160, 0.35)',
                   borderRadius: '12px',
                   padding: '16px',
                   display: 'flex',
@@ -4033,7 +4162,7 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{ fontSize: '18px' }}>🌍</span>
-                    <span style={{ fontSize: '13px', fontWeight: 800, color: '#00E5A0', letterSpacing: '0.03em' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 800, color: mt.isLight ? '#047857' : '#00E5A0', letterSpacing: '0.03em' }}>
                       STUDY ABROAD DESTINATION COUNTRY
                     </span>
                   </div>
@@ -4041,12 +4170,12 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
                     <span
                       style={{
                         fontSize: '11px',
-                        background: 'rgba(0, 229, 160, 0.18)',
-                        color: '#00E5A0',
+                        background: mt.isLight ? 'rgba(16, 185, 129, 0.15)' : 'rgba(0, 229, 160, 0.18)',
+                        color: mt.isLight ? '#047857' : '#00E5A0',
                         padding: '3px 8px',
                         borderRadius: '6px',
                         fontWeight: 700,
-                        border: '1px solid rgba(0, 229, 160, 0.3)',
+                        border: mt.isLight ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(0, 229, 160, 0.3)',
                       }}
                     >
                       ✨ AI Detected: {autoCountryInfo.flag} {autoCountryInfo.country} ({autoCountryInfo.reason})
@@ -4057,7 +4186,7 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
                 <div style={{ display: 'grid', gridTemplateColumns: selectedCountry === 'CUSTOM' ? '1.5fr 1.5fr' : '1fr', gap: '12px' }}>
                   {/* Country Selector Dropdown */}
                   <div>
-                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#EDEFFA', marginBottom: '6px' }}>
+                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: mt.textPrimary, marginBottom: '6px' }}>
                       Select Target Country for this Spreadsheet
                     </label>
                     <select
@@ -4065,29 +4194,29 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
                       onChange={(e) => setSelectedCountry(e.target.value)}
                       style={{
                         width: '100%',
-                        background: 'rgba(8, 10, 18, 0.95)',
-                        border: '1px solid #00E5A0',
+                        background: mt.inputBg,
+                        border: mt.isLight ? '1px solid #10B981' : '1px solid #00E5A0',
                         borderRadius: '8px',
                         padding: '9px 12px',
-                        color: '#00E5A0',
+                        color: mt.isLight ? '#047857' : '#00E5A0',
                         fontSize: '13px',
                         fontWeight: 700,
                         outline: 'none',
                       }}
                     >
                       {STUDY_ABROAD_COUNTRIES.map((c) => (
-                        <option key={c.name} value={c.name}>
+                        <option key={c.name} value={c.name} style={{ background: mt.isLight ? '#FFFFFF' : '#0B0E14', color: mt.textPrimary }}>
                           {c.flag} {c.name}
                         </option>
                       ))}
-                      <option value="CUSTOM">➕ Other / Type Custom Country...</option>
+                      <option value="CUSTOM" style={{ background: mt.isLight ? '#FFFFFF' : '#0B0E14', color: mt.textPrimary }}>➕ Other / Type Custom Country...</option>
                     </select>
                   </div>
 
                   {/* Custom Country Text Input */}
                   {selectedCountry === 'CUSTOM' && (
                     <div>
-                      <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#38BDF8', marginBottom: '6px' }}>
+                      <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: mt.isLight ? '#0284C7' : '#38BDF8', marginBottom: '6px' }}>
                         Type Custom Country Name
                       </label>
                       <input
@@ -4097,11 +4226,11 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
                         placeholder="e.g. Switzerland, Mauritius, Japan..."
                         style={{
                           width: '100%',
-                          background: 'rgba(8, 10, 18, 0.95)',
-                          border: '1px solid #38BDF8',
+                          background: mt.inputBg,
+                          border: `1px solid ${mt.inputBorder}`,
                           borderRadius: '8px',
                           padding: '9px 12px',
-                          color: '#fff',
+                          color: mt.textPrimary,
                           fontSize: '13px',
                           outline: 'none',
                         }}
@@ -4117,9 +4246,10 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
                     alignItems: 'flex-start',
                     gap: '8px',
                     fontSize: '12px',
-                    color: '#EDEFFA',
+                    color: mt.textPrimary,
                     cursor: 'pointer',
-                    background: 'rgba(0, 0, 0, 0.3)',
+                    background: mt.isLight ? '#FFFFFF' : 'rgba(0, 0, 0, 0.3)',
+                    border: mt.isLight ? '1px solid #E2E8F0' : 'none',
                     padding: '8px 12px',
                     borderRadius: '8px',
                   }}
@@ -4132,7 +4262,7 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
                   />
                   <span>
                     <strong>Apply {effectiveCountryFlag} {effectiveCountry} to ALL courses in this file</strong>{' '}
-                    <span style={{ color: '#8E9BB5' }}>
+                    <span style={{ color: mt.textMuted }}>
                       (Recommended: ensures 100% accurate country filtering in Course Finder even if the spreadsheet has no Country column).
                     </span>
                   </span>
@@ -4142,8 +4272,8 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
               {/* Program Level Intelligence & Override */}
               <div
                 style={{
-                  background: 'rgba(168, 85, 247, 0.08)',
-                  border: '1px solid rgba(168, 85, 247, 0.35)',
+                  background: mt.isLight ? '#FAF5FF' : 'rgba(168, 85, 247, 0.08)',
+                  border: mt.isLight ? '1px solid #E9D5FF' : '1px solid rgba(168, 85, 247, 0.35)',
                   borderRadius: '12px',
                   padding: '14px 16px',
                   display: 'flex',
@@ -4155,10 +4285,10 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{ fontSize: '18px' }}>🎓</span>
                     <div>
-                      <span style={{ fontSize: '12px', fontWeight: 800, color: '#C084FC', letterSpacing: '0.04em' }}>
+                      <span style={{ fontSize: '12px', fontWeight: 800, color: mt.isLight ? '#7E22CE' : '#C084FC', letterSpacing: '0.04em' }}>
                         PROGRAM LEVEL & QUALIFICATION CLASSIFIER
                       </span>
-                      <p style={{ fontSize: '11px', color: '#8E9BB5', margin: 0 }}>
+                      <p style={{ fontSize: '11px', color: mt.textMuted, margin: 0 }}>
                         Differentiates Bachelors, Masters, Diploma, PG Diploma, and PG Certificate automatically or with single-click override.
                       </p>
                     </div>
@@ -4166,9 +4296,9 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
                   {levelOverrideMode === 'AUTO' ? (
                     <span
                       style={{
-                        background: 'rgba(0, 229, 160, 0.15)',
-                        border: '1px solid #00E5A0',
-                        color: '#00E5A0',
+                        background: mt.isLight ? 'rgba(16, 185, 129, 0.15)' : 'rgba(0, 229, 160, 0.15)',
+                        border: mt.isLight ? '1px solid #10B981' : '1px solid #00E5A0',
+                        color: mt.isLight ? '#047857' : '#00E5A0',
                         fontSize: '11px',
                         fontWeight: 700,
                         padding: '3px 10px',
@@ -4200,38 +4330,38 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
                     onChange={(e) => setLevelOverrideMode(e.target.value)}
                     style={{
                       width: '100%',
-                      background: 'rgba(8, 10, 18, 0.95)',
-                      border: '1px solid rgba(168, 85, 247, 0.5)',
+                      background: mt.inputBg,
+                      border: mt.isLight ? '1px solid #C084FC' : '1px solid rgba(168, 85, 247, 0.5)',
                       borderRadius: '8px',
                       padding: '9px 12px',
-                      color: levelOverrideMode === 'AUTO' ? '#00E5A0' : getLevelBadgeInfo(levelOverrideMode).color,
+                      color: levelOverrideMode === 'AUTO' ? (mt.isLight ? '#047857' : '#00E5A0') : getLevelBadgeInfo(levelOverrideMode).color,
                       fontSize: '13px',
                       fontWeight: 700,
                       outline: 'none',
                     }}
                   >
-                    <option value="AUTO" style={{ background: '#0B0E14', color: '#00E5A0' }}>
+                    <option value="AUTO" style={{ background: mt.isLight ? '#FFFFFF' : '#0B0E14', color: mt.isLight ? '#047857' : '#00E5A0' }}>
                       ✨ AI Auto-Detect Level (Bachelors, Masters, UG Diploma, PG Diploma, UG Certificate, PG Certificate, Bridging Course)
                     </option>
-                    <option value="Bachelors" style={{ background: '#0B0E14', color: '#38BDF8' }}>
+                    <option value="Bachelors" style={{ background: mt.isLight ? '#FFFFFF' : '#0B0E14', color: mt.isLight ? '#0284C7' : '#38BDF8' }}>
                       🎓 Force All: Bachelors
                     </option>
-                    <option value="Masters" style={{ background: '#0B0E14', color: '#A855F7' }}>
+                    <option value="Masters" style={{ background: mt.isLight ? '#FFFFFF' : '#0B0E14', color: mt.isLight ? '#7E22CE' : '#A855F7' }}>
                       🎓 Force All: Masters
                     </option>
-                    <option value="UG Diploma" style={{ background: '#0B0E14', color: '#00F296' }}>
+                    <option value="UG Diploma" style={{ background: mt.isLight ? '#FFFFFF' : '#0B0E14', color: mt.isLight ? '#047857' : '#00F296' }}>
                       📜 Force All: UG Diploma
                     </option>
-                    <option value="PG Diploma" style={{ background: '#0B0E14', color: '#FFB020' }}>
+                    <option value="PG Diploma" style={{ background: mt.isLight ? '#FFFFFF' : '#0B0E14', color: mt.isLight ? '#B45309' : '#FFB020' }}>
                       📜 Force All: PG Diploma
                     </option>
-                    <option value="UG Certificate" style={{ background: '#0B0E14', color: '#10B981' }}>
+                    <option value="UG Certificate" style={{ background: mt.isLight ? '#FFFFFF' : '#0B0E14', color: '#10B981' }}>
                       📜 Force All: UG Certificate
                     </option>
-                    <option value="PG Certificate" style={{ background: '#0B0E14', color: '#FB923C' }}>
+                    <option value="PG Certificate" style={{ background: mt.isLight ? '#FFFFFF' : '#0B0E14', color: '#FB923C' }}>
                       📜 Force All: PG Certificate
                     </option>
-                    <option value="Bridging Course" style={{ background: '#0B0E14', color: '#818CF8' }}>
+                    <option value="Bridging Course" style={{ background: mt.isLight ? '#FFFFFF' : '#0B0E14', color: '#818CF8' }}>
                       🌉 Force All: Bridging Course (Preparatory / Foundation)
                     </option>
                   </select>
@@ -4242,7 +4372,7 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
               <div style={{ display: 'grid', gridTemplateColumns: availableSheets.length > 1 ? '1fr 2fr' : '1fr', gap: '12px' }}>
                 {availableSheets.length > 1 && (
                   <div>
-                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#8E9BB5', marginBottom: '6px' }}>
+                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: mt.textMuted, marginBottom: '6px' }}>
                       Workbook Sheet
                     </label>
                     <select
@@ -4250,17 +4380,17 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
                       onChange={(e) => handleSheetSwitch(e.target.value)}
                       style={{
                         width: '100%',
-                        background: 'rgba(8, 10, 18, 0.9)',
-                        border: '1px solid rgba(148, 163, 225, 0.22)',
+                        background: mt.inputBg,
+                        border: `1px solid ${mt.inputBorder}`,
                         borderRadius: '8px',
                         padding: '8px 12px',
-                        color: '#fff',
+                        color: mt.textPrimary,
                         fontSize: '12px',
                         outline: 'none',
                       }}
                     >
                       {availableSheets.map((s) => (
-                        <option key={s} value={s}>
+                        <option key={s} value={s} style={{ background: mt.isLight ? '#FFFFFF' : '#0B0E14', color: mt.textPrimary }}>
                           📑 {s}
                         </option>
                       ))}
@@ -4270,10 +4400,10 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
 
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                    <label style={{ fontSize: '11px', fontWeight: 700, color: '#8E9BB5' }}>
+                    <label style={{ fontSize: '11px', fontWeight: 700, color: mt.textMuted }}>
                       Header Row in Spreadsheet
                     </label>
-                    <span style={{ fontSize: '10px', color: '#00E5A0', fontWeight: 700 }}>
+                    <span style={{ fontSize: '10px', color: mt.isLight ? '#047857' : '#00E5A0', fontWeight: 700 }}>
                       ✨ Auto-detected: Row {headerRowIndex + 1}
                     </span>
                   </div>
@@ -4282,18 +4412,18 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
                     onChange={(e) => handleHeaderRowChange(parseInt(e.target.value))}
                     style={{
                       width: '100%',
-                      background: 'rgba(8, 10, 18, 0.9)',
-                      border: '1px solid rgba(0, 229, 160, 0.4)',
+                      background: mt.inputBg,
+                      border: mt.isLight ? '1px solid #10B981' : '1px solid rgba(0, 229, 160, 0.4)',
                       borderRadius: '8px',
                       padding: '8px 12px',
-                      color: '#00E5A0',
+                      color: mt.isLight ? '#047857' : '#00E5A0',
                       fontSize: '12px',
                       fontWeight: 600,
                       outline: 'none',
                     }}
                   >
                     {candidateHeaderRows.map((c) => (
-                      <option key={c.index} value={c.index}>
+                      <option key={c.index} value={c.index} style={{ background: mt.isLight ? '#FFFFFF' : '#0B0E14', color: mt.textPrimary }}>
                         {c.label}
                       </option>
                     ))}
@@ -4303,7 +4433,7 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
 
               {/* Default University Name Input */}
               <div>
-                <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#8E9BB5', marginBottom: '6px' }}>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: mt.textMuted, marginBottom: '6px' }}>
                   Default University / Institution Name (Used if no university column in file)
                 </label>
                 <input
@@ -4313,11 +4443,11 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
                   placeholder="e.g. Global College Malta / GBS Malta / BSBI Berlin"
                   style={{
                     width: '100%',
-                    background: 'rgba(8, 10, 18, 0.9)',
-                    border: '1px solid rgba(148, 163, 225, 0.22)',
+                    background: mt.inputBg,
+                    border: `1px solid ${mt.inputBorder}`,
                     borderRadius: '8px',
                     padding: '8px 12px',
-                    color: '#fff',
+                    color: mt.textPrimary,
                     fontSize: '13px',
                     outline: 'none',
                   }}
@@ -4326,7 +4456,7 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
 
               {/* Column Mapping Section */}
               <div>
-                <div style={{ fontSize: '12px', fontWeight: 800, color: '#00E5A0', letterSpacing: '0.04em', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <div style={{ fontSize: '12px', fontWeight: 800, color: mt.isLight ? '#047857' : '#00E5A0', letterSpacing: '0.04em', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span>🎯</span>
                   <span>MATCH SPREADSHEET COLUMNS TO COURSE FIELDS</span>
                 </div>
@@ -4347,27 +4477,27 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
                     { key: 'websiteUrl', label: 'Official Website / Course URL' },
                   ].map((field) => (
                     <div key={field.key} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <span style={{ fontSize: '11px', color: field.required ? '#00E5A0' : '#8E9BB5', fontWeight: 700 }}>
+                      <span style={{ fontSize: '11px', color: field.required ? (mt.isLight ? '#047857' : '#00E5A0') : mt.textMuted, fontWeight: 700 }}>
                         {field.label}
                       </span>
                       <select
                         value={columnMapping[field.key] || ''}
                         onChange={(e) => setColumnMapping({ ...columnMapping, [field.key]: e.target.value })}
                         style={{
-                          background: columnMapping[field.key] ? 'rgba(0, 229, 160, 0.08)' : 'rgba(8, 10, 18, 0.9)',
-                          border: columnMapping[field.key] ? '1px solid #00E5A0' : '1px solid rgba(148, 163, 225, 0.2)',
-                          color: columnMapping[field.key] ? '#00E5A0' : '#8E9BB5',
+                          background: columnMapping[field.key] ? (mt.isLight ? '#F0FDF4' : 'rgba(0, 229, 160, 0.08)') : mt.inputBg,
+                          border: columnMapping[field.key] ? (mt.isLight ? '1px solid #10B981' : '1px solid #00E5A0') : `1px solid ${mt.inputBorder}`,
+                          color: columnMapping[field.key] ? (mt.isLight ? '#047857' : '#00E5A0') : mt.textMuted,
                           borderRadius: '8px',
                           padding: '7px 10px',
                           fontSize: '12px',
                           outline: 'none',
                         }}
                       >
-                        <option value="">-- Not in file / Auto fallback --</option>
+                        <option value="" style={{ background: mt.isLight ? '#FFFFFF' : '#0B0E14', color: mt.textPrimary }}>-- Not in file / Auto fallback --</option>
                         {detectedHeaders.map((h) => {
                           const sampleVal = String(dataRows[0]?.[h] || '').slice(0, 25);
                           return (
-                            <option key={h} value={h}>
+                            <option key={h} value={h} style={{ background: mt.isLight ? '#FFFFFF' : '#0B0E14', color: mt.textPrimary }}>
                               {h} {sampleVal ? `(e.g. "${sampleVal}")` : ''}
                             </option>
                           );
@@ -4381,27 +4511,27 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
               {/* LIVE DATA PREVIEW TABLE (Shows exact country, flag, university, course names before import) */}
               <div
                 style={{
-                  background: 'rgba(8, 10, 18, 0.75)',
-                  border: '1px solid rgba(148, 163, 225, 0.18)',
+                  background: mt.sectionBg,
+                  border: mt.sectionBorder,
                   borderRadius: '12px',
                   padding: '14px',
                   marginTop: '4px',
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                  <div style={{ fontSize: '12px', fontWeight: 800, color: '#38BDF8', letterSpacing: '0.04em' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 800, color: mt.isLight ? '#0284C7' : '#38BDF8', letterSpacing: '0.04em' }}>
                     🔍 LIVE DATA PREVIEW (First {previewRows.length} Rows with Current Mapping)
                   </div>
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <span style={{ fontSize: '11px', color: '#00E5A0', fontWeight: 700 }}>
+                    <span style={{ fontSize: '11px', color: mt.isLight ? '#047857' : '#00E5A0', fontWeight: 700 }}>
                       Country: {effectiveCountryFlag} {effectiveCountry}
                     </span>
                     {previewRows[0]?.hasProg ? (
-                      <span style={{ fontSize: '11px', color: '#00E5A0', fontWeight: 700 }}>
+                      <span style={{ fontSize: '11px', color: mt.isLight ? '#047857' : '#00E5A0', fontWeight: 700 }}>
                         ✓ Course Names Validated
                       </span>
                     ) : (
-                      <span style={{ fontSize: '11px', color: '#FFB020', fontWeight: 700 }}>
+                      <span style={{ fontSize: '11px', color: mt.isLight ? '#B45309' : '#FFB020', fontWeight: 700 }}>
                         ⚠️ Pick "Program Title"
                       </span>
                     )}
@@ -4411,9 +4541,9 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
                 {!previewRows[0]?.hasProg && (
                   <div
                     style={{
-                      background: 'rgba(255, 176, 32, 0.12)',
-                      border: '1px solid rgba(255, 176, 32, 0.35)',
-                      color: '#FFB020',
+                      background: mt.isLight ? '#FFFBEB' : 'rgba(255, 176, 32, 0.12)',
+                      border: mt.isLight ? '1px solid #FCD34D' : '1px solid rgba(255, 176, 32, 0.35)',
+                      color: mt.isLight ? '#B45309' : '#FFB020',
                       padding: '8px 12px',
                       borderRadius: '8px',
                       fontSize: '12px',
@@ -4427,11 +4557,11 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
                 <div style={{ overflowX: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
                     <thead>
-                      <tr style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.1)', color: '#8E9BB5', textAlign: 'left' }}>
+                      <tr style={{ borderBottom: `1px solid ${mt.divider}`, color: mt.textMuted, textAlign: 'left' }}>
                         <th style={{ padding: '6px 8px', width: '30px' }}>#</th>
-                        <th style={{ padding: '6px 8px', color: '#00E5A0' }}>Country</th>
-                        <th style={{ padding: '6px 8px', color: '#EDEFFA' }}>University</th>
-                        <th style={{ padding: '6px 8px', color: '#38BDF8' }}>Course / Program Name</th>
+                        <th style={{ padding: '6px 8px', color: mt.isLight ? '#047857' : '#00E5A0' }}>Country</th>
+                        <th style={{ padding: '6px 8px', color: mt.textPrimary }}>University</th>
+                        <th style={{ padding: '6px 8px', color: mt.isLight ? '#0284C7' : '#38BDF8' }}>Course / Program Name</th>
                         <th style={{ padding: '6px 8px' }}>Level</th>
                         <th style={{ padding: '6px 8px' }}>Tuition/Yr</th>
                         <th style={{ padding: '6px 8px' }}>Duration</th>
@@ -4440,13 +4570,13 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
                     </thead>
                     <tbody>
                       {previewRows.map((r) => (
-                        <tr key={r.idx} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
-                          <td style={{ padding: '6px 8px', color: '#8E9BB5' }}>{r.idx}</td>
-                          <td style={{ padding: '6px 8px', color: '#00E5A0', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                        <tr key={r.idx} style={{ borderBottom: `1px solid ${mt.divider}` }}>
+                          <td style={{ padding: '6px 8px', color: mt.textMuted }}>{r.idx}</td>
+                          <td style={{ padding: '6px 8px', color: mt.isLight ? '#047857' : '#00E5A0', fontWeight: 700, whiteSpace: 'nowrap' }}>
                             {r.flag} {r.ctry}
                           </td>
-                          <td style={{ padding: '6px 8px', color: '#EDEFFA', fontWeight: 600 }}>{r.uni}</td>
-                          <td style={{ padding: '6px 8px', color: r.hasProg ? '#38BDF8' : '#FFB020', fontWeight: 700 }}>
+                          <td style={{ padding: '6px 8px', color: mt.textPrimary, fontWeight: 600 }}>{r.uni}</td>
+                          <td style={{ padding: '6px 8px', color: r.hasProg ? (mt.isLight ? '#0284C7' : '#38BDF8') : (mt.isLight ? '#B45309' : '#FFB020'), fontWeight: 700 }}>
                             {r.prog}
                           </td>
                           <td style={{ padding: '6px 8px' }}>
@@ -4457,7 +4587,7 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
                                   style={{
                                     background: badge.bg,
                                     border: `1px solid ${badge.border}`,
-                                    color: badge.color,
+                                    color: mt.isLight && badge.color === '#00F296' ? '#047857' : badge.color,
                                     fontSize: '11px',
                                     fontWeight: 700,
                                     padding: '2px 8px',
@@ -4474,9 +4604,9 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
                               );
                             })()}
                           </td>
-                          <td style={{ padding: '6px 8px', color: '#00E5A0' }}>{r.tFee}</td>
-                          <td style={{ padding: '6px 8px', color: '#8E9BB5' }}>{r.dur}</td>
-                          <td style={{ padding: '6px 8px', color: '#8E9BB5' }}>{r.itk}</td>
+                          <td style={{ padding: '6px 8px', color: mt.isLight ? '#047857' : '#00E5A0', fontWeight: 700 }}>{r.tFee}</td>
+                          <td style={{ padding: '6px 8px', color: mt.textMuted }}>{r.dur}</td>
+                          <td style={{ padding: '6px 8px', color: mt.textMuted }}>{r.itk}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -4490,13 +4620,14 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '20px',
-                  background: 'rgba(255, 255, 255, 0.03)',
+                  background: mt.sectionBg,
+                  border: mt.sectionBorder,
                   padding: '10px 14px',
                   borderRadius: '8px',
                 }}
               >
-                <span style={{ fontSize: '11px', color: '#8E9BB5', fontWeight: 700 }}>Import Action:</span>
-                <label style={{ fontSize: '12px', color: '#EDEFFA', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                <span style={{ fontSize: '11px', color: mt.textMuted, fontWeight: 700 }}>Import Action:</span>
+                <label style={{ fontSize: '12px', color: mt.textPrimary, display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
                   <input
                     type="radio"
                     name="importMode"
@@ -4506,7 +4637,7 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
                   />
                   <span>Merge with existing course catalog</span>
                 </label>
-                <label style={{ fontSize: '12px', color: '#EDEFFA', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                <label style={{ fontSize: '12px', color: mt.textPrimary, display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
                   <input
                     type="radio"
                     name="importMode"
@@ -4514,7 +4645,7 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
                     checked={importMode === 'replace'}
                     onChange={() => setImportMode('replace')}
                   />
-                  <span style={{ color: '#FFB020' }}>Replace entire catalog with this spreadsheet</span>
+                  <span style={{ color: mt.isLight ? '#B45309' : '#FFB020', fontWeight: 600 }}>Replace entire catalog with this spreadsheet</span>
                 </label>
               </div>
             </div>
@@ -4525,19 +4656,19 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
         <div
           style={{
             padding: '16px 24px',
-            borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+            borderTop: `1px solid ${mt.divider}`,
             display: 'flex',
             justifyContent: 'flex-end',
             gap: '12px',
-            background: 'rgba(8, 10, 18, 0.6)',
+            background: mt.headerBg,
           }}
         >
           <button
             onClick={onClose}
             style={{
-              background: 'rgba(255, 255, 255, 0.08)',
-              border: 'none',
-              color: '#EDEFFA',
+              background: mt.isLight ? '#F1F5F9' : 'rgba(255, 255, 255, 0.08)',
+              border: mt.isLight ? '1px solid #CBD5E1' : 'none',
+              color: mt.textPrimary,
               padding: '8px 18px',
               borderRadius: '8px',
               fontSize: '12px',
@@ -4580,6 +4711,7 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
 // SUB-COMPONENT: COUNTRY RESEARCH PORTALS HUB MODAL (User Requirement)
 // ============================================================================
 function CountryPortalsModal({ isOpen, onClose, portals, onOpenAddPortal }) {
+  const mt = useModalTheme();
   const [filterCountry, setFilterCountry] = useState('All');
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -4601,7 +4733,7 @@ function CountryPortalsModal({ isOpen, onClose, portals, onOpenAddPortal }) {
       style={{
         position: 'fixed',
         inset: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        backgroundColor: mt.backdropBg,
         backdropFilter: 'blur(8px)',
         zIndex: 1100,
         display: 'flex',
@@ -4616,10 +4748,10 @@ function CountryPortalsModal({ isOpen, onClose, portals, onOpenAddPortal }) {
           width: '100%',
           maxWidth: '920px',
           maxHeight: '90vh',
-          backgroundColor: '#0F1423',
-          border: '1px solid rgba(124, 111, 255, 0.3)',
+          backgroundColor: mt.modalBg,
+          border: mt.modalBorder,
           borderRadius: '16px',
-          boxShadow: '0 24px 60px rgba(0, 0, 0, 0.8)',
+          boxShadow: mt.shadow,
           overflowY: 'auto',
           display: 'flex',
           flexDirection: 'column',
@@ -4630,18 +4762,19 @@ function CountryPortalsModal({ isOpen, onClose, portals, onOpenAddPortal }) {
         <div
           style={{
             padding: '20px 24px',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+            borderBottom: `1px solid ${mt.divider}`,
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
+            background: mt.headerBg,
           }}
         >
           <div>
-            <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#A78BFA', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: 800, color: mt.isLight ? '#6D28D9' : '#A78BFA', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span>🌐</span>
               <span>Official Country Research Websites & Portals</span>
             </h3>
-            <p style={{ fontSize: '12px', color: '#8E9BB5', margin: '4px 0 0' }}>
+            <p style={{ fontSize: '12px', color: mt.textMuted, margin: '4px 0 0' }}>
               Connect directly with verified government portals, university databases, and visa guidance.
             </p>
           </div>
@@ -4665,9 +4798,9 @@ function CountryPortalsModal({ isOpen, onClose, portals, onOpenAddPortal }) {
             <button
               onClick={onClose}
               style={{
-                background: 'rgba(255, 255, 255, 0.08)',
+                background: mt.isLight ? '#F1F5F9' : 'rgba(255, 255, 255, 0.08)',
                 border: 'none',
-                color: '#8E9BB5',
+                color: mt.textMuted,
                 width: '32px',
                 height: '32px',
                 borderRadius: '50%',
@@ -4681,7 +4814,7 @@ function CountryPortalsModal({ isOpen, onClose, portals, onOpenAddPortal }) {
         </div>
 
         {/* Filter Toolbar */}
-        <div style={{ padding: '16px 24px', borderBottom: '1px solid rgba(255, 255, 255, 0.05)', display: 'flex', gap: '12px' }}>
+        <div style={{ padding: '16px 24px', borderBottom: `1px solid ${mt.divider}`, display: 'flex', gap: '12px' }}>
           <input
             type="text"
             placeholder="Search portal or country name..."
@@ -4689,11 +4822,11 @@ function CountryPortalsModal({ isOpen, onClose, portals, onOpenAddPortal }) {
             onChange={(e) => setSearchTerm(e.target.value)}
             style={{
               flex: 1,
-              background: 'rgba(8, 10, 18, 0.9)',
-              border: '1px solid rgba(148, 163, 225, 0.2)',
+              background: mt.inputBg,
+              border: `1px solid ${mt.inputBorder}`,
               borderRadius: '8px',
               padding: '8px 12px',
-              color: '#fff',
+              color: mt.textPrimary,
               fontSize: '12.5px',
               outline: 'none',
             }}
@@ -4703,19 +4836,19 @@ function CountryPortalsModal({ isOpen, onClose, portals, onOpenAddPortal }) {
             value={filterCountry}
             onChange={(e) => setFilterCountry(e.target.value)}
             style={{
-              background: 'rgba(8, 10, 18, 0.9)',
-              border: '1px solid rgba(148, 163, 225, 0.2)',
+              background: mt.inputBg,
+              border: `1px solid ${mt.inputBorder}`,
               borderRadius: '8px',
               padding: '8px 12px',
-              color: '#fff',
+              color: mt.textPrimary,
               fontSize: '12.5px',
               outline: 'none',
               cursor: 'pointer',
             }}
           >
-            <option value="All">All Countries</option>
+            <option value="All" style={{ background: mt.isLight ? '#FFFFFF' : '#0B0E14', color: mt.textPrimary }}>All Countries</option>
             {['Malta', 'Germany', 'United Kingdom', 'Ireland', 'United States of America', 'Australia', 'Canada', 'Lithuania'].map((c) => (
-              <option key={c} value={c}>{c}</option>
+              <option key={c} value={c} style={{ background: mt.isLight ? '#FFFFFF' : '#0B0E14', color: mt.textPrimary }}>{c}</option>
             ))}
           </select>
         </div>
@@ -4726,8 +4859,8 @@ function CountryPortalsModal({ isOpen, onClose, portals, onOpenAddPortal }) {
             <div
               key={item.id}
               style={{
-                background: 'rgba(255, 255, 255, 0.03)',
-                border: '1px solid rgba(148, 163, 225, 0.12)',
+                background: mt.sectionBg,
+                border: mt.sectionBorder,
                 borderRadius: '12px',
                 padding: '16px',
                 display: 'flex',
@@ -4740,16 +4873,16 @@ function CountryPortalsModal({ isOpen, onClose, portals, onOpenAddPortal }) {
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
                   <span style={{ fontSize: '16px' }}>{item.flag || '🌍'}</span>
-                  <span style={{ fontSize: '11px', fontWeight: 700, color: '#A78BFA' }}>{item.country}</span>
+                  <span style={{ fontSize: '11px', fontWeight: 700, color: mt.isLight ? '#6D28D9' : '#A78BFA' }}>{item.country}</span>
                 </div>
-                <h4 style={{ fontSize: '13.5px', fontWeight: 800, color: '#fff', margin: 0 }}>{item.title}</h4>
-                <p style={{ fontSize: '11.5px', color: '#8E9BB5', margin: '6px 0 0', lineHeight: 1.5 }}>
+                <h4 style={{ fontSize: '13.5px', fontWeight: 800, color: mt.textPrimary, margin: 0 }}>{item.title}</h4>
+                <p style={{ fontSize: '11.5px', color: mt.textMuted, margin: '6px 0 0', lineHeight: 1.5 }}>
                   {item.description}
                 </p>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '10px', color: '#64748B', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <span style={{ fontSize: '10px', color: mt.textMuted, maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {item.url}
                 </span>
                 <a
@@ -4757,9 +4890,9 @@ function CountryPortalsModal({ isOpen, onClose, portals, onOpenAddPortal }) {
                   target="_blank"
                   rel="noreferrer"
                   style={{
-                    background: 'rgba(56, 189, 248, 0.12)',
-                    border: '1px solid rgba(56, 189, 248, 0.3)',
-                    color: '#38BDF8',
+                    background: mt.isLight ? 'rgba(2, 132, 199, 0.12)' : 'rgba(56, 189, 248, 0.12)',
+                    border: mt.isLight ? '1px solid rgba(2, 132, 199, 0.3)' : '1px solid rgba(56, 189, 248, 0.3)',
+                    color: mt.isLight ? '#0284C7' : '#38BDF8',
                     padding: '5px 12px',
                     borderRadius: '6px',
                     fontSize: '11px',
@@ -4785,6 +4918,7 @@ function CountryPortalsModal({ isOpen, onClose, portals, onOpenAddPortal }) {
 // SUB-COMPONENT: ADD CUSTOM PORTAL MODAL
 // ============================================================================
 function AddCustomPortalModal({ isOpen, onClose, onAddPortal }) {
+  const mt = useModalTheme();
   const [country, setCountry] = useState('Malta');
   const [title, setTitle] = useState('');
   const [url, setUrl] = useState('');
@@ -4814,7 +4948,7 @@ function AddCustomPortalModal({ isOpen, onClose, onAddPortal }) {
       style={{
         position: 'fixed',
         inset: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.85)',
+        backgroundColor: mt.backdropBg,
         backdropFilter: 'blur(8px)',
         zIndex: 1200,
         display: 'flex',
@@ -4828,21 +4962,21 @@ function AddCustomPortalModal({ isOpen, onClose, onAddPortal }) {
         style={{
           width: '100%',
           maxWidth: '520px',
-          backgroundColor: '#0F1423',
-          border: '1px solid rgba(124, 111, 255, 0.35)',
+          backgroundColor: mt.modalBg,
+          border: mt.modalBorder,
           borderRadius: '16px',
           padding: '24px',
-          boxShadow: '0 24px 60px rgba(0, 0, 0, 0.8)',
+          boxShadow: mt.shadow,
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#A78BFA', margin: '0 0 16px' }}>
+        <h3 style={{ fontSize: '16px', fontWeight: 800, color: mt.isLight ? '#6D28D9' : '#A78BFA', margin: '0 0 16px' }}>
           Connect Official Country Website / Research Link
         </h3>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           <div>
-            <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#8E9BB5', marginBottom: '4px' }}>
+            <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: mt.textMuted, marginBottom: '4px' }}>
               Country
             </label>
             <input
@@ -4852,11 +4986,11 @@ function AddCustomPortalModal({ isOpen, onClose, onAddPortal }) {
               onChange={(e) => setCountry(e.target.value)}
               style={{
                 width: '100%',
-                background: 'rgba(8, 10, 18, 0.9)',
-                border: '1px solid rgba(148, 163, 225, 0.2)',
+                background: mt.inputBg,
+                border: `1px solid ${mt.inputBorder}`,
                 borderRadius: '8px',
                 padding: '8px 12px',
-                color: '#fff',
+                color: mt.textPrimary,
                 fontSize: '13px',
                 outline: 'none',
               }}
@@ -4865,7 +4999,7 @@ function AddCustomPortalModal({ isOpen, onClose, onAddPortal }) {
           </div>
 
           <div>
-            <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#8E9BB5', marginBottom: '4px' }}>
+            <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: mt.textMuted, marginBottom: '4px' }}>
               Website / Portal Title
             </label>
             <input
@@ -4875,11 +5009,11 @@ function AddCustomPortalModal({ isOpen, onClose, onAddPortal }) {
               onChange={(e) => setTitle(e.target.value)}
               style={{
                 width: '100%',
-                background: 'rgba(8, 10, 18, 0.9)',
-                border: '1px solid rgba(148, 163, 225, 0.2)',
+                background: mt.inputBg,
+                border: `1px solid ${mt.inputBorder}`,
                 borderRadius: '8px',
                 padding: '8px 12px',
-                color: '#fff',
+                color: mt.textPrimary,
                 fontSize: '13px',
                 outline: 'none',
               }}
@@ -4888,7 +5022,7 @@ function AddCustomPortalModal({ isOpen, onClose, onAddPortal }) {
           </div>
 
           <div>
-            <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#8E9BB5', marginBottom: '4px' }}>
+            <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: mt.textMuted, marginBottom: '4px' }}>
               Official Website URL
             </label>
             <input
@@ -4898,11 +5032,11 @@ function AddCustomPortalModal({ isOpen, onClose, onAddPortal }) {
               onChange={(e) => setUrl(e.target.value)}
               style={{
                 width: '100%',
-                background: 'rgba(8, 10, 18, 0.9)',
-                border: '1px solid rgba(148, 163, 225, 0.2)',
+                background: mt.inputBg,
+                border: `1px solid ${mt.inputBorder}`,
                 borderRadius: '8px',
                 padding: '8px 12px',
-                color: '#fff',
+                color: mt.textPrimary,
                 fontSize: '13px',
                 outline: 'none',
               }}
@@ -4911,7 +5045,7 @@ function AddCustomPortalModal({ isOpen, onClose, onAddPortal }) {
           </div>
 
           <div>
-            <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#8E9BB5', marginBottom: '4px' }}>
+            <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: mt.textMuted, marginBottom: '4px' }}>
               Research Notes / Purpose
             </label>
             <textarea
@@ -4921,11 +5055,11 @@ function AddCustomPortalModal({ isOpen, onClose, onAddPortal }) {
               rows={3}
               style={{
                 width: '100%',
-                background: 'rgba(8, 10, 18, 0.9)',
-                border: '1px solid rgba(148, 163, 225, 0.2)',
+                background: mt.inputBg,
+                border: `1px solid ${mt.inputBorder}`,
                 borderRadius: '8px',
                 padding: '8px 12px',
-                color: '#fff',
+                color: mt.textPrimary,
                 fontSize: '12px',
                 outline: 'none',
                 resize: 'none',
@@ -4938,9 +5072,9 @@ function AddCustomPortalModal({ isOpen, onClose, onAddPortal }) {
               type="button"
               onClick={onClose}
               style={{
-                background: 'rgba(255, 255, 255, 0.08)',
-                border: 'none',
-                color: '#EDEFFA',
+                background: mt.isLight ? '#F1F5F9' : 'rgba(255, 255, 255, 0.08)',
+                border: mt.isLight ? '1px solid #CBD5E1' : 'none',
+                color: mt.textPrimary,
                 padding: '8px 16px',
                 borderRadius: '8px',
                 fontSize: '12px',
@@ -4975,6 +5109,7 @@ function AddCustomPortalModal({ isOpen, onClose, onAddPortal }) {
 // SUB-COMPONENT: DOWNLOAD PREFERENCES MODAL (User Requirement)
 // ============================================================================
 function DownloadPreferencesModal({ isOpen, onClose, selectedCount, totalFiltered, onConfirm }) {
+  const mt = useModalTheme();
   const [format, setFormat] = useState('xlsx'); // 'xlsx' | 'csv'
   const [scope, setScope] = useState(selectedCount > 0 ? 'selected' : 'all');
   const [selectedColumns, setSelectedColumns] = useState({
@@ -5002,7 +5137,7 @@ function DownloadPreferencesModal({ isOpen, onClose, selectedCount, totalFiltere
       style={{
         position: 'fixed',
         inset: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        backgroundColor: mt.backdropBg,
         backdropFilter: 'blur(8px)',
         zIndex: 1100,
         display: 'flex',
@@ -5016,25 +5151,25 @@ function DownloadPreferencesModal({ isOpen, onClose, selectedCount, totalFiltere
         style={{
           width: '100%',
           maxWidth: '560px',
-          backgroundColor: '#0F1423',
-          border: '1px solid rgba(148, 163, 225, 0.3)',
+          backgroundColor: mt.modalBg,
+          border: mt.modalBorder,
           borderRadius: '16px',
           padding: '24px',
-          boxShadow: '0 24px 60px rgba(0, 0, 0, 0.8)',
+          boxShadow: mt.shadow,
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 style={{ fontSize: '17px', fontWeight: 800, color: '#fff', margin: '0 0 4px' }}>
+        <h3 style={{ fontSize: '17px', fontWeight: 800, color: mt.textPrimary, margin: '0 0 4px' }}>
           Download Course Data Preferences
         </h3>
-        <p style={{ fontSize: '12px', color: '#8E9BB5', margin: '0 0 16px' }}>
+        <p style={{ fontSize: '12px', color: mt.textMuted, margin: '0 0 16px' }}>
           Select your export format, scope, and specific fields to include.
         </p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {/* Format Selection */}
           <div>
-            <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#8E9BB5', marginBottom: '6px' }}>
+            <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: mt.textMuted, marginBottom: '6px' }}>
               File Format
             </label>
             <div style={{ display: 'flex', gap: '10px' }}>
@@ -5043,9 +5178,9 @@ function DownloadPreferencesModal({ isOpen, onClose, selectedCount, totalFiltere
                 onClick={() => setFormat('xlsx')}
                 style={{
                   flex: 1,
-                  background: format === 'xlsx' ? 'rgba(0, 229, 160, 0.15)' : 'rgba(255, 255, 255, 0.05)',
-                  border: format === 'xlsx' ? '1px solid #00E5A0' : '1px solid rgba(255, 255, 255, 0.12)',
-                  color: format === 'xlsx' ? '#00E5A0' : '#8E9BB5',
+                  background: format === 'xlsx' ? (mt.isLight ? 'rgba(16, 185, 129, 0.15)' : 'rgba(0, 229, 160, 0.15)') : (mt.isLight ? '#F1F5F9' : 'rgba(255, 255, 255, 0.05)'),
+                  border: format === 'xlsx' ? (mt.isLight ? '1px solid #10B981' : '1px solid #00E5A0') : (mt.isLight ? '1px solid #CBD5E1' : '1px solid rgba(255, 255, 255, 0.12)'),
+                  color: format === 'xlsx' ? (mt.isLight ? '#047857' : '#00E5A0') : mt.textMuted,
                   padding: '9px',
                   borderRadius: '8px',
                   fontSize: '12px',
@@ -5060,9 +5195,9 @@ function DownloadPreferencesModal({ isOpen, onClose, selectedCount, totalFiltere
                 onClick={() => setFormat('csv')}
                 style={{
                   flex: 1,
-                  background: format === 'csv' ? 'rgba(56, 189, 248, 0.15)' : 'rgba(255, 255, 255, 0.05)',
-                  border: format === 'csv' ? '1px solid #38BDF8' : '1px solid rgba(255, 255, 255, 0.12)',
-                  color: format === 'csv' ? '#38BDF8' : '#8E9BB5',
+                  background: format === 'csv' ? (mt.isLight ? 'rgba(2, 132, 199, 0.15)' : 'rgba(56, 189, 248, 0.15)') : (mt.isLight ? '#F1F5F9' : 'rgba(255, 255, 255, 0.05)'),
+                  border: format === 'csv' ? (mt.isLight ? '1px solid #0284C7' : '1px solid #38BDF8') : (mt.isLight ? '1px solid #CBD5E1' : '1px solid rgba(255, 255, 255, 0.12)'),
+                  color: format === 'csv' ? (mt.isLight ? '#0284C7' : '#38BDF8') : mt.textMuted,
                   padding: '9px',
                   borderRadius: '8px',
                   fontSize: '12px',
@@ -5077,7 +5212,7 @@ function DownloadPreferencesModal({ isOpen, onClose, selectedCount, totalFiltere
 
           {/* Scope Selection */}
           <div>
-            <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#8E9BB5', marginBottom: '6px' }}>
+            <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: mt.textMuted, marginBottom: '6px' }}>
               Export Scope
             </label>
             <div style={{ display: 'flex', gap: '10px' }}>
@@ -5087,9 +5222,9 @@ function DownloadPreferencesModal({ isOpen, onClose, selectedCount, totalFiltere
                   onClick={() => setScope('selected')}
                   style={{
                     flex: 1,
-                    background: scope === 'selected' ? 'rgba(124, 111, 255, 0.15)' : 'rgba(255, 255, 255, 0.05)',
-                    border: scope === 'selected' ? '1px solid #7C6FFF' : '1px solid rgba(255, 255, 255, 0.12)',
-                    color: scope === 'selected' ? '#A78BFA' : '#8E9BB5',
+                    background: scope === 'selected' ? (mt.isLight ? 'rgba(109, 40, 217, 0.15)' : 'rgba(124, 111, 255, 0.15)') : (mt.isLight ? '#F1F5F9' : 'rgba(255, 255, 255, 0.05)'),
+                    border: scope === 'selected' ? '1px solid #7C6FFF' : (mt.isLight ? '1px solid #CBD5E1' : '1px solid rgba(255, 255, 255, 0.12)'),
+                    color: scope === 'selected' ? (mt.isLight ? '#6D28D9' : '#A78BFA') : mt.textMuted,
                     padding: '8px',
                     borderRadius: '8px',
                     fontSize: '12px',
@@ -5105,9 +5240,9 @@ function DownloadPreferencesModal({ isOpen, onClose, selectedCount, totalFiltere
                 onClick={() => setScope('all')}
                 style={{
                   flex: 1,
-                  background: scope === 'all' ? 'rgba(124, 111, 255, 0.15)' : 'rgba(255, 255, 255, 0.05)',
-                  border: scope === 'all' ? '1px solid #7C6FFF' : '1px solid rgba(255, 255, 255, 0.12)',
-                  color: scope === 'all' ? '#A78BFA' : '#8E9BB5',
+                  background: scope === 'all' ? (mt.isLight ? 'rgba(109, 40, 217, 0.15)' : 'rgba(124, 111, 255, 0.15)') : (mt.isLight ? '#F1F5F9' : 'rgba(255, 255, 255, 0.05)'),
+                  border: scope === 'all' ? '1px solid #7C6FFF' : (mt.isLight ? '1px solid #CBD5E1' : '1px solid rgba(255, 255, 255, 0.12)'),
+                  color: scope === 'all' ? (mt.isLight ? '#6D28D9' : '#A78BFA') : mt.textMuted,
                   padding: '8px',
                   borderRadius: '8px',
                   fontSize: '12px',
@@ -5122,9 +5257,9 @@ function DownloadPreferencesModal({ isOpen, onClose, selectedCount, totalFiltere
                 onClick={() => setScope('top25')}
                 style={{
                   flex: 1,
-                  background: scope === 'top25' ? 'rgba(124, 111, 255, 0.15)' : 'rgba(255, 255, 255, 0.05)',
-                  border: scope === 'top25' ? '1px solid #7C6FFF' : '1px solid rgba(255, 255, 255, 0.12)',
-                  color: scope === 'top25' ? '#A78BFA' : '#8E9BB5',
+                  background: scope === 'top25' ? (mt.isLight ? 'rgba(109, 40, 217, 0.15)' : 'rgba(124, 111, 255, 0.15)') : (mt.isLight ? '#F1F5F9' : 'rgba(255, 255, 255, 0.05)'),
+                  border: scope === 'top25' ? '1px solid #7C6FFF' : (mt.isLight ? '1px solid #CBD5E1' : '1px solid rgba(255, 255, 255, 0.12)'),
+                  color: scope === 'top25' ? (mt.isLight ? '#6D28D9' : '#A78BFA') : mt.textMuted,
                   padding: '8px',
                   borderRadius: '8px',
                   fontSize: '12px',
@@ -5139,7 +5274,7 @@ function DownloadPreferencesModal({ isOpen, onClose, selectedCount, totalFiltere
 
           {/* Columns Checklist */}
           <div>
-            <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#8E9BB5', marginBottom: '6px' }}>
+            <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: mt.textMuted, marginBottom: '6px' }}>
               Columns to Include in Spreadsheet
             </label>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', maxHeight: '180px', overflowY: 'auto' }}>
@@ -5158,7 +5293,7 @@ function DownloadPreferencesModal({ isOpen, onClose, selectedCount, totalFiltere
                 { k: 'entryCriteria', label: 'Entry Requirements' },
                 { k: 'websiteUrl', label: 'Official Research Link' },
               ].map((c) => (
-                <label key={c.k} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11.5px', color: '#EDEFFA', cursor: 'pointer' }}>
+                <label key={c.k} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11.5px', color: mt.textPrimary, cursor: 'pointer' }}>
                   <input
                     type="checkbox"
                     checked={!!selectedColumns[c.k]}
@@ -5177,9 +5312,9 @@ function DownloadPreferencesModal({ isOpen, onClose, selectedCount, totalFiltere
           <button
             onClick={onClose}
             style={{
-              background: 'rgba(255, 255, 255, 0.08)',
-              border: 'none',
-              color: '#EDEFFA',
+              background: mt.isLight ? '#F1F5F9' : 'rgba(255, 255, 255, 0.08)',
+              border: mt.isLight ? '1px solid #CBD5E1' : 'none',
+              color: mt.textPrimary,
               padding: '8px 16px',
               borderRadius: '8px',
               fontSize: '12px',
