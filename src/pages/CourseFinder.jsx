@@ -1069,6 +1069,41 @@ export default function CourseFinder({ setCurrentPage }) {
     }
   };
 
+  const handleEditGroup = (group, updates) => {
+    const { newUniversity, newCountry, newCountryFlag, newFileName } = updates;
+    const trimmedUni = newUniversity ? newUniversity.trim() : '';
+    const trimmedFile = newFileName ? newFileName.trim() : '';
+
+    setCourses((prev) => {
+      return prev.map((c) => {
+        if (!group.ids.includes(c.id)) return c;
+        return {
+          ...c,
+          university: trimmedUni || c.university,
+          country: newCountry || c.country,
+          countryFlag: newCountryFlag || (newCountry ? getCountryFlag(newCountry) : c.countryFlag),
+          sourceFileName: trimmedFile || c.sourceFileName,
+        };
+      });
+    });
+
+    toast.success(`Updated ${group.count} courses for "${trimmedUni || group.university}"!`);
+  };
+
+  const handleRenameUniversity = (oldName, newName) => {
+    if (!newName || !newName.trim()) return;
+    const trimmed = newName.trim();
+    setCourses((prev) => {
+      return prev.map((c) => {
+        if (c.university === oldName) {
+          return { ...c, university: trimmed };
+        }
+        return c;
+      });
+    });
+    toast.success(`Renamed university "${oldName}" to "${trimmed}" across all programs!`);
+  };
+
   const handleResetAllUploads = () => {
     localStorage.removeItem('sterling_course_catalog');
     setCourses(DEFAULT_COURSES);
@@ -1759,10 +1794,35 @@ export default function CourseFinder({ setCurrentPage }) {
                   </div>
 
                   <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                       <h3 style={{ fontSize: '16px', fontWeight: 800, color: t.textPrimary, margin: 0 }}>
                         {uni.name}
                       </h3>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const newName = window.prompt(`Rename University "${uni.name}" across all programs to:`, uni.name);
+                          if (newName && newName.trim() && newName.trim() !== uni.name) {
+                            handleRenameUniversity(uni.name, newName.trim());
+                          }
+                        }}
+                        style={{
+                          background: isLight ? '#F1F5F9' : 'rgba(255, 255, 255, 0.06)',
+                          border: isLight ? '1px solid #CBD5E1' : '1px solid rgba(255, 255, 255, 0.12)',
+                          color: t.textMuted,
+                          cursor: 'pointer',
+                          padding: '2px 7px',
+                          borderRadius: '6px',
+                          fontSize: '11px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '3px',
+                          fontWeight: 600,
+                        }}
+                        title={`Rename "${uni.name}" across all programs`}
+                      >
+                        <span>✏️ Rename</span>
+                      </button>
                       {uni.portalUrl && (
                         <a
                           href={uni.portalUrl}
@@ -2393,7 +2453,9 @@ export default function CourseFinder({ setCurrentPage }) {
           onClose={() => setShowFileManagerModal(false)}
           sourceGroups={sourceGroups}
           onRemoveGroup={handleRemoveGroup}
+          onEditGroup={handleEditGroup}
           onResetAll={handleResetAllUploads}
+          courses={courses}
         />
       )}
     </div>
@@ -2435,9 +2497,404 @@ function useModalTheme() {
 }
 
 // ============================================================================
+// POPULAR STUDY DESTINATIONS FOR DATASET EDITING
+// ============================================================================
+const POPULAR_STUDY_COUNTRIES = [
+  { name: 'Malta', flag: '🇲🇹' },
+  { name: 'Germany', flag: '🇩🇪' },
+  { name: 'United Kingdom', flag: '🇬🇧' },
+  { name: 'Ireland', flag: '🇮🇪' },
+  { name: 'Canada', flag: '🇨🇦' },
+  { name: 'Australia', flag: '🇦🇺' },
+  { name: 'United States of America', flag: '🇺🇸' },
+  { name: 'New Zealand', flag: '🇳🇿' },
+  { name: 'France', flag: '🇫🇷' },
+  { name: 'Italy', flag: '🇮🇹' },
+  { name: 'Spain', flag: '🇪🇸' },
+  { name: 'Netherlands', flag: '🇳🇱' },
+  { name: 'Poland', flag: '🇵🇱' },
+  { name: 'Lithuania', flag: '🇱🇹' },
+  { name: 'Hungary', flag: '🇭🇺' },
+  { name: 'Switzerland', flag: '🇨🇭' },
+  { name: 'Austria', flag: '🇦🇹' },
+  { name: 'Cyprus', flag: '🇨🇾' },
+  { name: 'United Arab Emirates', flag: '🇦🇪' },
+  { name: 'Singapore', flag: '🇸🇬' },
+  { name: 'Malaysia', flag: '🇲🇾' },
+];
+
+// ============================================================================
+// SUB-COMPONENT: INDIVIDUAL UPLOADED DATASET CARD WITH INLINE EDIT (User Requirement)
+// ============================================================================
+function UploadedFileCard({ group, onRemove, onEdit, mt, allCourses }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editUniversity, setEditUniversity] = useState(group.university || '');
+  const [editCountry, setEditCountry] = useState(group.country || 'Malta');
+  const [editFileName, setEditFileName] = useState(group.name || '');
+  const [showAllCourses, setShowAllCourses] = useState(false);
+
+  useEffect(() => {
+    setEditUniversity(group.university || '');
+    setEditCountry(group.country || 'Malta');
+    setEditFileName(group.name || '');
+  }, [group.university, group.country, group.name]);
+
+  const handleSave = () => {
+    const trimmedUni = editUniversity.trim();
+    if (!trimmedUni) {
+      toast.error('University / Institution name cannot be empty');
+      return;
+    }
+    const countryObj = POPULAR_STUDY_COUNTRIES.find(
+      (c) => c.name.toLowerCase() === editCountry.toLowerCase()
+    );
+    const flag = countryObj ? countryObj.flag : getCountryFlag(editCountry);
+
+    onEdit(group, {
+      newUniversity: trimmedUni,
+      newCountry: editCountry,
+      newCountryFlag: flag,
+      newFileName: editFileName.trim() || group.name,
+    });
+    setIsEditing(false);
+  };
+
+  const handleCancel = () => {
+    setEditUniversity(group.university || '');
+    setEditCountry(group.country || 'Malta');
+    setEditFileName(group.name || '');
+    setIsEditing(false);
+  };
+
+  const groupCourses = useMemo(() => {
+    if (!allCourses || !group.ids) return [];
+    return allCourses.filter((c) => group.ids.includes(c.id));
+  }, [allCourses, group.ids]);
+
+  return (
+    <div
+      style={{
+        background: mt.sectionBg,
+        border: isEditing
+          ? (mt.isLight ? '1px solid #3B82F6' : '1px solid rgba(59, 130, 246, 0.6)')
+          : mt.sectionBorder,
+        borderRadius: '12px',
+        padding: '16px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '12px',
+        transition: 'border-color 0.2s',
+      }}
+    >
+      {/* Top Header Bar */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span style={{ fontSize: '26px' }}>📊</span>
+          <div>
+            <div style={{ fontSize: '14px', fontWeight: 800, color: mt.textPrimary }}>
+              {group.name}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '3px', fontSize: '11.5px', color: mt.textMuted, flexWrap: 'wrap' }}>
+              <span style={{ color: mt.isLight ? '#047857' : '#00E5A0', fontWeight: 700 }}>
+                {group.flag} {group.country}
+              </span>
+              <span>•</span>
+              <span style={{ fontWeight: 700, color: mt.textPrimary }}>🏫 {group.university}</span>
+              <span>•</span>
+              <span style={{ color: mt.isLight ? '#7E22CE' : '#C084FC', fontWeight: 700 }}>{group.count} Courses</span>
+              <span>•</span>
+              <span style={{ color: mt.textMuted }}>{group.uploadedAt}</span>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => setIsEditing(!isEditing)}
+            style={{
+              background: isEditing
+                ? (mt.isLight ? '#E0E7FF' : 'rgba(99, 102, 241, 0.3)')
+                : (mt.isLight ? '#EFF6FF' : 'rgba(59, 130, 246, 0.15)'),
+              border: isEditing
+                ? (mt.isLight ? '1px solid #6366F1' : '1px solid rgba(99, 102, 241, 0.6)')
+                : (mt.isLight ? '1px solid #BFDBFE' : '1px solid rgba(59, 130, 246, 0.35)'),
+              color: isEditing
+                ? (mt.isLight ? '#4338CA' : '#A5B4FC')
+                : (mt.isLight ? '#1D4ED8' : '#60A5FA'),
+              padding: '7px 12px',
+              borderRadius: '8px',
+              fontSize: '12px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
+            }}
+            title="Edit university name, country, or file label"
+          >
+            <span>✏️</span>
+            <span>{isEditing ? 'Close Edit' : 'Edit File & University'}</span>
+          </button>
+
+          <button
+            onClick={() => onRemove(group)}
+            style={{
+              background: mt.isLight ? 'rgba(239, 68, 68, 0.08)' : 'linear-gradient(135deg, rgba(255, 75, 107, 0.2) 0%, rgba(239, 68, 68, 0.25) 100%)',
+              border: mt.isLight ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(255, 75, 107, 0.5)',
+              color: mt.isLight ? '#DC2626' : '#FF6B8B',
+              padding: '7px 12px',
+              borderRadius: '8px',
+              fontSize: '12px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <span>🗑️</span>
+            <span>Remove ({group.count})</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Inline Edit Form Panel */}
+      {isEditing && (
+        <div
+          style={{
+            background: mt.isLight ? '#F0F9FF' : 'rgba(59, 130, 246, 0.08)',
+            border: mt.isLight ? '1px solid #BAE6FD' : '1px solid rgba(59, 130, 246, 0.25)',
+            borderRadius: '10px',
+            padding: '14px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '12px', fontWeight: 800, color: mt.isLight ? '#0369A1' : '#38BDF8' }}>
+              ✏️ EDIT DATASET & UNIVERSITY INFORMATION
+            </span>
+            <span style={{ fontSize: '11px', color: mt.textMuted }}>
+              Applies to all {group.count} courses in this file
+            </span>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '10px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: mt.textMuted, marginBottom: '4px' }}>
+                University / Institution Name <span style={{ color: '#EF4444' }}>*</span>
+              </label>
+              <input
+                type="text"
+                value={editUniversity}
+                onChange={(e) => setEditUniversity(e.target.value)}
+                placeholder="e.g. Queen Mary University, MCAST, GBS..."
+                style={{
+                  width: '100%',
+                  padding: '7px 10px',
+                  borderRadius: '6px',
+                  background: mt.inputBg,
+                  border: `1px solid ${mt.inputBorder}`,
+                  color: mt.textPrimary,
+                  fontSize: '12px',
+                  outline: 'none',
+                  fontWeight: 600,
+                  boxSizing: 'border-box',
+                }}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: mt.textMuted, marginBottom: '4px' }}>
+                Destination Country
+              </label>
+              <select
+                value={editCountry}
+                onChange={(e) => setEditCountry(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '7px 10px',
+                  borderRadius: '6px',
+                  background: mt.inputBg,
+                  border: `1px solid ${mt.inputBorder}`,
+                  color: mt.textPrimary,
+                  fontSize: '12px',
+                  outline: 'none',
+                  fontWeight: 600,
+                  boxSizing: 'border-box',
+                }}
+              >
+                {POPULAR_STUDY_COUNTRIES.map((cty) => (
+                  <option key={cty.name} value={cty.name}>
+                    {cty.flag} {cty.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: mt.textMuted, marginBottom: '4px' }}>
+                File / Dataset Display Label
+              </label>
+              <input
+                type="text"
+                value={editFileName}
+                onChange={(e) => setEditFileName(e.target.value)}
+                placeholder="e.g. MCAST_Course_Matrix.xlsx"
+                style={{
+                  width: '100%',
+                  padding: '7px 10px',
+                  borderRadius: '6px',
+                  background: mt.inputBg,
+                  border: `1px solid ${mt.inputBorder}`,
+                  color: mt.textPrimary,
+                  fontSize: '12px',
+                  outline: 'none',
+                  fontWeight: 500,
+                  boxSizing: 'border-box',
+                }}
+              />
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '2px' }}>
+            <button
+              onClick={handleCancel}
+              style={{
+                background: mt.isLight ? '#FFFFFF' : 'rgba(255, 255, 255, 0.06)',
+                border: mt.isLight ? '1px solid #CBD5E1' : '1px solid rgba(255, 255, 255, 0.15)',
+                color: mt.textMuted,
+                padding: '6px 14px',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              style={{
+                background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+                border: 'none',
+                color: '#FFFFFF',
+                padding: '6px 16px',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                boxShadow: '0 2px 6px rgba(16, 185, 129, 0.3)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+              }}
+            >
+              <span>💾</span>
+              <span>Save Changes</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Sample Courses Preview */}
+      <div
+        style={{
+          background: mt.isLight ? '#F1F5F9' : 'rgba(8, 10, 18, 0.6)',
+          borderRadius: '8px',
+          padding: '8px 12px',
+          fontSize: '11px',
+          color: mt.textMuted,
+        }}
+      >
+        <span style={{ color: mt.isLight ? '#0284C7' : '#38BDF8', fontWeight: 700 }}>Sample Courses from this file: </span>
+        {group.sampleCourses.join(' • ')}
+        {group.count > group.sampleCourses.length && ` + ${group.count - group.sampleCourses.length} more`}
+      </div>
+
+      {/* Expand / Collapse All Courses */}
+      <div>
+        <button
+          onClick={() => setShowAllCourses(!showAllCourses)}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: mt.isLight ? '#2563EB' : '#38BDF8',
+            fontSize: '11.5px',
+            fontWeight: 600,
+            cursor: 'pointer',
+            padding: '2px 0',
+            textAlign: 'left',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px',
+          }}
+        >
+          <span>{showAllCourses ? '▲ Hide Full Course List' : `▼ View All ${group.count} Courses in this Dataset`}</span>
+        </button>
+
+        {showAllCourses && (
+          <div
+            style={{
+              marginTop: '6px',
+              maxHeight: '220px',
+              overflowY: 'auto',
+              background: mt.isLight ? '#F8FAFC' : 'rgba(0, 0, 0, 0.25)',
+              border: mt.sectionBorder,
+              borderRadius: '8px',
+              padding: '6px 10px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '4px',
+            }}
+          >
+            {groupCourses.map((c) => (
+              <div
+                key={c.id}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  fontSize: '11px',
+                  padding: '4px 6px',
+                  borderBottom: `1px solid ${mt.divider}`,
+                }}
+              >
+                <div style={{ color: mt.textPrimary, fontWeight: 600, maxWidth: '65%' }}>
+                  {c.programName}
+                </div>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <span
+                    style={{
+                      fontSize: '10px',
+                      padding: '1px 6px',
+                      borderRadius: '4px',
+                      background: mt.isLight ? '#E2E8F0' : 'rgba(255,255,255,0.08)',
+                      color: mt.textMuted,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {c.level || 'Program'}
+                  </span>
+                  <span style={{ color: mt.isLight ? '#047857' : '#00E5A0', fontWeight: 700 }}>
+                    {c.tuitionYear || '—'}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
 // SUB-COMPONENT: MANAGE UPLOADED FILES & DATASETS MODAL (User Requirement)
 // ============================================================================
-function ManageFilesModal({ isOpen, onClose, sourceGroups, onRemoveGroup, onResetAll }) {
+function ManageFilesModal({ isOpen, onClose, sourceGroups, onRemoveGroup, onEditGroup, onResetAll, courses }) {
   if (!isOpen) return null;
   const mt = useModalTheme();
 
@@ -2492,7 +2949,7 @@ function ManageFilesModal({ isOpen, onClose, sourceGroups, onRemoveGroup, onRese
                 Manage Uploaded Excel Files & Datasets
               </h2>
               <p style={{ fontSize: '12px', color: mt.textMuted, margin: '2px 0 0 0' }}>
-                View and remove any specific uploaded Excel spreadsheet, university import, or batch.
+                View, rename university / country, or remove any specific uploaded Excel spreadsheet.
               </p>
             </div>
           </div>
@@ -2563,84 +3020,14 @@ function ManageFilesModal({ isOpen, onClose, sourceGroups, onRemoveGroup, onRese
               </div>
 
               {customGroups.map((group) => (
-                <div
+                <UploadedFileCard
                   key={group.key}
-                  style={{
-                    background: mt.sectionBg,
-                    border: mt.sectionBorder,
-                    borderRadius: '12px',
-                    padding: '16px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '12px',
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <span style={{ fontSize: '26px' }}>📊</span>
-                      <div>
-                        <div style={{ fontSize: '14px', fontWeight: 800, color: mt.textPrimary }}>
-                          {group.name}
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '3px', fontSize: '11.5px', color: mt.textMuted }}>
-                          <span style={{ color: mt.isLight ? '#047857' : '#00E5A0', fontWeight: 700 }}>
-                            {group.flag} {group.country}
-                          </span>
-                          <span>•</span>
-                          <span>{group.university}</span>
-                          <span>•</span>
-                          <span style={{ color: mt.isLight ? '#7E22CE' : '#C084FC', fontWeight: 700 }}>{group.count} Courses</span>
-                          <span>•</span>
-                          <span style={{ color: mt.textMuted }}>{group.uploadedAt}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={() => onRemoveGroup(group)}
-                      style={{
-                        background: mt.isLight ? 'rgba(239, 68, 68, 0.1)' : 'linear-gradient(135deg, rgba(255, 75, 107, 0.25) 0%, rgba(239, 68, 68, 0.3) 100%)',
-                        border: mt.isLight ? '1px solid rgba(239, 68, 68, 0.35)' : '1px solid rgba(255, 75, 107, 0.6)',
-                        color: mt.isLight ? '#DC2626' : '#FF6B8B',
-                        padding: '8px 14px',
-                        borderRadius: '8px',
-                        fontSize: '12px',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        whiteSpace: 'nowrap',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = 'rgba(239, 68, 68, 0.45)';
-                        e.currentTarget.style.color = '#fff';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = mt.isLight ? 'rgba(239, 68, 68, 0.1)' : 'linear-gradient(135deg, rgba(255, 75, 107, 0.25) 0%, rgba(239, 68, 68, 0.3) 100%)';
-                        e.currentTarget.style.color = mt.isLight ? '#DC2626' : '#FF6B8B';
-                      }}
-                    >
-                      <span>🗑️</span>
-                      <span>Remove This Excel ({group.count} courses)</span>
-                    </button>
-                  </div>
-
-                  {/* Sample Courses Preview */}
-                  <div
-                    style={{
-                      background: mt.isLight ? '#F1F5F9' : 'rgba(8, 10, 18, 0.6)',
-                      borderRadius: '8px',
-                      padding: '8px 12px',
-                      fontSize: '11px',
-                      color: mt.textMuted,
-                    }}
-                  >
-                    <span style={{ color: mt.isLight ? '#0284C7' : '#38BDF8', fontWeight: 700 }}>Sample Courses from this file: </span>
-                    {group.sampleCourses.join(' • ')}
-                    {group.count > group.sampleCourses.length && ` + ${group.count - group.sampleCourses.length} more`}
-                  </div>
-                </div>
+                  group={group}
+                  onRemove={onRemoveGroup}
+                  onEdit={onEditGroup}
+                  mt={mt}
+                  allCourses={courses}
+                />
               ))}
             </>
           )}
