@@ -2483,6 +2483,387 @@ function ProgramDetailsModal({ course, onClose, onApplyStudent }) {
 }
 
 // ============================================================================
+// GLOBAL COUNTRY METADATA & INTELLIGENT AUTO-DETECTION ENGINE
+// ============================================================================
+const STUDY_ABROAD_COUNTRIES = [
+  {
+    name: 'Malta',
+    flag: '🇲🇹',
+    currency: 'EUR',
+    currencySymbol: '€',
+    keywords: [
+      'malta', 'valletta', 'st. julian', 'st julian', 'sliema', 'msida', 'birkirkara', 'naxxar',
+      'gbs malta', 'global college malta', 'mcast', 'american university of malta', 'queen mary malta',
+      'ascencia malta', 'domain academy', 'idea academy', 'eie institute', 'st martins', 'studyinmalta',
+      'identity malta', 'central visa unit', 'maltese'
+    ]
+  },
+  {
+    name: 'Germany',
+    flag: '🇩🇪',
+    currency: 'EUR',
+    currencySymbol: '€',
+    keywords: [
+      'germany', 'deutschland', 'berlin', 'munich', 'münchen', 'frankfurt', 'hamburg', 'potsdam',
+      'leipzig', 'cologne', 'köln', 'stuttgart', 'düsseldorf', 'bsbi', 'university of europe',
+      'iu international', 'gisma', 'arden berlin', 'lancaster leipzig', 'daad', 'uni-assist',
+      'anabin', 'aps certificate', 'blocked account', 'fintiba', 'coracle', 'expatrio'
+    ]
+  },
+  {
+    name: 'United Kingdom',
+    flag: '🇬🇧',
+    currency: 'GBP',
+    currencySymbol: '£',
+    keywords: [
+      'united kingdom', 'uk', 'great britain', 'england', 'scotland', 'wales', 'london', 'birmingham',
+      'manchester', 'leeds', 'glasgow', 'edinburgh', 'liverpool', 'coventry', 'hertfordshire',
+      'greenwich', 'anglia ruskin', 'west london', 'teesside', 'de montfort', 'cardiff', 'ulster',
+      'ucas', 'cas statement', 'graduate route', 'ukvi', 'gbp', '£'
+    ]
+  },
+  {
+    name: 'Ireland',
+    flag: '🇮🇪',
+    currency: 'EUR',
+    currencySymbol: '€',
+    keywords: [
+      'ireland', 'irish', 'dublin', 'cork', 'galway', 'limerick', 'maynooth', 'waterford',
+      'nci', 'national college of ireland', 'griffith college', 'dbs', 'dublin business school',
+      'trinity college', 'ucd', 'dcu', 'ucc', 'nuig', 'tud', 'inis', 'stamp 1g'
+    ]
+  },
+  {
+    name: 'Lithuania',
+    flag: '🇱🇹',
+    currency: 'EUR',
+    currencySymbol: '€',
+    keywords: [
+      'lithuania', 'lietuva', 'vilnius', 'kaunas', 'klaipeda', 'klaipėda', 'siauliai',
+      'lsmu', 'lithuanian university of health sciences', 'vilnius university', 'vgtu', 'vilnius tech',
+      'ktu', 'kaunas university of technology', 'mru', 'mykolas romeris', 'vytautas magnus', 'vdu',
+      'skvc', 'migris', 'lithuanian'
+    ]
+  },
+  {
+    name: 'France',
+    flag: '🇫🇷',
+    currency: 'EUR',
+    currencySymbol: '€',
+    keywords: [
+      'france', 'french', 'paris', 'lyon', 'marseille', 'toulouse', 'nice', 'nantes', 'strasbourg',
+      'montpellier', 'bordeaux', 'lille', 'rennes', 'grenoble', 'skema', 'ieseg', 'emlyon',
+      'kedge', 'neoma', 'audencia', 'essec', 'edhec', 'campus france'
+    ]
+  },
+  {
+    name: 'Poland',
+    flag: '🇵🇱',
+    currency: 'PLN',
+    currencySymbol: 'zł',
+    keywords: [
+      'poland', 'polska', 'warsaw', 'warszawa', 'krakow', 'kraków', 'wroclaw', 'wrocław',
+      'poznan', 'poznań', 'gdansk', 'gdańsk', 'lodz', 'łódź', 'vistula', 'lazarski', 'kozminski',
+      'warsaw university', 'jagiellonian', 'polish'
+    ]
+  },
+  {
+    name: 'Canada',
+    flag: '🇨🇦',
+    currency: 'CAD',
+    currencySymbol: 'C$',
+    keywords: [
+      'canada', 'canadian', 'ontario', 'british columbia', 'alberta', 'quebec', 'manitoba', 'saskatchewan',
+      'toronto', 'vancouver', 'montreal', 'calgary', 'ottawa', 'edmonton', 'fanshawe', 'conestoga',
+      'seneca', 'humber', 'george brown', 'sheridan', 'centennial', 'algoma', 'cape breton',
+      'ircc', 'sds', 'pgwp', 'cad', 'c$'
+    ]
+  },
+  {
+    name: 'United States of America',
+    flag: '🇺🇸',
+    currency: 'USD',
+    currencySymbol: '$',
+    keywords: [
+      'united states', 'usa', 'u.s.a', 'america', 'new york', 'california', 'texas', 'florida',
+      'boston', 'chicago', 'los angeles', 'san francisco', 'seattle', 'i-20', 'sevis', 'opt', 'cpt',
+      'f-1 visa'
+    ]
+  },
+  {
+    name: 'Australia',
+    flag: '🇦🇺',
+    currency: 'AUD',
+    currencySymbol: 'A$',
+    keywords: [
+      'australia', 'australian', 'sydney', 'melbourne', 'brisbane', 'perth', 'adelaide', 'gold coast',
+      'canberra', 'cricos', 'gsr', 'genuine student', 'subclass 500', 'pswv', 'aud', 'a$'
+    ]
+  },
+  {
+    name: 'New Zealand',
+    flag: '🇳🇿',
+    currency: 'NZD',
+    currencySymbol: 'NZ$',
+    keywords: [
+      'new zealand', 'nz', 'auckland', 'wellington', 'christchurch', 'hamilton', 'otago', 'inz', 'nzd'
+    ]
+  },
+  {
+    name: 'United Arab Emirates',
+    flag: '🇦🇪',
+    currency: 'AED',
+    currencySymbol: 'AED',
+    keywords: [
+      'united arab emirates', 'uae', 'u.a.e', 'dubai', 'abu dhabi', 'sharjah', 'knowledge park',
+      'dixc', 'academic city', 'murdoch dubai', 'curtin dubai', 'middlesex dubai', 'heriot watt dubai',
+      'aed', 'dirham'
+    ]
+  },
+  {
+    name: 'Singapore',
+    flag: '🇸🇬',
+    currency: 'SGD',
+    currencySymbol: 'S$',
+    keywords: [
+      'singapore', 'psb academy', 'kaplan singapore', 'sim global education', 'jcu singapore',
+      'curtin singapore', 'mdis', 'sgd', 's$'
+    ]
+  },
+  {
+    name: 'Malaysia',
+    flag: '🇲🇾',
+    currency: 'MYR',
+    currencySymbol: 'RM',
+    keywords: [
+      'malaysia', 'kuala lumpur', 'selangor', 'penang', 'taylors', 'sunway', 'monash malaysia',
+      'nottingham malaysia', 'curtin malaysia', 'emgs', 'myr', 'ringgit'
+    ]
+  },
+  {
+    name: 'Italy',
+    flag: '🇮🇹',
+    currency: 'EUR',
+    currencySymbol: '€',
+    keywords: [
+      'italy', 'italia', 'rome', 'roma', 'milan', 'milano', 'florence', 'firenze', 'bologna', 'turin',
+      'torino', 'naba', 'ied', 'marangoni', 'politecnico di milano', 'universitaly', 'dsu scholarship'
+    ]
+  },
+  {
+    name: 'Spain',
+    flag: '🇪🇸',
+    currency: 'EUR',
+    currencySymbol: '€',
+    keywords: [
+      'spain', 'españa', 'madrid', 'barcelona', 'valencia', 'seville', 'granada', 'malaga',
+      'ie university', 'esade', 'ucam', 'eada', 'nebrija', 'spanish'
+    ]
+  },
+  {
+    name: 'Netherlands',
+    flag: '🇳🇱',
+    currency: 'EUR',
+    currencySymbol: '€',
+    keywords: [
+      'netherlands', 'holland', 'dutch', 'amsterdam', 'rotterdam', 'utrecht', 'the hague', 'eindhoven',
+      'groningen', 'maastricht', 'studielink'
+    ]
+  },
+  {
+    name: 'Hungary',
+    flag: '🇭🇺',
+    currency: 'HUF',
+    currencySymbol: 'Ft',
+    keywords: [
+      'hungary', 'budapest', 'debrecen', 'szeged', 'pecs', 'pécs', 'corvinus', 'semmelweis',
+      'stipendium hungaricum', 'forint', 'huf'
+    ]
+  },
+  {
+    name: 'Czech Republic',
+    flag: '🇨🇿',
+    currency: 'CZK',
+    currencySymbol: 'Kč',
+    keywords: [
+      'czech republic', 'czechia', 'prague', 'praha', 'brno', 'ostrava', 'charles university',
+      'masaryk', 'czk'
+    ]
+  },
+  {
+    name: 'Switzerland',
+    flag: '🇨🇭',
+    currency: 'CHF',
+    currencySymbol: 'CHF',
+    keywords: [
+      'switzerland', 'swiss', 'zurich', 'zürich', 'geneva', 'genève', 'lausanne', 'basel',
+      'glion', 'les roches', 'ehl', 'bhms', 'chf'
+    ]
+  },
+  {
+    name: 'Austria',
+    flag: '🇦🇹',
+    currency: 'EUR',
+    currencySymbol: '€',
+    keywords: [
+      'austria', 'österreich', 'vienna', 'wien', 'salzburg', 'graz', 'innsbruck', 'modul university'
+    ]
+  },
+  {
+    name: 'Cyprus',
+    flag: '🇨🇾',
+    currency: 'EUR',
+    currencySymbol: '€',
+    keywords: [
+      'cyprus', 'nicosia', 'limassol', 'larnaca', 'paphos', 'university of nicosia', 'european university cyprus'
+    ]
+  },
+  {
+    name: 'Georgia',
+    flag: '🇬🇪',
+    currency: 'GEL',
+    currencySymbol: '₾',
+    keywords: [
+      'georgia', 'tbilisi', 'batumi', 'kutaisi', 'ilia state', 'tbilisi state medical', 'geomedi',
+      'caucasus university'
+    ]
+  },
+  {
+    name: 'Latvia',
+    flag: '🇱🇻',
+    currency: 'EUR',
+    currencySymbol: '€',
+    keywords: [
+      'latvia', 'riga', 'rīga', 'turiba', 'riga technical university', 'rtu', 'university of latvia'
+    ]
+  },
+  {
+    name: 'Finland',
+    flag: '🇫🇮',
+    currency: 'EUR',
+    currencySymbol: '€',
+    keywords: [
+      'finland', 'helsinki', 'tampere', 'espoo', 'oulu', 'turku', 'aalto', 'lut university'
+    ]
+  },
+  {
+    name: 'Sweden',
+    flag: '🇸🇪',
+    currency: 'SEK',
+    currencySymbol: 'kr',
+    keywords: [
+      'sweden', 'stockholm', 'gothenburg', 'göteborg', 'malmö', 'kth', 'chalmers', 'sek'
+    ]
+  },
+];
+
+// Helper to return exact country flag emoji
+function getCountryFlag(countryName) {
+  if (!countryName) return '🌍';
+  const c = countryName.toLowerCase().trim();
+  const found = STUDY_ABROAD_COUNTRIES.find(
+    (def) => def.name.toLowerCase() === c || def.keywords.some((kw) => kw === c)
+  );
+  if (found) return found.flag;
+
+  if (c.includes('malta')) return '🇲🇹';
+  if (c.includes('germany') || c.includes('deutschland')) return '🇩🇪';
+  if (c.includes('united kingdom') || c === 'uk' || c.includes('britain') || c.includes('england') || c.includes('scotland')) return '🇬🇧';
+  if (c.includes('ireland')) return '🇮🇪';
+  if (c.includes('lithuania')) return '🇱🇹';
+  if (c.includes('france')) return '🇫🇷';
+  if (c.includes('poland')) return '🇵🇱';
+  if (c.includes('canada')) return '🇨🇦';
+  if (c.includes('united states') || c === 'usa' || c === 'us' || c.includes('america')) return '🇺🇸';
+  if (c.includes('australia')) return '🇦🇺';
+  if (c.includes('new zealand')) return '🇳🇿';
+  if (c.includes('united arab emirates') || c.includes('uae') || c.includes('dubai')) return '🇦🇪';
+  if (c.includes('singapore')) return '🇸🇬';
+  if (c.includes('malaysia')) return '🇲🇾';
+  if (c.includes('italy')) return '🇮🇹';
+  if (c.includes('spain')) return '🇪🇸';
+  if (c.includes('netherlands') || c.includes('holland')) return '🇳🇱';
+  if (c.includes('hungary')) return '🇭🇺';
+  if (c.includes('czech')) return '🇨🇿';
+  if (c.includes('switzerland')) return '🇨🇭';
+  if (c.includes('austria')) return '🇦🇹';
+  if (c.includes('cyprus')) return '🇨🇾';
+  if (c.includes('georgia')) return '🇬🇪';
+  if (c.includes('latvia')) return '🇱🇻';
+  if (c.includes('finland')) return '🇫🇮';
+  if (c.includes('sweden')) return '🇸🇪';
+  return '🌍';
+}
+
+// AI Country Detection Engine
+function detectCountryFromData(fileName = '', sheetName = '', grid = [], headers = [], rows = []) {
+  const fileLower = (fileName || '').toLowerCase();
+  const sheetLower = (sheetName || '').toLowerCase();
+
+  // Combine words from headers and first 30 rows
+  const textPool = [
+    fileLower,
+    sheetLower,
+    ...(headers || []).map((h) => String(h || '').toLowerCase()),
+    ...(grid || []).slice(0, 30).flat().map((c) => String(c ?? '').toLowerCase()),
+  ].join(' ');
+
+  let bestCountry = 'Malta';
+  let bestScore = -1;
+  let reason = 'Default European Hub';
+
+  for (const c of STUDY_ABROAD_COUNTRIES) {
+    let score = 0;
+    let matchedReason = '';
+
+    // Check file name match (Highest Weight)
+    for (const kw of c.keywords) {
+      if (fileLower.includes(kw)) {
+        score += 30;
+        matchedReason = `file name "${kw}"`;
+        break;
+      }
+    }
+
+    // Check sheet name match
+    for (const kw of c.keywords) {
+      if (sheetLower.includes(kw)) {
+        score += 20;
+        if (!matchedReason) matchedReason = `sheet name "${kw}"`;
+        break;
+      }
+    }
+
+    // Check text pool
+    for (const kw of c.keywords) {
+      if (textPool.includes(kw)) {
+        score += 5;
+        if (!matchedReason) matchedReason = `content match "${kw}"`;
+      }
+    }
+
+    // Check specific currency clues
+    if (c.currency === 'GBP' && textPool.includes('£')) score += 8;
+    if (c.currency === 'CAD' && textPool.includes('cad')) score += 8;
+    if (c.currency === 'AUD' && textPool.includes('aud')) score += 8;
+    if (c.currency === 'AED' && (textPool.includes('aed') || textPool.includes('dirham'))) score += 10;
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestCountry = c.name;
+      reason = matchedReason || `content clues`;
+    }
+  }
+
+  return {
+    country: bestCountry,
+    flag: getCountryFlag(bestCountry),
+    confidence: bestScore > 20 ? 'High' : bestScore > 5 ? 'Medium' : 'Default',
+    reason,
+  };
+}
+
+// ============================================================================
 // SUB-COMPONENT: SMART EXCEL/CSV UPLOADER WITH COLUMN MAPPER & LIVE PREVIEW
 // ============================================================================
 function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
@@ -2490,19 +2871,29 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
   const [workbook, setWorkbook] = useState(null);
   const [availableSheets, setAvailableSheets] = useState([]);
   const [selectedSheet, setSelectedSheet] = useState('');
-  
+
   // 2D grid: array of arrays (rows)
   const [sheetGrid, setSheetGrid] = useState([]);
   const [candidateHeaderRows, setCandidateHeaderRows] = useState([]);
   const [headerRowIndex, setHeaderRowIndex] = useState(0);
-  
+
   const [detectedHeaders, setDetectedHeaders] = useState([]);
   const [dataRows, setDataRows] = useState([]);
-  
-  const [defaultCountry, setDefaultCountry] = useState('Malta');
+
+  // Country Selection & Intelligence
+  const [selectedCountry, setSelectedCountry] = useState('Malta');
+  const [customCountryInput, setCustomCountryInput] = useState('');
+  const [forceCountryForAll, setForceCountryForAll] = useState(true);
+  const [autoCountryInfo, setAutoCountryInfo] = useState({
+    country: 'Malta',
+    flag: '🇲🇹',
+    confidence: 'Default',
+    reason: '',
+  });
+
   const [defaultUniversity, setDefaultUniversity] = useState('');
   const [importMode, setImportMode] = useState('merge'); // 'merge' | 'replace'
-  
+
   const [columnMapping, setColumnMapping] = useState({
     university: '',
     programName: '',
@@ -2521,8 +2912,20 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
 
   const [step, setStep] = useState('file'); // 'file' | 'mapping'
 
+  // Computed destination country (either dropdown selection or typed custom name)
+  const effectiveCountry = useMemo(() => {
+    if (selectedCountry === 'CUSTOM') {
+      return customCountryInput.trim() || 'Malta';
+    }
+    return selectedCountry || 'Malta';
+  }, [selectedCountry, customCountryInput]);
+
+  const effectiveCountryFlag = useMemo(() => {
+    return getCountryFlag(effectiveCountry);
+  }, [effectiveCountry]);
+
   // Apply a specific header row to the raw grid
-  const applyHeaderRow = (grid, headerIdx, activeFileName = '') => {
+  const applyHeaderRow = (grid, headerIdx, activeFileName = '', activeSheetName = '') => {
     if (!grid || grid.length <= headerIdx) return;
 
     const rawHeaderRow = grid[headerIdx] || [];
@@ -2565,7 +2968,6 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
       /fee|duration|level|intake|country|campus|requirement|ielts|pte/i
     );
 
-    // Secondary fallback: simple titles
     if (!progCol) {
       progCol = findHeader(
         /^(title|subject|name|course_name|programme_name|qualification\s*title)$/i,
@@ -2575,7 +2977,10 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
 
     // Tertiary content fallback: if no header name matched, inspect actual row contents!
     if (!progCol && rows.length > 0) {
-      const degreeWords = ['bachelor', 'master', 'bsc', 'msc', 'ba', 'ma', 'mba', 'diploma', 'engineering', 'business', 'management', 'science', 'arts', 'computing', 'technology', 'health', 'finance', 'law'];
+      const degreeWords = [
+        'bachelor', 'master', 'bsc', 'msc', 'ba', 'ma', 'mba', 'diploma', 'engineering',
+        'business', 'management', 'science', 'arts', 'computing', 'technology', 'health', 'finance', 'law'
+      ];
       let bestContentCol = '';
       let bestContentScore = -1;
       for (const h of headers) {
@@ -2601,6 +3006,18 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
       /fee|duration|level/i
     );
 
+    const countryCol = findHeader(/country|nation|destination/i);
+
+    // Run AI Country Auto-Detection
+    const aiCountry = detectCountryFromData(activeFileName, activeSheetName, grid, headers, rows);
+    setAutoCountryInfo(aiCountry);
+    setSelectedCountry(aiCountry.country);
+
+    // If file has NO country column, enable forceCountryForAll by default
+    if (!countryCol) {
+      setForceCountryForAll(true);
+    }
+
     // Suggest default university from file name if no university column in file
     if (!uniCol && activeFileName) {
       const cleanName = activeFileName
@@ -2617,7 +3034,7 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
       programName: progCol,
       university: uniCol,
       level: findHeader(/level|award|type|qualification/i, /fee|duration/i),
-      country: findHeader(/country|nation|destination/i),
+      country: countryCol,
       campus: findHeader(/campus|city|location|province|state|region/i),
       duration: findHeader(/duration|length|period|years|months|semesters|ects/i),
       yearlyTuition: findHeader(/tuition|fee|fees|cost|annual|yearly|price|amount/i, /app|application|reg/i),
@@ -2631,7 +3048,7 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
   };
 
   // Process raw worksheet
-  const processWorksheet = (ws, fileName = '') => {
+  const processWorksheet = (ws, fileName = '', sheetName = '') => {
     const grid = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
     if (!grid || grid.length === 0) {
       toast.error('The selected sheet has no data');
@@ -2683,7 +3100,7 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
 
     setCandidateHeaderRows(candidates);
     setHeaderRowIndex(autoHeaderIdx);
-    applyHeaderRow(grid, autoHeaderIdx, fileName);
+    applyHeaderRow(grid, autoHeaderIdx, fileName, sheetName);
   };
 
   const handleFileChange = (e) => {
@@ -2698,13 +3115,13 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
         const wb = XLSX.read(bstr, { type: 'binary' });
         setWorkbook(wb);
         setAvailableSheets(wb.SheetNames);
-        
+
         // Pick best sheet
         const initialSheet = wb.SheetNames[0];
         setSelectedSheet(initialSheet);
-        
+
         const ws = wb.Sheets[initialSheet];
-        processWorksheet(ws, selectedFile.name);
+        processWorksheet(ws, selectedFile.name, initialSheet);
         setStep('mapping');
       } catch (err) {
         console.error('File parsing error:', err);
@@ -2718,15 +3135,15 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
     if (!workbook || !workbook.Sheets[sheetName]) return;
     setSelectedSheet(sheetName);
     const ws = workbook.Sheets[sheetName];
-    processWorksheet(ws, file?.name || '');
+    processWorksheet(ws, file?.name || '', sheetName);
   };
 
   const handleHeaderRowChange = (idx) => {
     setHeaderRowIndex(idx);
-    applyHeaderRow(sheetGrid, idx, file?.name || '');
+    applyHeaderRow(sheetGrid, idx, file?.name || '', selectedSheet);
   };
 
-  // Real-time live preview of top 4 rows using current mapping
+  // Real-time live preview of top 4 rows using current mapping and country resolution
   const previewRows = useMemo(() => {
     return dataRows.slice(0, 4).map((row, idx) => {
       // 1. Program Name
@@ -2749,7 +3166,17 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
       let uni = columnMapping.university ? String(row[columnMapping.university] || '').trim() : '';
       if (!uni) uni = defaultUniversity.trim() || 'Partner Institution';
 
-      // 3. Level
+      // 3. Country Resolution
+      let ctry = '';
+      if (!forceCountryForAll && columnMapping.country && row[columnMapping.country]) {
+        ctry = String(row[columnMapping.country]).trim();
+      }
+      if (!ctry) {
+        ctry = effectiveCountry;
+      }
+      const flag = getCountryFlag(ctry);
+
+      // 4. Level
       let lvl = columnMapping.level ? String(row[columnMapping.level] || '').trim() : '';
       if (!lvl) {
         const lower = (prog || '').toLowerCase();
@@ -2758,19 +3185,21 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
         else lvl = 'UG';
       }
 
-      // 4. Tuition
+      // 5. Tuition
       let tFee = columnMapping.yearlyTuition ? String(row[columnMapping.yearlyTuition] || '').trim() : '';
       if (!tFee) tFee = 'EUR 6,000';
 
-      // 5. Duration
+      // 6. Duration
       let dur = columnMapping.duration ? String(row[columnMapping.duration] || '').trim() : '';
       if (!dur) dur = '36 months';
 
-      // 6. Intakes
+      // 7. Intakes
       let itk = columnMapping.intakes ? String(row[columnMapping.intakes] || '').trim() : 'Sep, Jan';
 
       return {
         idx: idx + 1,
+        ctry,
+        flag,
         uni,
         prog: prog || '⚠️ Not detected',
         lvl,
@@ -2780,7 +3209,7 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
         hasProg: Boolean(prog),
       };
     });
-  }, [dataRows, columnMapping, defaultUniversity]);
+  }, [dataRows, columnMapping, defaultUniversity, effectiveCountry, forceCountryForAll]);
 
   // Final Ingestion with Robust Fallbacks
   const handleProcessImport = () => {
@@ -2794,7 +3223,6 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
       let prog = columnMapping.programName ? String(row[columnMapping.programName] || '').trim() : '';
 
       if (!prog) {
-        // Fallback layer 1: search keys for typical degree / major keywords
         for (const k of Object.keys(row)) {
           const v = String(row[k] || '').trim();
           if (v.length >= 4 && /bachelor|master|bsc|msc|ba|ma|mba|diploma|certificate|business|management|computing|engineering|science|arts|health|design|law/i.test(v)) {
@@ -2805,7 +3233,6 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
       }
 
       if (!prog) {
-        // Fallback layer 2: pick the longest non-numeric text column
         const textCols = Object.values(row)
           .map((v) => String(v || '').trim())
           .filter((v) => v.length > 5 && isNaN(Number(v)) && !v.includes('http') && !v.includes('@'));
@@ -2822,11 +3249,15 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
         uni = defaultUniversity.trim() || 'Partner Institution';
       }
 
-      // 3. Country extraction
-      let ctry = columnMapping.country ? String(row[columnMapping.country] || '').trim() : '';
-      if (!ctry) {
-        ctry = defaultCountry.trim() || 'Malta';
+      // 3. Country extraction (Respects Force Flag or Column Mapping)
+      let ctry = '';
+      if (!forceCountryForAll && columnMapping.country && row[columnMapping.country]) {
+        ctry = String(row[columnMapping.country]).trim();
       }
+      if (!ctry) {
+        ctry = effectiveCountry;
+      }
+      const cFlag = getCountryFlag(ctry);
 
       // 4. Level extraction
       let lvl = columnMapping.level ? String(row[columnMapping.level] || '').trim() : '';
@@ -2863,18 +3294,32 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
       }
       if (!dur) dur = '36 months';
 
-      // 6. Tuition Fee
+      // 6. Tuition Fee & Currency Detection
       let tFee = columnMapping.yearlyTuition ? String(row[columnMapping.yearlyTuition] || '').trim() : '';
       if (!tFee || tFee === '0') {
         for (const k of Object.keys(row)) {
           const v = String(row[k] || '').trim();
-          if (/[€$£₹]|\bEUR\b|\bUSD\b|\bGBP\b/i.test(v)) {
+          if (/[€$£₹]|\bEUR\b|\bUSD\b|\bGBP\b|\bCAD\b|\bAUD\b|\bAED\b/i.test(v)) {
             tFee = v;
             break;
           }
         }
       }
-      if (!tFee) tFee = 'EUR 6,000';
+      if (!tFee) {
+        const defaultSym =
+          ctry.includes('United Kingdom') || ctry === 'UK'
+            ? 'GBP '
+            : ctry.includes('Canada')
+            ? 'CAD '
+            : ctry.includes('Australia')
+            ? 'AUD '
+            : ctry.includes('United States')
+            ? 'USD '
+            : ctry.includes('United Arab Emirates')
+            ? 'AED '
+            : 'EUR ';
+        tFee = `${defaultSym}6,000`;
+      }
 
       // 7. Intakes
       const itkRaw = columnMapping.intakes ? String(row[columnMapping.intakes] || 'Sep, Jan').trim() : 'Sep, Jan';
@@ -2886,7 +3331,7 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
       const appFee = columnMapping.applicationFee ? String(row[columnMapping.applicationFee] || 'No Application Fee').trim() : 'No Application Fee';
       const comm = columnMapping.expectedCommission ? String(row[columnMapping.expectedCommission] || 'Standard Agency Commission').trim() : 'Standard Agency Commission';
       const web = columnMapping.websiteUrl ? String(row[columnMapping.websiteUrl] || '').trim() : '';
-      const campus = columnMapping.campus ? String(row[columnMapping.campus] || 'Main Campus').trim() : 'Main Campus';
+      const campus = columnMapping.campus ? String(row[columnMapping.campus] || `${ctry} Campus`).trim() : `${ctry} Campus`;
 
       const tuitionNum = parseInt(tFee.replace(/\D/g, '')) || 6000;
 
@@ -2896,13 +3341,7 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
         logo: uni.slice(0, 3).toUpperCase(),
         logoColor: '#36D1DC',
         country: ctry,
-        countryFlag: ctry.toLowerCase().includes('malta')
-          ? '🇲🇹'
-          : ctry.toLowerCase().includes('germany')
-          ? '🇩🇪'
-          : ctry.toLowerCase().includes('uk') || ctry.toLowerCase().includes('united kingdom')
-          ? '🇬🇧'
-          : '🌍',
+        countryFlag: cFlag,
         region: campus,
         campus: campus,
         websiteUrl: web,
@@ -2919,7 +3358,17 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
         durationYears: dur.includes('1') ? '1 - 2 Years' : dur.includes('2') ? '2 - 3 Years' : '3 - 4 Years',
         yearlyTuition: tFee,
         tuitionNumeric: tuitionNum,
-        tuitionCurrency: tFee.includes('$') ? 'USD' : tFee.includes('£') ? 'GBP' : 'EUR',
+        tuitionCurrency: tFee.includes('$')
+          ? ctry.includes('Canada')
+            ? 'CAD'
+            : ctry.includes('Australia')
+            ? 'AUD'
+            : 'USD'
+          : tFee.includes('£')
+          ? 'GBP'
+          : tFee.includes('AED')
+          ? 'AED'
+          : 'EUR',
         applicationFee: appFee,
         expectedCommission: comm,
         commissionNumeric: 800,
@@ -2938,7 +3387,7 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
         },
         standardizedTests: 'Standard Entry Assessment',
         entryRequirements: reqs || '12 years secondary or equivalent bachelor degree.',
-        remarks: engReqs ? `Language requirements: ${engReqs}` : 'Uploaded via custom country course spreadsheet.',
+        remarks: engReqs ? `Language requirements: ${engReqs}` : `Imported for destination country ${cFlag} ${ctry}.`,
         tags: ['Custom Upload', ctry],
       };
     });
@@ -2964,7 +3413,7 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
       <div
         style={{
           width: '100%',
-          maxWidth: '920px',
+          maxWidth: '940px',
           maxHeight: '92vh',
           backgroundColor: '#0F1423',
           border: '1px solid rgba(0, 229, 160, 0.35)',
@@ -2993,7 +3442,7 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
               <span>Upload Custom Course Spreadsheet</span>
             </h3>
             <p style={{ fontSize: '12px', color: '#8E9BB5', margin: '4px 0 0' }}>
-              Smart multi-sheet parser & header auto-detector. Previews your exact course names before importing.
+              Smart multi-sheet parser with <strong>AI Country Detection</strong> and live preview before ingestion.
             </p>
           </div>
           <button
@@ -3014,7 +3463,7 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
         </div>
 
         {/* Modal Body */}
-        <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
           {step === 'file' ? (
             <div
               style={{
@@ -3033,7 +3482,7 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
                 Click to Select or Drag Excel (.xlsx, .xls) / CSV File Here
               </div>
               <div style={{ fontSize: '12px', color: '#8E9BB5', maxWidth: '480px', margin: '0 auto' }}>
-                Works seamlessly with university sheets, partner brochures, or custom multi-column fee lists from Malta, Germany, UK, etc.
+                Works with any country format. AI automatically detects the destination country or lets you pick/override it with 1 click.
               </div>
               <input
                 id="cf-excel-upload-input"
@@ -3044,7 +3493,7 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
               />
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {/* File Info Bar */}
               <div
                 style={{
@@ -3082,7 +3531,130 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
                 </button>
               </div>
 
-              {/* Sheet & Header Row Selectors (Fixes merged title rows & multi-tab workbooks) */}
+              {/* =========================================================================
+                  AI COUNTRY DETECTION & DESTINATION SELECTION CARD (CRITICAL USER FEATURE)
+                 ========================================================================= */}
+              <div
+                style={{
+                  background: 'linear-gradient(135deg, rgba(0, 229, 160, 0.08) 0%, rgba(56, 189, 248, 0.08) 100%)',
+                  border: '1px solid rgba(0, 229, 160, 0.35)',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '18px' }}>🌍</span>
+                    <span style={{ fontSize: '13px', fontWeight: 800, color: '#00E5A0', letterSpacing: '0.03em' }}>
+                      STUDY ABROAD DESTINATION COUNTRY
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span
+                      style={{
+                        fontSize: '11px',
+                        background: 'rgba(0, 229, 160, 0.18)',
+                        color: '#00E5A0',
+                        padding: '3px 8px',
+                        borderRadius: '6px',
+                        fontWeight: 700,
+                        border: '1px solid rgba(0, 229, 160, 0.3)',
+                      }}
+                    >
+                      ✨ AI Detected: {autoCountryInfo.flag} {autoCountryInfo.country} ({autoCountryInfo.reason})
+                    </span>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: selectedCountry === 'CUSTOM' ? '1.5fr 1.5fr' : '1fr', gap: '12px' }}>
+                  {/* Country Selector Dropdown */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#EDEFFA', marginBottom: '6px' }}>
+                      Select Target Country for this Spreadsheet
+                    </label>
+                    <select
+                      value={selectedCountry}
+                      onChange={(e) => setSelectedCountry(e.target.value)}
+                      style={{
+                        width: '100%',
+                        background: 'rgba(8, 10, 18, 0.95)',
+                        border: '1px solid #00E5A0',
+                        borderRadius: '8px',
+                        padding: '9px 12px',
+                        color: '#00E5A0',
+                        fontSize: '13px',
+                        fontWeight: 700,
+                        outline: 'none',
+                      }}
+                    >
+                      {STUDY_ABROAD_COUNTRIES.map((c) => (
+                        <option key={c.name} value={c.name}>
+                          {c.flag} {c.name}
+                        </option>
+                      ))}
+                      <option value="CUSTOM">➕ Other / Type Custom Country...</option>
+                    </select>
+                  </div>
+
+                  {/* Custom Country Text Input */}
+                  {selectedCountry === 'CUSTOM' && (
+                    <div>
+                      <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#38BDF8', marginBottom: '6px' }}>
+                        Type Custom Country Name
+                      </label>
+                      <input
+                        type="text"
+                        value={customCountryInput}
+                        onChange={(e) => setCustomCountryInput(e.target.value)}
+                        placeholder="e.g. Switzerland, Mauritius, Japan..."
+                        style={{
+                          width: '100%',
+                          background: 'rgba(8, 10, 18, 0.95)',
+                          border: '1px solid #38BDF8',
+                          borderRadius: '8px',
+                          padding: '9px 12px',
+                          color: '#fff',
+                          fontSize: '13px',
+                          outline: 'none',
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Force Country Checkbox (For files without Country column) */}
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '8px',
+                    fontSize: '12px',
+                    color: '#EDEFFA',
+                    cursor: 'pointer',
+                    background: 'rgba(0, 0, 0, 0.3)',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={forceCountryForAll}
+                    onChange={(e) => setForceCountryForAll(e.target.checked)}
+                    style={{ marginTop: '2px' }}
+                  />
+                  <span>
+                    <strong>Apply {effectiveCountryFlag} {effectiveCountry} to ALL courses in this file</strong>{' '}
+                    <span style={{ color: '#8E9BB5' }}>
+                      (Recommended: ensures 100% accurate country filtering in Course Finder even if the spreadsheet has no Country column).
+                    </span>
+                  </span>
+                </label>
+              </div>
+
+              {/* Sheet & Header Row Selectors */}
               <div style={{ display: 'grid', gridTemplateColumns: availableSheets.length > 1 ? '1fr 2fr' : '1fr', gap: '12px' }}>
                 {availableSheets.length > 1 && (
                   <div>
@@ -3145,69 +3717,27 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
                 </div>
               </div>
 
-              {/* Default University & Country (Used if columns are not present in file) */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '12px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#8E9BB5', marginBottom: '6px' }}>
-                    Default University / Institution Name (Used if no university column in file)
-                  </label>
-                  <input
-                    type="text"
-                    value={defaultUniversity}
-                    onChange={(e) => setDefaultUniversity(e.target.value)}
-                    placeholder="e.g. Global College Malta / GBS Malta"
-                    style={{
-                      width: '100%',
-                      background: 'rgba(8, 10, 18, 0.9)',
-                      border: '1px solid rgba(148, 163, 225, 0.22)',
-                      borderRadius: '8px',
-                      padding: '8px 12px',
-                      color: '#fff',
-                      fontSize: '13px',
-                      outline: 'none',
-                    }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#8E9BB5', marginBottom: '6px' }}>
-                    Default Country (Used if no country column in file)
-                  </label>
-                  <select
-                    value={defaultCountry}
-                    onChange={(e) => setDefaultCountry(e.target.value)}
-                    style={{
-                      width: '100%',
-                      background: 'rgba(8, 10, 18, 0.9)',
-                      border: '1px solid rgba(148, 163, 225, 0.22)',
-                      borderRadius: '8px',
-                      padding: '8px 12px',
-                      color: '#fff',
-                      fontSize: '13px',
-                      outline: 'none',
-                    }}
-                  >
-                    {[
-                      'Malta',
-                      'Germany',
-                      'United Kingdom',
-                      'United States of America',
-                      'Canada',
-                      'Australia',
-                      'Ireland',
-                      'Lithuania',
-                      'France',
-                      'Poland',
-                      'United Arab Emirates',
-                      'Singapore',
-                      'Other',
-                    ].map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              {/* Default University Name Input */}
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#8E9BB5', marginBottom: '6px' }}>
+                  Default University / Institution Name (Used if no university column in file)
+                </label>
+                <input
+                  type="text"
+                  value={defaultUniversity}
+                  onChange={(e) => setDefaultUniversity(e.target.value)}
+                  placeholder="e.g. Global College Malta / GBS Malta / BSBI Berlin"
+                  style={{
+                    width: '100%',
+                    background: 'rgba(8, 10, 18, 0.9)',
+                    border: '1px solid rgba(148, 163, 225, 0.22)',
+                    borderRadius: '8px',
+                    padding: '8px 12px',
+                    color: '#fff',
+                    fontSize: '13px',
+                    outline: 'none',
+                  }}
+                />
               </div>
 
               {/* Column Mapping Section */}
@@ -3220,11 +3750,11 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
                   {[
                     { key: 'programName', label: 'Program / Course Title * (Critical)', required: true },
                     { key: 'university', label: 'University / Institution Name' },
+                    { key: 'country', label: 'Country Column (Optional if selected above)' },
                     { key: 'level', label: 'Degree Level (UG, PG, Diploma)' },
                     { key: 'yearlyTuition', label: 'Yearly Tuition Fee' },
                     { key: 'duration', label: 'Duration (e.g. 36 months, 3 yrs)' },
                     { key: 'intakes', label: 'Intakes / Start Dates' },
-                    { key: 'country', label: 'Country Column' },
                     { key: 'campus', label: 'Campus / City / Province' },
                     { key: 'requirements', label: 'Entry Requirements / Eligibility' },
                     { key: 'englishRequirements', label: 'IELTS / PTE / English Test' },
@@ -3264,7 +3794,7 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
                 </div>
               </div>
 
-              {/* LIVE DATA PREVIEW (Crucial: Shows exact extracted course names before importing) */}
+              {/* LIVE DATA PREVIEW TABLE (Shows exact country, flag, university, course names before import) */}
               <div
                 style={{
                   background: 'rgba(8, 10, 18, 0.75)',
@@ -3278,15 +3808,20 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
                   <div style={{ fontSize: '12px', fontWeight: 800, color: '#38BDF8', letterSpacing: '0.04em' }}>
                     🔍 LIVE DATA PREVIEW (First {previewRows.length} Rows with Current Mapping)
                   </div>
-                  {previewRows[0]?.hasProg ? (
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                     <span style={{ fontSize: '11px', color: '#00E5A0', fontWeight: 700 }}>
-                      ✓ Course Names Validated
+                      Country: {effectiveCountryFlag} {effectiveCountry}
                     </span>
-                  ) : (
-                    <span style={{ fontSize: '11px', color: '#FFB020', fontWeight: 700 }}>
-                      ⚠️ Pick "Program / Course Title" above
-                    </span>
-                  )}
+                    {previewRows[0]?.hasProg ? (
+                      <span style={{ fontSize: '11px', color: '#00E5A0', fontWeight: 700 }}>
+                        ✓ Course Names Validated
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: '11px', color: '#FFB020', fontWeight: 700 }}>
+                        ⚠️ Pick "Program Title"
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 {!previewRows[0]?.hasProg && (
@@ -3310,7 +3845,8 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
                     <thead>
                       <tr style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.1)', color: '#8E9BB5', textAlign: 'left' }}>
                         <th style={{ padding: '6px 8px', width: '30px' }}>#</th>
-                        <th style={{ padding: '6px 8px', color: '#00E5A0' }}>University</th>
+                        <th style={{ padding: '6px 8px', color: '#00E5A0' }}>Country</th>
+                        <th style={{ padding: '6px 8px', color: '#EDEFFA' }}>University</th>
                         <th style={{ padding: '6px 8px', color: '#38BDF8' }}>Course / Program Name</th>
                         <th style={{ padding: '6px 8px' }}>Level</th>
                         <th style={{ padding: '6px 8px' }}>Tuition/Yr</th>
@@ -3322,6 +3858,9 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
                       {previewRows.map((r) => (
                         <tr key={r.idx} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
                           <td style={{ padding: '6px 8px', color: '#8E9BB5' }}>{r.idx}</td>
+                          <td style={{ padding: '6px 8px', color: '#00E5A0', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                            {r.flag} {r.ctry}
+                          </td>
                           <td style={{ padding: '6px 8px', color: '#EDEFFA', fontWeight: 600 }}>{r.uni}</td>
                           <td style={{ padding: '6px 8px', color: r.hasProg ? '#38BDF8' : '#FFB020', fontWeight: 700 }}>
                             {r.prog}
@@ -3420,7 +3959,7 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
               }}
             >
               <span>🚀</span>
-              <span>Import {dataRows.length} Courses to Portal</span>
+              <span>Import {dataRows.length} Courses to {effectiveCountryFlag} {effectiveCountry}</span>
             </button>
           )}
         </div>
