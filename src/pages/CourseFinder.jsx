@@ -698,8 +698,18 @@ const DEFAULT_COUNTRY_PORTALS = [
 ];
 
 // ============================================================================
-// INTELLIGENT DEGREE LEVEL CLASSIFIER (Bachelors, Masters, Diploma, Certificate, PG Diploma, PG Certificate, PhD)
+// SIMPLIFIED 7 PROGRAM LEVELS CLASSIFIER (Bachelors, Masters, UG Diploma, PG Diploma, UG Certificate, PG Certificate, Bridging Course)
 // ============================================================================
+export const CANONICAL_PROGRAM_LEVELS = [
+  'Bachelors',
+  'Masters',
+  'UG Diploma',
+  'PG Diploma',
+  'UG Certificate',
+  'PG Certificate',
+  'Bridging Course',
+];
+
 export function detectProgramLevel(courseName = '', rawLevel = '', duration = '') {
   const name = String(courseName || '').trim();
   const raw = String(rawLevel || '').trim();
@@ -707,51 +717,50 @@ export function detectProgramLevel(courseName = '', rawLevel = '', duration = ''
   const nLow = name.toLowerCase();
   const rLow = raw.toLowerCase();
 
-  // 1. PhD / Doctorate
+  // 1. Bridging Course / Preparatory / Foundation / Pathway Course
+  // (e.g. Preparatory Course for the Bachelor in Culinary Arts, Foundation in Science, Bridging Program)
   if (
-    /\b(ph\.?d|doctorate|doctor of philosophy|dba\b|doctor of business)\b/i.test(name) ||
-    /\b(ph\.?d|doctorate|dba)\b/i.test(raw)
+    /\b(bridging|bridge|preparatory|foundation|pathway|pre-bachelor|pre bachelor|pre-master|pre master|international foundation|pre-sessional)\b/i.test(nLow) ||
+    /\b(bridging|foundation|pathway)\b/i.test(rLow)
   ) {
-    return 'PhD';
+    return 'Bridging Course';
   }
 
-  // 2. Preparatory / Foundation / Pathway Course
-  // CRITICAL: Must be checked BEFORE Bachelor/Master because titles like 'Preparatory Course for the Bachelor in Culinary Arts' contain 'Bachelor'!
-  if (
-    /\b(preparatory|foundation|pathway|pre-bachelor|pre bachelor|pre-master|pre master|international foundation|pre-sessional)\b/i.test(nLow)
-  ) {
-    return 'Diploma';
-  }
-
-  // 3. PG Certificate (Postgraduate Certificate / PGCert / Level 7 Certificate)
+  // 2. PG Certificate (Postgraduate Certificate / PGCert / Level 7 Certificate)
   if (
     /\b(pgcert|pg cert|pg-cert|postgraduate certificate|post-graduate certificate|post graduate certificate|graduate certificate|grad cert|gradcert|advanced certificate|executive certificate)\b/i.test(nLow) ||
-    (/\b(cert|certificate)\b/i.test(nLow) && /\b(postgraduate|graduate|pg\b|level 7|level 8)\b/i.test(rLow + ' ' + nLow))
+    (/\b(cert|certificate)\b/i.test(nLow) && /\b(postgraduate|graduate|pg\b|level 7|level 8)\b/i.test(rLow + ' ' + nLow)) ||
+    /\b(pg certificate|postgraduate certificate)\b/i.test(rLow)
   ) {
     return 'PG Certificate';
   }
 
-  // 4. PG Diploma (Postgraduate Diploma / PGDip / Level 7 Diploma)
+  // 3. PG Diploma (Postgraduate Diploma / PGDip / Level 7 Diploma)
   if (
     /\b(pgdip|pg dip|pg-dip|postgraduate diploma|post-graduate diploma|post graduate diploma|graduate diploma|grad dip|graddip|advanced diploma|pgd\b)\b/i.test(nLow) ||
-    (/\b(diploma|dip\b)\b/i.test(nLow) && /\b(postgraduate|graduate|pg\b|level 7|level 8)\b/i.test(rLow + ' ' + nLow))
+    (/\b(diploma|dip\b)\b/i.test(nLow) && /\b(postgraduate|graduate|pg\b|level 7|level 8)\b/i.test(rLow + ' ' + nLow)) ||
+    /\b(pg diploma|postgraduate diploma)\b/i.test(rLow)
   ) {
     return 'PG Diploma';
   }
 
-  // 5. Undergraduate Certificate (Certificate in Rooms Division, Certificate in Travel and Tourism, etc.)
-  if (/\b(certificate in|cert in|certificate\b|cert\b)\b/i.test(nLow)) {
-    return 'Certificate';
-  }
-
-  // 6. Undergraduate Diploma / Higher National Diploma / HND / Associate
+  // 4. UG Certificate (Certificate in Rooms Division, Certificate in Travel and Tourism, 60 ECTS Certificate)
   if (
-    /\b(higher national diploma|hnd\b|hnc\b|national diploma|diploma in|diploma\b|dip\b|associate degree|associate of|vocational)\b/i.test(nLow)
+    /\b(ug certificate|undergraduate certificate|certificate in|cert in|certificate\b|cert\b)\b/i.test(nLow) ||
+    /\b(ug certificate|undergraduate certificate)\b/i.test(rLow)
   ) {
-    return 'Diploma';
+    return 'UG Certificate';
   }
 
-  // 7. Masters / Postgraduate Degree (MSc, MA, MBA, etc.)
+  // 5. UG Diploma (Undergraduate Diploma, Higher National Diploma / HND / HNC / Vocational Diploma)
+  if (
+    /\b(ug diploma|undergraduate diploma|higher national diploma|hnd\b|hnc\b|national diploma|diploma in|diploma\b|dip\b|associate degree|associate of|vocational)\b/i.test(nLow) ||
+    /\b(ug diploma|undergraduate diploma|diploma)\b/i.test(rLow)
+  ) {
+    return 'UG Diploma';
+  }
+
+  // 6. Masters (MSc, MA, MBA, MEng, LLM, MPhil, Postgraduate Degree)
   if (
     /\b(master|masters|msc|m\.sc|m\.s\.|ma\b|m\.a\.|mba|m\.b\.a\.|meng|m\.eng|llm|l\.l\.m\.|mphil|m\.phil|mres|m\.res|mtech|m\.tech|mdes|m\.des|mfin|m\.fin|mcom|m\.com|med\b|m\.ed|m\.arch|march|mpharm|m\.pharm|postgraduate degree|pg degree)\b/i.test(nLow) ||
     (/\b(master|msc|mba|ma\b|postgraduate|pg)\b/i.test(rLow) && !/\b(bachelor|undergraduate|ug)\b/i.test(nLow))
@@ -759,7 +768,7 @@ export function detectProgramLevel(courseName = '', rawLevel = '', duration = ''
     return 'Masters';
   }
 
-  // 8. Bachelors / Undergraduate Degree (BSc, BA, BEng, BBA, etc.)
+  // 7. Bachelors (BSc, BA, BEng, BBA, LLB, MBBS, Undergraduate Degree)
   if (
     /\b(bachelor|bachelors|bsc|b\.sc|b\.s\.|ba\b|b\.a\.|bba|b\.b\.a\.|beng|b\.eng|llb|l\.l\.b\.|btech|b\.tech|bcom|b\.com|bed\b|b\.ed|bdes|b\.des|bpharm|b\.pharm|barch|b\.arch|mbbs|bds|undergraduate degree|ug degree)\b/i.test(nLow) ||
     /\b(bachelor|bsc|ba\b|undergraduate|ug)\b/i.test(rLow)
@@ -767,9 +776,9 @@ export function detectProgramLevel(courseName = '', rawLevel = '', duration = ''
     return 'Bachelors';
   }
 
-  // 9. Duration & Credit heuristics
+  // 8. Duration & Credit heuristics
   if (nLow.includes('60 ects') || dur.includes('60 ects') || dur.includes('1 year') || dur.includes('12 month')) {
-    return 'Certificate';
+    return 'UG Certificate';
   }
   if (dur.includes('3 year') || dur.includes('4 year') || dur.includes('36 month') || dur.includes('48 month')) {
     return 'Bachelors';
@@ -800,24 +809,34 @@ export function getLevelBadgeInfo(level) {
       icon: '📜',
     };
   }
-  if (l === 'Certificate') {
+  if (l === 'UG Certificate' || l === 'Certificate') {
     return {
-      label: 'Certificate',
-      shortLabel: 'Certificate',
+      label: 'UG Certificate',
+      shortLabel: 'UG Certificate',
       color: '#10B981',
       bg: 'rgba(16, 185, 129, 0.14)',
       border: 'rgba(16, 185, 129, 0.4)',
       icon: '📜',
     };
   }
-  if (l === 'Diploma' || l === 'UG Diploma' || l === 'Foundation / Prep') {
+  if (l === 'UG Diploma' || l === 'Diploma') {
     return {
-      label: 'Diploma',
-      shortLabel: 'Diploma',
+      label: 'UG Diploma',
+      shortLabel: 'UG Diploma',
       color: '#00F296',
       bg: 'rgba(0, 242, 150, 0.12)',
       border: 'rgba(0, 242, 150, 0.35)',
       icon: '📜',
+    };
+  }
+  if (l === 'Bridging Course' || l === 'Foundation / Prep') {
+    return {
+      label: 'Bridging Course',
+      shortLabel: 'Bridging',
+      color: '#818CF8',
+      bg: 'rgba(129, 140, 248, 0.14)',
+      border: 'rgba(129, 140, 248, 0.4)',
+      icon: '🌉',
     };
   }
   if (l === 'Masters' || l === 'PG' || l.toLowerCase().includes('master')) {
@@ -828,16 +847,6 @@ export function getLevelBadgeInfo(level) {
       bg: 'rgba(168, 85, 247, 0.12)',
       border: 'rgba(168, 85, 247, 0.35)',
       icon: '🎓',
-    };
-  }
-  if (l === 'PhD' || l.toLowerCase().includes('doctor')) {
-    return {
-      label: 'PhD / Doctorate',
-      shortLabel: 'PhD',
-      color: '#FF3366',
-      bg: 'rgba(255, 51, 102, 0.12)',
-      border: 'rgba(255, 51, 102, 0.35)',
-      icon: '🔬',
     };
   }
   // Default: Bachelors
@@ -905,22 +914,35 @@ export default function CourseFinder({ setCurrentPage }) {
     }
   }, [countryPortals]);
 
-  // UI state
-  const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
+  // UI state & Simplified Program Level Filter (7 Canonical Options)
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedLevel, setSelectedLevel] = useState('All'); // 'All' | 'Bachelors' | 'Masters' | 'UG Diploma' | 'PG Diploma' | 'UG Certificate' | 'PG Certificate' | 'Bridging Course'
+  const [selectedCountry, setSelectedCountry] = useState('All');
   const [selectedIntakes, setSelectedIntakes] = useState([]);
   const [selectedYear, setSelectedYear] = useState('2026/2027');
   const [selectedNationality, setSelectedNationality] = useState('India');
   const [selectedStudentState, setSelectedStudentState] = useState('');
-
-  // Advanced Filters State (Images 2, 3, 4, 5)
-  const [selectedLevels, setSelectedLevels] = useState([]);
-  const [selectedCountry, setSelectedCountry] = useState('All');
-  const [selectedProvince, setSelectedProvince] = useState('');
-  const [selectedStudyArea, setSelectedStudyArea] = useState('All');
-  const [selectedDiscipline, setSelectedDiscipline] = useState('');
   const [selectedDuration, setSelectedDuration] = useState('All');
-  const [selectedRequirements, setSelectedRequirements] = useState([]);
+
+  // Fast counts for the 7 canonical levels
+  const levelCounts = useMemo(() => {
+    const counts = {
+      All: courses.length,
+      'Bachelors': 0,
+      'Masters': 0,
+      'UG Diploma': 0,
+      'PG Diploma': 0,
+      'UG Certificate': 0,
+      'PG Certificate': 0,
+      'Bridging Course': 0,
+    };
+    courses.forEach((c) => {
+      const lvl = detectProgramLevel(c.programName, c.level, c.duration);
+      if (counts[lvl] !== undefined) counts[lvl]++;
+      else counts['Bachelors']++;
+    });
+    return counts;
+  }, [courses]);
 
   // Selection & Actions
   const [selectedCourseIds, setSelectedCourseIds] = useState(new Set());
@@ -1052,38 +1074,13 @@ export default function CourseFinder({ setCurrentPage }) {
         return false;
       }
 
-      // 6. Program Level Multi-Checkboxes with Fuzzy Hierarchy Matching
-      if (selectedLevels.length > 0) {
-        const matchesLevel = selectedLevels.some((sl) => {
-          const curLevel = detectProgramLevel(c.programName, c.level, c.duration);
-          if (sl === curLevel) return true;
-          if ((sl === 'Bachelors' || sl === 'UG') && (curLevel === 'Bachelors' || curLevel === 'UG')) return true;
-          if ((sl === 'Masters' || sl === 'PG') && (curLevel === 'Masters' || curLevel === 'PG')) return true;
-          if ((sl === 'Diploma' || sl === 'UG Diploma') && (curLevel === 'Diploma' || curLevel === 'Certificate' || curLevel === 'Foundation / Prep')) return true;
-          if (sl === 'Certificate' && (curLevel === 'Certificate' || curLevel === 'Diploma')) return true;
-          if (sl === 'PG Diploma' && curLevel === 'PG Diploma') return true;
-          if (sl === 'PG Certificate' && curLevel === 'PG Certificate') return true;
-          if (sl === 'PhD' && curLevel === 'PhD') return true;
-          return false;
-        });
-        if (!matchesLevel) return false;
+      // 4. Simplified 7 Program Levels (Bachelors, Masters, UG Diploma, PG Diploma, UG Certificate, PG Certificate, Bridging Course)
+      if (selectedLevel !== 'All') {
+        const curLevel = detectProgramLevel(c.programName, c.level, c.duration);
+        if (curLevel !== selectedLevel) return false;
       }
 
-      // 7. Requirements Checkboxes
-      if (selectedRequirements.length > 0) {
-        for (const req of selectedRequirements) {
-          if (req === 'PTE' && !(c.englishRequirements?.pteOverall > 0)) return false;
-          if (req === 'IELTS' && !(c.englishRequirements?.ieltsOverall > 0)) return false;
-          if (req === 'TOEFL iBT' && !(c.englishRequirements?.toeflOverall > 0)) return false;
-          if (req === 'DET' && !(c.englishRequirements?.detScore > 0)) return false;
-          if (req === 'Without English Proficiency' && !c.englishRequirements?.moiAccepted) return false;
-          if (req === 'Scholarship Available' && !c.scholarshipAvailable) return false;
-          if (req === 'STEM Programs' && !c.tags?.includes('STEM Programs')) return false;
-          if (req === 'Application Fee Waiver (upto 100%)' && c.applicationFee !== 'No Application Fee') return false;
-        }
-      }
-
-      // 8. Quick Filter Suggestions (Image 6 Bottom)
+      // 5. Quick Filter Suggestions (Image 6 Bottom)
       if (quickFilter === 'faster_tat' && !c.fasterOfferTAT) return false;
       if (quickFilter === 'scholarship' && !c.scholarshipAvailable) return false;
       if (quickFilter === 'high_acceptance' && !c.highAcceptance) return false;
@@ -1097,8 +1094,7 @@ export default function CourseFinder({ setCurrentPage }) {
     selectedCountry,
     selectedStudyArea,
     selectedDuration,
-    selectedLevels,
-    selectedRequirements,
+    selectedLevel,
     quickFilter,
   ]);
 
@@ -1150,12 +1146,11 @@ export default function CourseFinder({ setCurrentPage }) {
 
   const clearAllFilters = () => {
     setSearchQuery('');
-    setSelectedIntakes([]);
+    setSelectedLevel('All');
     setSelectedCountry('All');
+    setSelectedIntakes([]);
     setSelectedStudyArea('All');
     setSelectedDuration('All');
-    setSelectedLevels([]);
-    setSelectedRequirements([]);
     setSelectedProvince('');
     setSelectedDiscipline('');
     setQuickFilter(null);
@@ -1435,7 +1430,7 @@ export default function CourseFinder({ setCurrentPage }) {
           gap: '12px',
         }}
       >
-        <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr 1fr 1.5fr 1.5fr auto', gap: '10px', alignItems: 'flex-end' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '2.5fr 1.5fr 1.5fr auto', gap: '12px', alignItems: 'flex-end' }}>
           {/* 1. Search Program / University */}
           <div>
             <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#8E9BB5', marginBottom: '6px' }}>
@@ -1447,7 +1442,7 @@ export default function CourseFinder({ setCurrentPage }) {
               </span>
               <input
                 type="text"
-                placeholder="Search Program / University..."
+                placeholder="Search Program / University / Campus..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 style={{
@@ -1464,7 +1459,33 @@ export default function CourseFinder({ setCurrentPage }) {
             </div>
           </div>
 
-          {/* 2. Intake */}
+          {/* 2. Country */}
+          <div>
+            <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#8E9BB5', marginBottom: '6px' }}>
+              Country
+            </label>
+            <select
+              value={selectedCountry}
+              onChange={(e) => setSelectedCountry(e.target.value)}
+              style={{
+                width: '100%',
+                background: 'rgba(8, 10, 18, 0.9)',
+                border: '1px solid rgba(148, 163, 225, 0.22)',
+                borderRadius: '10px',
+                padding: '9px 12px',
+                color: '#EDEFFA',
+                fontSize: '13px',
+                outline: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              {availableCountries.map((c) => (
+                <option key={c} value={c}>{c === 'All' ? '🌍 All Countries' : `${getCountryFlag(c)} ${c}`}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* 3. Intake */}
           <div>
             <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#8E9BB5', marginBottom: '6px' }}>
               Intake
@@ -1487,93 +1508,14 @@ export default function CourseFinder({ setCurrentPage }) {
                 cursor: 'pointer',
               }}
             >
-              <option value="All">All Intakes (Jan - Dec)</option>
+              <option value="All">📅 All Intakes (Jan - Dec)</option>
               {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((m) => (
                 <option key={m} value={m}>{m} Intake</option>
               ))}
             </select>
           </div>
 
-          {/* 3. Year */}
-          <div>
-            <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#8E9BB5', marginBottom: '6px' }}>
-              Year
-            </label>
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(e.target.value)}
-              style={{
-                width: '100%',
-                background: 'rgba(8, 10, 18, 0.9)',
-                border: '1px solid rgba(148, 163, 225, 0.22)',
-                borderRadius: '10px',
-                padding: '9px 12px',
-                color: '#EDEFFA',
-                fontSize: '13px',
-                outline: 'none',
-                cursor: 'pointer',
-              }}
-            >
-              <option value="2026">2026</option>
-              <option value="2026/2027">2026 / 2027</option>
-              <option value="2027">2027</option>
-              <option value="2028">2028</option>
-            </select>
-          </div>
-
-          {/* 4. Student Nationality */}
-          <div>
-            <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#8E9BB5', marginBottom: '6px' }}>
-              Student's Nationality
-            </label>
-            <select
-              value={selectedNationality}
-              onChange={(e) => setSelectedNationality(e.target.value)}
-              style={{
-                width: '100%',
-                background: 'rgba(8, 10, 18, 0.9)',
-                border: '1px solid rgba(148, 163, 225, 0.22)',
-                borderRadius: '10px',
-                padding: '9px 12px',
-                color: '#EDEFFA',
-                fontSize: '13px',
-                outline: 'none',
-                cursor: 'pointer',
-              }}
-            >
-              <option value="India">🇮🇳 India</option>
-              <option value="Nepal">🇳🇵 Nepal</option>
-              <option value="Bangladesh">🇧🇩 Bangladesh</option>
-              <option value="Sri Lanka">🇱🇰 Sri Lanka</option>
-              <option value="Nigeria">🇳🇬 Nigeria</option>
-              <option value="Other">🌍 International / Other</option>
-            </select>
-          </div>
-
-          {/* 5. Student's State */}
-          <div>
-            <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#8E9BB5', marginBottom: '6px' }}>
-              Student's State
-            </label>
-            <input
-              type="text"
-              placeholder="e.g. Kerala, Punjab..."
-              value={selectedStudentState}
-              onChange={(e) => setSelectedStudentState(e.target.value)}
-              style={{
-                width: '100%',
-                background: 'rgba(8, 10, 18, 0.9)',
-                border: '1px solid rgba(148, 163, 225, 0.22)',
-                borderRadius: '10px',
-                padding: '9px 12px',
-                color: '#fff',
-                fontSize: '13px',
-                outline: 'none',
-              }}
-            />
-          </div>
-
-          {/* 6. Search & Clear Buttons */}
+          {/* 4. Search & Clear Buttons */}
           <div style={{ display: 'flex', gap: '8px' }}>
             <button
               onClick={() => {
@@ -1616,252 +1558,78 @@ export default function CourseFinder({ setCurrentPage }) {
           </div>
         </div>
 
-        {/* Advanced Search Toggle Button */}
-        <div style={{ display: 'flex', justifyContent: 'center', paddingTop: '4px' }}>
-          <button
-            onClick={() => setShowAdvancedSearch((prev) => !prev)}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: '#38BDF8',
-              fontSize: '13px',
-              fontWeight: 700,
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '4px 12px',
-              borderRadius: '6px',
-            }}
-          >
-            <span>{showAdvancedSearch ? '▲ Hide Advanced Search' : '▼ Advanced Search (Program Level, Countries, Exam Waivers)'}</span>
-          </button>
-        </div>
-
         {/* =======================================================================
-            ADVANCED SEARCH 3-COLUMN PANEL (Exact Match to Images 2, 3, 4, 5)
+            SIMPLIFIED 7 PROGRAM LEVELS FILTER (Horizontal Counselor Bar)
            ======================================================================= */}
-        {showAdvancedSearch && (
-          <div
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            flexWrap: 'wrap',
+            paddingTop: '8px',
+            borderTop: '1px solid rgba(148, 163, 225, 0.1)',
+          }}
+        >
+          <span
             style={{
-              display: 'grid',
-              gridTemplateColumns: '1.2fr 1.3fr 1.5fr',
-              gap: '20px',
-              paddingTop: '16px',
-              borderTop: '1px solid rgba(148, 163, 225, 0.12)',
-              marginTop: '4px',
+              fontSize: '11px',
+              fontWeight: 800,
+              color: '#8E9BB5',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+              marginRight: '4px',
             }}
           >
-            {/* COLUMN 1: Program Level */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div style={{ fontSize: '12px', fontWeight: 800, color: '#fff', letterSpacing: '0.04em', marginBottom: '4px' }}>
-                Program Level
-              </div>
-              <div
+            Program Level:
+          </span>
+          {['All', 'Bachelors', 'Masters', 'UG Diploma', 'PG Diploma', 'UG Certificate', 'PG Certificate', 'Bridging Course'].map((lvl) => {
+            const isAct = selectedLevel === lvl;
+            const badge = lvl === 'All' ? null : getLevelBadgeInfo(lvl);
+            const count = levelCounts[lvl] ?? 0;
+            return (
+              <button
+                key={lvl}
+                onClick={() => setSelectedLevel(lvl)}
                 style={{
-                  display: 'flex',
-                  flexDirection: 'column',
+                  background: isAct
+                    ? (badge ? badge.bg : 'rgba(56, 189, 248, 0.22)')
+                    : 'rgba(255, 255, 255, 0.04)',
+                  border: isAct
+                    ? `1.5px solid ${badge ? badge.color : '#38BDF8'}`
+                    : '1px solid rgba(255, 255, 255, 0.12)',
+                  color: isAct
+                    ? (badge ? badge.color : '#38BDF8')
+                    : '#94A3B8',
+                  padding: '6px 14px',
+                  borderRadius: '20px',
+                  fontSize: '12px',
+                  fontWeight: isAct ? 800 : 600,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
                   gap: '6px',
-                  maxHeight: '340px',
-                  overflowY: 'auto',
-                  paddingRight: '6px',
+                  transition: 'all 0.15s ease',
                 }}
               >
-                {[
-                  { id: 'Bachelors', label: '🎓 Bachelors Degree (BSc / BA / BBA / BEng)' },
-                  { id: 'Masters', label: '🎓 Masters Degree (MSc / MA / MBA / MEng)' },
-                  { id: 'PG Diploma', label: '📜 PG Diploma (Postgraduate Diploma / PGDip)' },
-                  { id: 'PG Certificate', label: '📜 PG Certificate (Postgraduate Certificate / PGCert)' },
-                  { id: 'Diploma', label: '📜 Diploma (Undergraduate Diploma / HND / Vocational)' },
-                  { id: 'Certificate', label: '📜 Certificate (Undergraduate / Vocational Certificate)' },
-                  { id: 'PhD', label: '🔬 PhD / Doctorate Degree' },
-                  { id: 'Pathway UG', label: 'Pathway Programs (UG)' },
-                  { id: 'Pathway PG', label: 'Pathway Programs (PG)' },
-                  { id: 'English Prep', label: 'English Language Program (ELP)' },
-                  { id: 'Online', label: 'Online Programmes / Distance' },
-                  { id: 'Hybrid', label: 'Hybrid Programmes' },
-                  { id: 'Summer', label: 'Short-term / Summer Programs' },
-                  { id: 'High School', label: 'High School (11th - 12th)' },
-                ].map((lvl) => {
-                  const isChecked = selectedLevels.includes(lvl.id);
-                  return (
-                    <label
-                      key={lvl.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        fontSize: '12px',
-                        color: isChecked ? '#fff' : '#A8B2C7',
-                        cursor: 'pointer',
-                        userSelect: 'none',
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() => {
-                          setSelectedLevels((prev) =>
-                            prev.includes(lvl.id) ? prev.filter((x) => x !== lvl.id) : [...prev, lvl.id]
-                          );
-                        }}
-                        style={{ accentColor: '#38BDF8', width: '15px', height: '15px' }}
-                      />
-                      <span>{lvl.label}</span>
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* COLUMN 2: Other Filters (Country, Study Area, Duration) */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div style={{ fontSize: '12px', fontWeight: 800, color: '#fff', letterSpacing: '0.04em' }}>
-                Other Filters
-              </div>
-
-              {/* Country Select (Image 3) */}
-              <div>
-                <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#8E9BB5', marginBottom: '4px' }}>
-                  Country
-                </label>
-                <select
-                  value={selectedCountry}
-                  onChange={(e) => setSelectedCountry(e.target.value)}
+                {badge && <span>{badge.icon}</span>}
+                <span>{lvl === 'All' ? 'All Programs' : lvl}</span>
+                <span
                   style={{
-                    width: '100%',
-                    background: 'rgba(8, 10, 18, 0.9)',
-                    border: '1px solid rgba(148, 163, 225, 0.22)',
-                    borderRadius: '8px',
-                    padding: '8px 12px',
-                    color: '#EDEFFA',
-                    fontSize: '12.5px',
-                    outline: 'none',
-                    cursor: 'pointer',
+                    fontSize: '10.5px',
+                    padding: '1px 6px',
+                    borderRadius: '10px',
+                    background: isAct ? 'rgba(255, 255, 255, 0.22)' : 'rgba(255, 255, 255, 0.08)',
+                    color: isAct ? '#fff' : '#64748B',
+                    fontWeight: 700,
                   }}
                 >
-                  {availableCountries.map((c) => (
-                    <option key={c} value={c}>{c === 'All' ? 'Select Country (All)' : c}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Study Area Select (Image 4) */}
-              <div>
-                <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#8E9BB5', marginBottom: '4px' }}>
-                  Study Area
-                </label>
-                <select
-                  value={selectedStudyArea}
-                  onChange={(e) => setSelectedStudyArea(e.target.value)}
-                  style={{
-                    width: '100%',
-                    background: 'rgba(8, 10, 18, 0.9)',
-                    border: '1px solid rgba(148, 163, 225, 0.22)',
-                    borderRadius: '8px',
-                    padding: '8px 12px',
-                    color: '#EDEFFA',
-                    fontSize: '12.5px',
-                    outline: 'none',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {availableStudyAreas.map((sa) => (
-                    <option key={sa} value={sa}>{sa === 'All' ? 'Select Study Area (All)' : sa}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Duration Select (Image 5) */}
-              <div>
-                <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#8E9BB5', marginBottom: '4px' }}>
-                  Duration
-                </label>
-                <select
-                  value={selectedDuration}
-                  onChange={(e) => setSelectedDuration(e.target.value)}
-                  style={{
-                    width: '100%',
-                    background: 'rgba(8, 10, 18, 0.9)',
-                    border: '1px solid rgba(148, 163, 225, 0.22)',
-                    borderRadius: '8px',
-                    padding: '8px 12px',
-                    color: '#EDEFFA',
-                    fontSize: '12.5px',
-                    outline: 'none',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <option value="All">Select Duration (All)</option>
-                  <option value="0 - 1 Years">0 - 1 Years</option>
-                  <option value="1 - 2 Years">1 - 2 Years</option>
-                  <option value="2 - 3 Years">2 - 3 Years</option>
-                  <option value="3 - 4 Years">3 - 4 Years</option>
-                  <option value="4 and above Years">4 and above Years</option>
-                </select>
-              </div>
-            </div>
-
-            {/* COLUMN 3: Requirements & Waivers */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div style={{ fontSize: '12px', fontWeight: 800, color: '#fff', letterSpacing: '0.04em', marginBottom: '4px' }}>
-                Requirements & Waivers
-              </div>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr',
-                  gap: '6px',
-                  maxHeight: '340px',
-                  overflowY: 'auto',
-                }}
-              >
-                {[
-                  'IELTS',
-                  'PTE',
-                  'TOEFL iBT',
-                  'DET',
-                  'Without English Proficiency',
-                  'Without GRE',
-                  'Without GMAT',
-                  'Without Maths',
-                  'STEM Programs',
-                  'Scholarship Available',
-                  'Application Fee Waiver (upto 100%)',
-                  'Open Programs',
-                ].map((req) => {
-                  const isChecked = selectedRequirements.includes(req);
-                  return (
-                    <label
-                      key={req}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        fontSize: '11px',
-                        color: isChecked ? '#00E5A0' : '#A8B2C7',
-                        cursor: 'pointer',
-                        userSelect: 'none',
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() => {
-                          setSelectedRequirements((prev) =>
-                            prev.includes(req) ? prev.filter((x) => x !== req) : [...prev, req]
-                          );
-                        }}
-                        style={{ accentColor: '#00E5A0', width: '14px', height: '14px' }}
-                      />
-                      <span>{req}</span>
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        )}
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* =========================================================================
@@ -2130,67 +1898,64 @@ export default function CourseFinder({ setCurrentPage }) {
                         </div>
                       </div>
 
-                      {/* Program Metrics Grid (Level, Duration, Tuition, App Fee, Commission) */}
+                      {/* Program Metrics Grid (Level, Duration, Tuition, App Fee - Clean Counselor Design) */}
                       <div
                         style={{
                           display: 'grid',
-                          gridTemplateColumns: 'repeat(5, 1fr) auto',
-                          gap: '12px',
+                          gridTemplateColumns: '1.2fr 1fr 1.3fr 1.2fr auto',
+                          gap: '16px',
                           alignItems: 'center',
-                          paddingTop: '6px',
-                          borderTop: '1px solid rgba(255, 255, 255, 0.05)',
+                          paddingTop: '8px',
+                          borderTop: '1px solid rgba(255, 255, 255, 0.06)',
                         }}
                       >
+                        {/* 1. Degree Level */}
                         <div>
-                          <div style={{ fontSize: '10.5px', color: '#8E9BB5', fontWeight: 600 }}>Degree Level</div>
+                          <div style={{ fontSize: '11px', color: '#8E9BB5', fontWeight: 600 }}>Degree Level</div>
                           {(() => {
                             const effLvl = detectProgramLevel(prog.programName, prog.level, prog.duration);
                             const badge = getLevelBadgeInfo(effLvl);
                             return (
                               <div
                                 style={{
-                                  fontSize: '12px',
-                                  fontWeight: 700,
+                                  fontSize: '12.5px',
+                                  fontWeight: 800,
                                   color: badge.color,
                                   display: 'inline-flex',
                                   alignItems: 'center',
-                                  gap: '4px',
+                                  gap: '5px',
                                   marginTop: '2px',
                                 }}
                               >
                                 <span>{badge.icon}</span>
-                                <span>{badge.shortLabel}</span>
+                                <span>{badge.label}</span>
                               </div>
                             );
                           })()}
                         </div>
 
+                        {/* 2. Duration */}
                         <div>
-                          <div style={{ fontSize: '10.5px', color: '#8E9BB5', fontWeight: 600 }}>Duration</div>
-                          <div style={{ fontSize: '12.5px', fontWeight: 700, color: '#EDEFFA' }}>{prog.duration}</div>
+                          <div style={{ fontSize: '11px', color: '#8E9BB5', fontWeight: 600 }}>Duration</div>
+                          <div style={{ fontSize: '13px', fontWeight: 700, color: '#EDEFFA', marginTop: '2px' }}>{prog.duration}</div>
                         </div>
 
+                        {/* 3. Tuition/yr */}
                         <div>
-                          <div style={{ fontSize: '10.5px', color: '#8E9BB5', fontWeight: 600 }}>Tuition/yr</div>
-                          <div style={{ fontSize: '12.5px', fontWeight: 800, color: '#fff' }}>
-                            {prog.yearlyTuition} <span style={{ color: '#38BDF8', fontSize: '10px' }}>ℹ</span>
+                          <div style={{ fontSize: '11px', color: '#8E9BB5', fontWeight: 600 }}>Tuition/yr</div>
+                          <div style={{ fontSize: '13.5px', fontWeight: 800, color: '#fff', marginTop: '2px' }}>
+                            {prog.yearlyTuition}
                           </div>
                         </div>
 
+                        {/* 4. Application Fee */}
                         <div>
-                          <div style={{ fontSize: '10.5px', color: '#8E9BB5', fontWeight: 600 }}>Application Fee</div>
-                          <div style={{ fontSize: '12.5px', fontWeight: 700, color: '#EDEFFA' }}>{prog.applicationFee}</div>
-                        </div>
-
-                        <div>
-                          <div style={{ fontSize: '10.5px', color: '#8E9BB5', fontWeight: 600 }}>Expected Commission</div>
-                          <div style={{ fontSize: '12.5px', fontWeight: 800, color: '#00E5A0' }}>
-                            {prog.expectedCommission} <span style={{ fontSize: '10px' }}>ℹ</span>
-                          </div>
+                          <div style={{ fontSize: '11px', color: '#8E9BB5', fontWeight: 600 }}>Application Fee</div>
+                          <div style={{ fontSize: '13px', fontWeight: 700, color: '#38BDF8', marginTop: '2px' }}>{prog.applicationFee}</div>
                         </div>
 
                         {/* Quick View & Delete Buttons */}
-                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                           <button
                             onClick={() => setActiveCourseDetails(prog)}
                             style={{
@@ -2994,8 +2759,10 @@ function ProgramDetailsModal({ course, onClose, onApplyStudent, onRemoveCourse }
                 <div style={{ fontSize: '14px', fontWeight: 800, color: '#fff', marginTop: '2px' }}>{course.yearlyTuition}</div>
               </div>
               <div>
-                <div style={{ fontSize: '11px', color: '#8E9BB5' }}>Expected Commission</div>
-                <div style={{ fontSize: '14px', fontWeight: 800, color: '#00E5A0', marginTop: '2px' }}>{course.expectedCommission}</div>
+                <div style={{ fontSize: '11px', color: '#8E9BB5' }}>Country / Destination</div>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: '#38BDF8', marginTop: '2px' }}>
+                  {course.countryFlag || '🌍'} {course.country || 'International'}
+                </div>
               </div>
               <div>
                 <div style={{ fontSize: '11px', color: '#8E9BB5' }}>Degree Level</div>
@@ -4460,28 +4227,28 @@ function ExcelCourseUploaderModal({ isOpen, onClose, onCoursesImported }) {
                     }}
                   >
                     <option value="AUTO" style={{ background: '#0B0E14', color: '#00E5A0' }}>
-                      ✨ AI Auto-Detect Level from Course Names (Differentiates Bachelors, Masters, Diploma, PG Diploma, PG Certificate)
+                      ✨ AI Auto-Detect Level (Bachelors, Masters, UG Diploma, PG Diploma, UG Certificate, PG Certificate, Bridging Course)
                     </option>
                     <option value="Bachelors" style={{ background: '#0B0E14', color: '#38BDF8' }}>
-                      🎓 Force All: Bachelors Degree (BSc, BA, BBA, BEng, Undergraduate)
+                      🎓 Force All: Bachelors
                     </option>
                     <option value="Masters" style={{ background: '#0B0E14', color: '#A855F7' }}>
-                      🎓 Force All: Masters Degree (MSc, MA, MBA, MEng, Postgraduate)
+                      🎓 Force All: Masters
                     </option>
-                    <option value="Diploma" style={{ background: '#0B0E14', color: '#00F296' }}>
-                      📜 Force All: Diploma (Undergraduate Diploma / Vocational / Associate Degree)
-                    </option>
-                    <option value="Certificate" style={{ background: '#0B0E14', color: '#10B981' }}>
-                      📜 Force All: Certificate (Undergraduate / Vocational Certificate)
+                    <option value="UG Diploma" style={{ background: '#0B0E14', color: '#00F296' }}>
+                      📜 Force All: UG Diploma
                     </option>
                     <option value="PG Diploma" style={{ background: '#0B0E14', color: '#FFB020' }}>
-                      📜 Force All: PG Diploma (Postgraduate Diploma / PGDip)
+                      📜 Force All: PG Diploma
+                    </option>
+                    <option value="UG Certificate" style={{ background: '#0B0E14', color: '#10B981' }}>
+                      📜 Force All: UG Certificate
                     </option>
                     <option value="PG Certificate" style={{ background: '#0B0E14', color: '#FB923C' }}>
-                      📜 Force All: PG Certificate (Postgraduate Certificate / PGCert)
+                      📜 Force All: PG Certificate
                     </option>
-                    <option value="PhD" style={{ background: '#0B0E14', color: '#FF3366' }}>
-                      🔬 Force All: PhD / Doctorate (Doctoral Research)
+                    <option value="Bridging Course" style={{ background: '#0B0E14', color: '#818CF8' }}>
+                      🌉 Force All: Bridging Course (Preparatory / Foundation)
                     </option>
                   </select>
                 </div>
