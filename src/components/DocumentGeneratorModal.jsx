@@ -1,16 +1,70 @@
 import React, { useState, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
+import { supabase } from '../supabase';
 
 /**
  * DocumentGeneratorModal
  * Enterprise SAP-grade Invoice & Remittance Receipt Generator
  * 
  * Generates:
- * 1. Dubai Student Service Fee Invoice (based on WIO Bank UAE template)
+ * 1. Dubai Student Service Fee Invoice & Official Payment Receipt (WIO Bank Abu Dhabi)
  * 2. B2B Payment Disbursement Voucher & Remittance Receipt with official "PAID & SETTLED" seal stamp
  * 
- * Both rendered seamlessly on the official Sterling Letterhead.
+ * Features:
+ * - 100% Solid Pitch-Black Font & High-Contrast Borders (Fixes faded/invisible fonts)
+ * - Blank Paper Mode (Hides digital letterhead for printing onto pre-printed corporate stationery)
+ * - Blank Template Reset (Start from blank canvas anytime)
+ * - Student Selector & Real-Time Student Field Updaters
+ * - Company Disbursing Bank Selector (Our 4+ Sterling Bank Accounts)
  */
+
+export const STERLING_COMPANY_BANKS_DEFAULT = [
+  {
+    id: 'comp-bank-fed-1',
+    bank_name: 'Federal Bank',
+    account_number: '14200200039281',
+    ifsc: 'FDRL0001420',
+    branch: 'Valanchery Main, Malappuram',
+    label: 'Federal Bank Current A/C (Valanchery)',
+    currency: 'INR',
+  },
+  {
+    id: 'comp-bank-hdfc-1',
+    bank_name: 'HDFC Bank',
+    account_number: '50200049281039',
+    ifsc: 'HDFC0000042',
+    branch: 'Calicut Bypass Road, Hi-Lite Business Park',
+    label: 'HDFC Bank Current A/C (Calicut)',
+    currency: 'INR',
+  },
+  {
+    id: 'comp-bank-icici-1',
+    bank_name: 'ICICI Bank',
+    account_number: '002905009182',
+    ifsc: 'ICIC0000029',
+    branch: 'Kottakkal / Malappuram',
+    label: 'ICICI Bank Corporate A/C',
+    currency: 'INR',
+  },
+  {
+    id: 'comp-bank-wio-1',
+    bank_name: 'WIO Bank Abu Dhabi (UAE)',
+    account_number: 'AE620860000009569370024',
+    ifsc: 'WIOBAEADXXX',
+    branch: 'Etihad Airways Centre 5th Floor, Abu Dhabi, UAE',
+    label: 'WIO Bank UAE Foreign Currency (USD / EUR / AED)',
+    currency: 'USD',
+  },
+  {
+    id: 'comp-bank-axis-1',
+    bank_name: 'Axis Bank',
+    account_number: '921020048291039',
+    ifsc: 'UTIB0000829',
+    branch: 'Tirur / Malappuram',
+    label: 'Axis Bank Operations A/C',
+    currency: 'INR',
+  },
+];
 
 export default function DocumentGeneratorModal({
   isOpen,
@@ -18,22 +72,33 @@ export default function DocumentGeneratorModal({
   initialMode = 'dubai_invoice', // 'dubai_invoice' | 'b2b_receipt'
   studentData = null,
   b2bPaymentData = null,
+  companyBanks = STERLING_COMPANY_BANKS_DEFAULT,
 }) {
   const [mode, setMode] = useState(initialMode);
+  const [studentDocType, setStudentDocType] = useState('invoice'); // 'invoice' | 'receipt'
   const [includeLetterheadBg, setIncludeLetterheadBg] = useState(true);
   const [showPaidSeal, setShowPaidSeal] = useState(true);
-  const [showEditDrawer, setShowEditDrawer] = useState(false);
+  const [showEditDrawer, setShowEditDrawer] = useState(true);
+  const [erpStudentsList, setErpStudentsList] = useState([]);
+  const [selectedStudentId, setSelectedStudentId] = useState('');
+  const [studentSearchQuery, setStudentSearchQuery] = useState('');
   const printContainerRef = useRef(null);
 
-  // --- 1. STUDENT DUBAI INVOICE STATE (WIO Bank Abu Dhabi Template) ---
+  // --- 1. STUDENT DUBAI INVOICE / RECEIPT STATE (WIO Bank Abu Dhabi Template) ---
   const [studentInvoice, setStudentInvoice] = useState({
     invoiceNumber: 'INV-2026-081',
     invoiceDate: new Date().toLocaleDateString('en-GB').replace(/\//g, '.'),
     dueDate: new Date().toLocaleDateString('en-GB').replace(/\//g, '.'),
     studentName: 'JOICE SAMUEL',
     studentAddress: 'INDIA',
+    courseDetails: 'Bachelor of Business Administration',
+    intake: 'Jan 2027',
+    passportNumber: '',
+    applicationNumber: '',
     terms: 'Due on date',
     currency: 'USD',
+    paymentMode: 'Direct Bank Wire (TT / SWIFT)',
+    utrNumber: '',
     items: [
       {
         id: 1,
@@ -75,47 +140,48 @@ export default function DocumentGeneratorModal({
     paymentMode: 'Bank Transfer (IMPS / NEFT)',
     utrNumber: 'HDFC638291048291',
     transferAccount: 'HDFC Bank A/C: 50200038291048 | IFSC: HDFC0000240 | Beneficiary: Consult Fox Edutech Pvt Ltd',
-    debitAccount: 'Sterling Overseas Consultancy Operating A/C',
+    selectedPayingBankId: 'comp-bank-fed-1',
+    debitAccount: 'Federal Bank Current A/C: 14200200039281 (Valanchery Main)',
     authorizedSignatory: 'Accounts Department - Sterling Overseas',
     status: 'PAID',
     remarks: 'Full settlement disbursed and cleared as per contract agreement.',
   });
 
-  // Populate data when props or mode change
+  // Fetch all ERP Students for instant selection in the document editor
+  useEffect(() => {
+    async function loadStudents() {
+      try {
+        const { data, error } = await supabase
+          .from('students')
+          .select('id, name, country, intake, course, service_fee, total_fee, passport_number')
+          .order('name');
+        if (!error && data && data.length > 0) {
+          setErpStudentsList(data);
+        } else {
+          // Fallback to local storage if available
+          const localStr = localStorage.getItem('sterling_students_cache');
+          if (localStr) setErpStudentsList(JSON.parse(localStr));
+        }
+      } catch (err) {
+        console.warn('Could not fetch students for doc dropdown:', err);
+      }
+    }
+    loadStudents();
+  }, []);
+
+  // Update mode when props change
   useEffect(() => {
     if (initialMode) setMode(initialMode);
   }, [initialMode, isOpen]);
 
+  // Handle student data incoming prop
   useEffect(() => {
     if (studentData) {
-      const todayStr = new Date().toLocaleDateString('en-GB').replace(/\//g, '.');
-      const feeAmount = Number(studentData.service_fee || studentData.total_fee || studentData.amount || 1000);
-      const feeCurr = studentData.currency || (studentData.destination === 'Europe' ? 'EUR' : 'USD');
-      
-      setStudentInvoice((prev) => ({
-        ...prev,
-        invoiceNumber: `INV-DXB-${new Date().getFullYear()}-${String(studentData.id || Math.floor(100 + Math.random() * 900)).padStart(3, '0')}`,
-        invoiceDate: todayStr,
-        dueDate: todayStr,
-        studentName: (studentData.name || studentData.student_name || 'STUDENT NAME').toUpperCase(),
-        studentAddress: (studentData.country || studentData.nationality || studentData.state || 'INDIA').toUpperCase(),
-        currency: feeCurr,
-        items: [
-          {
-            id: 1,
-            description: `Administration Service Fee - ${studentData.course || 'Higher Education Consultation'}`,
-            quantity: 1,
-            unitPrice: feeAmount,
-            taxPercent: 0,
-            amount: feeAmount,
-          },
-        ],
-        subTotal: feeAmount,
-        grandTotal: feeAmount,
-      }));
+      applyStudentToInvoice(studentData);
     }
   }, [studentData]);
 
+  // Handle B2B payment incoming prop
   useEffect(() => {
     if (b2bPaymentData) {
       const todayStr = new Date().toLocaleDateString('en-GB').replace(/\//g, '.');
@@ -140,6 +206,11 @@ export default function DocumentGeneratorModal({
         }
       }
 
+      // Check which of Sterling's 4+ banks was used
+      const matchedPayingBank = companyBanks.find(
+        (b) => b.id === b2bPaymentData.paying_bank_id || b.bank_name.toLowerCase().includes((b2bPaymentData.payment_mode || '').toLowerCase())
+      ) || companyBanks[0];
+
       setB2BReceipt({
         receiptNumber: `REC-B2B-${new Date().getFullYear()}-${String(b2bPaymentData.id || Math.floor(1000 + Math.random() * 9000)).padStart(4, '0')}`,
         voucherDate: todayStr,
@@ -155,15 +226,125 @@ export default function DocumentGeneratorModal({
         paymentMode: b2bPaymentData.payment_mode || 'Bank Transfer (IMPS / NEFT)',
         utrNumber: b2bPaymentData.utr_number || `UTR/${Math.floor(100000000000 + Math.random() * 900000000000)}`,
         transferAccount: b2bPaymentData.transfer_account || 'Partner Bank Account',
-        debitAccount: 'Sterling Overseas Consultancy Operating A/C',
+        selectedPayingBankId: matchedPayingBank.id,
+        debitAccount: b2bPaymentData.debit_account || `${matchedPayingBank.bank_name} A/C: ${matchedPayingBank.account_number} (${matchedPayingBank.branch})`,
         authorizedSignatory: 'Accounts Department - Sterling Overseas',
         status: b2bPaymentData.status === 'completed' ? 'PAID' : 'SETTLED',
         remarks: b2bPaymentData.notes || 'Full payment settled and confirmed through electronic fund transfer.',
       });
     }
-  }, [b2bPaymentData]);
+  }, [b2bPaymentData, companyBanks]);
 
   if (!isOpen) return null;
+
+  // Apply a selected student record to the Dubai Invoice fields
+  const applyStudentToInvoice = (stu) => {
+    if (!stu) return;
+    const todayStr = new Date().toLocaleDateString('en-GB').replace(/\//g, '.');
+    const feeAmount = Number(stu.service_fee || stu.total_fee || stu.amount || 1000);
+    const feeCurr = stu.currency || (stu.country === 'Malta' || stu.country === 'Germany' || stu.country === 'France' ? 'EUR' : 'USD');
+    const courseName = stu.course || 'Study Abroad Consultation & Processing';
+
+    setSelectedStudentId(stu.id || '');
+    setStudentInvoice((prev) => ({
+      ...prev,
+      invoiceNumber: `INV-DXB-${new Date().getFullYear()}-${String(stu.id || Math.floor(100 + Math.random() * 900)).padStart(3, '0')}`,
+      invoiceDate: todayStr,
+      dueDate: todayStr,
+      studentName: (stu.name || 'STUDENT NAME').toUpperCase(),
+      studentAddress: (stu.country || stu.state || 'INDIA').toUpperCase(),
+      courseDetails: courseName,
+      intake: stu.intake || 'Upcoming Intake',
+      passportNumber: stu.passport_number || '',
+      currency: feeCurr,
+      items: [
+        {
+          id: 1,
+          description: `Administration Service Fee - ${courseName}`,
+          quantity: 1,
+          unitPrice: feeAmount,
+          taxPercent: 0,
+          amount: feeAmount,
+        },
+      ],
+      subTotal: feeAmount,
+      grandTotal: feeAmount,
+    }));
+    toast.success(`Loaded details for ${stu.name}`);
+  };
+
+  // Reset to a 100% Blank Invoice for manual billing
+  const handleResetToBlankInvoice = () => {
+    const todayStr = new Date().toLocaleDateString('en-GB').replace(/\//g, '.');
+    setSelectedStudentId('');
+    setStudentInvoice({
+      invoiceNumber: `INV-DXB-${new Date().getFullYear()}-001`,
+      invoiceDate: todayStr,
+      dueDate: todayStr,
+      studentName: '',
+      studentAddress: '',
+      courseDetails: '',
+      intake: '',
+      passportNumber: '',
+      applicationNumber: '',
+      terms: 'Due on date',
+      currency: 'USD',
+      paymentMode: 'Direct Bank Wire (TT / SWIFT)',
+      utrNumber: '',
+      items: [
+        {
+          id: 1,
+          description: 'Administration Service Fee',
+          quantity: 1,
+          unitPrice: 0,
+          taxPercent: 0,
+          amount: 0,
+        },
+      ],
+      subTotal: 0,
+      taxTotal: 0,
+      grandTotal: 0,
+      bankDetails: {
+        accountHolder: 'Sterling Overseas Consultancy LLC',
+        businessId: 'WIOBAEADXXX',
+        bankName: 'WIO BANK',
+        address: 'Etihad Airways Centre 5th Floor, Abu Dhabi, UAE',
+        accountNumber: 'AE620860000009569370024',
+        iban: 'AE620860000009569370024',
+        swiftCode: 'WIOBAEADXXX',
+      },
+      footerNote: 'Note: Please note that the transfer fee of the banks are not included in this fee!',
+    });
+    toast.success('Reset to Blank Invoice template');
+  };
+
+  // Reset to a 100% Blank B2B Receipt
+  const handleResetToBlankReceipt = () => {
+    const todayStr = new Date().toLocaleDateString('en-GB').replace(/\//g, '.');
+    const firstBank = companyBanks[0] || STERLING_COMPANY_BANKS_DEFAULT[0];
+    setB2BReceipt({
+      receiptNumber: `REC-B2B-${new Date().getFullYear()}-001`,
+      voucherDate: todayStr,
+      settledDate: todayStr,
+      partnerName: '',
+      studentNames: '',
+      purpose: 'Sub-Agent Commission & University Admission Coordination',
+      currency: 'INR',
+      baseAmount: 0,
+      gstRate: 0,
+      gstAmount: 0,
+      totalDisbursed: 0,
+      paymentMode: 'Bank Transfer (IMPS / NEFT)',
+      utrNumber: '',
+      transferAccount: '',
+      selectedPayingBankId: firstBank.id,
+      debitAccount: `${firstBank.bank_name} A/C: ${firstBank.account_number} (${firstBank.branch})`,
+      authorizedSignatory: 'Accounts Department - Sterling Overseas',
+      status: 'PAID',
+      remarks: 'Payment settled and confirmed through electronic fund transfer.',
+    });
+    toast.success('Reset to Blank B2B Receipt template');
+  };
 
   // Recalculate Student Invoice totals
   const handleItemChange = (index, field, value) => {
@@ -176,18 +357,16 @@ export default function DocumentGeneratorModal({
       newItems[index].amount = qty * unit;
 
       const sub = newItems.reduce((acc, it) => acc + (Number(it.amount) || 0), 0);
-      const grand = sub; // Tax 0%
-
       return {
         ...prev,
         items: newItems,
         subTotal: sub,
-        grandTotal: grand,
+        grandTotal: sub,
       };
     });
   };
 
-  // Add Item to Student Invoice
+  // Add Item
   const handleAddItem = () => {
     setStudentInvoice((prev) => {
       const nextId = prev.items.length + 1;
@@ -195,7 +374,7 @@ export default function DocumentGeneratorModal({
         ...prev.items,
         {
           id: nextId,
-          description: 'Document Processing / Visa Guidance',
+          description: 'Document Verification / Processing Fee',
           quantity: 1,
           unitPrice: 200,
           taxPercent: 0,
@@ -230,7 +409,18 @@ export default function DocumentGeneratorModal({
     });
   };
 
-  // --- PRINT / DOWNLOAD PDF HANDLER ---
+  // Handle changing Sterling's Paying Bank in B2B Receipt
+  const handleSelectPayingBank = (bankId) => {
+    const chosen = companyBanks.find((b) => b.id === bankId);
+    if (!chosen) return;
+    setB2BReceipt((prev) => ({
+      ...prev,
+      selectedPayingBankId: chosen.id,
+      debitAccount: `${chosen.bank_name} A/C: ${chosen.account_number} (${chosen.branch})`,
+    }));
+  };
+
+  // --- PRINT / DOWNLOAD PDF HANDLER (100% Black Crisp Typography & Proper Spacing) ---
   const handlePrint = () => {
     const printArea = printContainerRef.current;
     if (!printArea) return;
@@ -242,8 +432,8 @@ export default function DocumentGeneratorModal({
     }
 
     const docTitle = mode === 'dubai_invoice'
-      ? `Sterling_Invoice_${studentInvoice.invoiceNumber}_${studentInvoice.studentName.replace(/\s+/g, '_')}`
-      : `Sterling_Receipt_${b2bReceipt.receiptNumber}_${b2bReceipt.partnerName.replace(/\s+/g, '_')}`;
+      ? `Sterling_${studentDocType.toUpperCase()}_${studentInvoice.invoiceNumber}_${studentInvoice.studentName.replace(/\s+/g, '_') || 'Customer'}`
+      : `Sterling_Receipt_${b2bReceipt.receiptNumber}_${b2bReceipt.partnerName.replace(/\s+/g, '_') || 'Partner'}`;
 
     printWindow.document.write(`
       <!DOCTYPE html>
@@ -252,7 +442,7 @@ export default function DocumentGeneratorModal({
           <title>${docTitle}</title>
           <link rel="preconnect" href="https://fonts.googleapis.com">
           <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-          <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+          <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
           <style>
             @page {
               size: A4 portrait;
@@ -262,13 +452,14 @@ export default function DocumentGeneratorModal({
               box-sizing: border-box;
               -webkit-print-color-adjust: exact !important;
               print-color-adjust: exact !important;
+              color: #000000 !important;
             }
             body {
               margin: 0;
               padding: 0;
-              background: #fff;
+              background: #ffffff;
               font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-              color: #111827;
+              color: #000000 !important;
               display: flex;
               justify-content: center;
             }
@@ -277,35 +468,49 @@ export default function DocumentGeneratorModal({
               min-height: 297mm;
               height: 297mm;
               position: relative;
-              padding: 50mm 18mm 25mm 18mm;
-              background-color: #ffffff;
-              ${includeLetterheadBg ? "background-image: url('/sterling-letterhead.jpg'); background-size: 100% 100%; background-repeat: no-repeat;" : ''}
+              padding: ${includeLetterheadBg ? '48mm 18mm 25mm 18mm' : '45mm 18mm 25mm 18mm'};
+              background-color: #ffffff !important;
+              ${includeLetterheadBg ? "background-image: url('/sterling-letterhead.jpg'); background-size: 100% 100%; background-repeat: no-repeat;" : 'background-image: none !important;'}
               overflow: hidden;
             }
             table {
-              border-collapse: collapse;
-              width: 100%;
+              border-collapse: collapse !important;
+              width: 100% !important;
+              background-color: #ffffff !important;
             }
-            th, td {
-              border: 1px solid #111827;
-              padding: 6px 10px;
-              font-size: 12px;
+            th {
+              border: 1.5px solid #000000 !important;
+              padding: 6px 10px !important;
+              font-size: 11.5px !important;
+              font-weight: 800 !important;
+              color: #000000 !important;
+              background-color: #f1f5f9 !important;
+            }
+            td {
+              border: 1.5px solid #000000 !important;
+              padding: 6px 10px !important;
+              font-size: 11.5px !important;
+              color: #000000 !important;
+              background-color: #ffffff !important;
             }
             .rubber-stamp {
               position: absolute;
               bottom: 45mm;
               right: 25mm;
-              border: 3.5px dashed #059669;
-              color: #059669;
+              border: 3.5px dashed #047857 !important;
+              color: #047857 !important;
               padding: 10px 16px;
               border-radius: 12px;
               text-align: center;
               font-family: 'Plus Jakarta Sans', sans-serif;
-              font-weight: 800;
+              font-weight: 900;
               transform: rotate(-6deg);
-              background: rgba(240, 253, 244, 0.85);
-              box-shadow: 0 0 0 4px rgba(5, 150, 105, 0.15);
+              background: rgba(240, 253, 244, 0.95) !important;
+              box-shadow: 0 0 0 4px rgba(4, 120, 87, 0.2);
               z-index: 50;
+            }
+            .rubber-stamp * {
+              color: #047857 !important;
             }
           </style>
         </head>
@@ -334,7 +539,7 @@ export default function DocumentGeneratorModal({
         position: 'fixed',
         inset: 0,
         zIndex: 2200,
-        background: 'rgba(5, 7, 15, 0.85)',
+        background: 'rgba(5, 7, 15, 0.88)',
         backdropFilter: 'blur(8px)',
         display: 'flex',
         alignItems: 'center',
@@ -344,12 +549,59 @@ export default function DocumentGeneratorModal({
       }}
       onClick={onClose}
     >
+      <style>{`
+        /* FORCED HIGH-CONTRAST PITCH-BLACK TYPOGRAPHY ON INVOICE PAPER */
+        .invoice-sheet-canvas {
+          background-color: #ffffff !important;
+          color: #000000 !important;
+        }
+        .invoice-sheet-canvas,
+        .invoice-sheet-canvas div,
+        .invoice-sheet-canvas p,
+        .invoice-sheet-canvas span,
+        .invoice-sheet-canvas strong,
+        .invoice-sheet-canvas h1,
+        .invoice-sheet-canvas h2,
+        .invoice-sheet-canvas h3,
+        .invoice-sheet-canvas h4 {
+          color: #000000 !important;
+        }
+        .invoice-sheet-canvas table {
+          border-collapse: collapse !important;
+          width: 100% !important;
+          background-color: #ffffff !important;
+        }
+        .invoice-sheet-canvas th {
+          background-color: #E2E8F0 !important;
+          color: #000000 !important;
+          font-weight: 800 !important;
+          border: 1.5px solid #000000 !important;
+          padding: 7px 10px !important;
+          font-size: 11.5px !important;
+        }
+        .invoice-sheet-canvas td {
+          background-color: #ffffff !important;
+          color: #000000 !important;
+          border: 1.5px solid #000000 !important;
+          padding: 7px 10px !important;
+          font-size: 11.5px !important;
+        }
+        .invoice-sheet-canvas .accent-dark {
+          color: #000000 !important;
+          font-weight: 800 !important;
+        }
+        .invoice-sheet-canvas .bank-accent {
+          color: #047857 !important;
+          font-weight: 800 !important;
+        }
+      `}</style>
+
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
           width: '98%',
-          maxWidth: '1240px',
-          height: '94vh',
+          maxWidth: '1280px',
+          height: '95vh',
           maxHeight: '96vh',
           background: 'var(--bg2solid, #0B0F1C)',
           borderRadius: '16px',
@@ -374,9 +626,9 @@ export default function DocumentGeneratorModal({
             gap: '12px',
           }}
         >
-          {/* Left: Document Mode Switcher */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '18px' }}>📄</span>
+          {/* Left: Mode Switcher */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '20px' }}>📄</span>
             <div style={{ display: 'inline-flex', background: 'rgba(255,255,255,0.06)', borderRadius: '8px', padding: '3px' }}>
               <button
                 type="button"
@@ -393,7 +645,7 @@ export default function DocumentGeneratorModal({
                   transition: 'all 0.15s ease',
                 }}
               >
-                🇦🇪 Student Dubai Invoice
+                🇦🇪 Student Dubai Invoices & Receipts
               </button>
               <button
                 type="button"
@@ -416,31 +668,66 @@ export default function DocumentGeneratorModal({
           </div>
 
           {/* Right: Actions */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            {/* Toggle Letterhead BG */}
-            <label
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                fontSize: '12px',
-                color: '#CBD5E1',
-                cursor: 'pointer',
-                background: 'rgba(255,255,255,0.05)',
-                padding: '6px 10px',
-                borderRadius: '6px',
-                border: '1px solid rgba(255,255,255,0.1)',
-              }}
-              title="Toggle full Sterling letterhead artwork"
-            >
-              <input
-                type="checkbox"
-                checked={includeLetterheadBg}
-                onChange={(e) => setIncludeLetterheadBg(e.target.checked)}
-              />
-              <span>Letterhead Artwork</span>
-            </label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            
+            {/* 1. Letterhead Artwork vs Blank Paper Switcher */}
+            <div style={{ display: 'inline-flex', background: 'rgba(255,255,255,0.06)', borderRadius: '6px', padding: '2px' }}>
+              <button
+                type="button"
+                onClick={() => setIncludeLetterheadBg(true)}
+                title="Includes top black/gold corporate banner & crest watermark"
+                style={{
+                  padding: '5px 10px',
+                  borderRadius: '4px',
+                  border: 'none',
+                  fontSize: '11.5px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  background: includeLetterheadBg ? 'rgba(79, 70, 229, 0.25)' : 'transparent',
+                  color: includeLetterheadBg ? '#818CF8' : '#94A3B8',
+                }}
+              >
+                🎨 Letterhead Artwork
+              </button>
+              <button
+                type="button"
+                onClick={() => setIncludeLetterheadBg(false)}
+                title="Hides letterhead artwork for printing on pre-printed office stationery paper"
+                style={{
+                  padding: '5px 10px',
+                  borderRadius: '4px',
+                  border: 'none',
+                  fontSize: '11.5px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  background: !includeLetterheadBg ? '#10B981' : 'transparent',
+                  color: !includeLetterheadBg ? '#fff' : '#94A3B8',
+                }}
+              >
+                📄 Blank Paper Mode
+              </button>
+            </div>
 
+            {/* 2. Reset to Blank Template Button */}
+            <button
+              type="button"
+              onClick={mode === 'dubai_invoice' ? handleResetToBlankInvoice : handleResetToBlankReceipt}
+              title="Clear all fields and start fresh with a blank document"
+              style={{
+                background: 'rgba(255,255,255,0.06)',
+                border: '1px solid rgba(255,255,255,0.15)',
+                color: '#CBD5E1',
+                padding: '6px 11px',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              ➕ Blank {mode === 'dubai_invoice' ? 'Invoice' : 'Receipt'}
+            </button>
+
+            {/* 3. Paid Seal Toggle for B2B Receipt */}
             {mode === 'b2b_receipt' && (
               <label
                 style={{
@@ -451,7 +738,7 @@ export default function DocumentGeneratorModal({
                   color: '#CBD5E1',
                   cursor: 'pointer',
                   background: 'rgba(5, 150, 105, 0.15)',
-                  padding: '6px 10px',
+                  padding: '5px 10px',
                   borderRadius: '6px',
                   border: '1px solid rgba(5, 150, 105, 0.3)',
                 }}
@@ -462,11 +749,11 @@ export default function DocumentGeneratorModal({
                   checked={showPaidSeal}
                   onChange={(e) => setShowPaidSeal(e.target.checked)}
                 />
-                <span style={{ color: '#34D399', fontWeight: 600 }}>PAID Seal Stamp</span>
+                <span style={{ color: '#34D399', fontWeight: 600 }}>PAID Seal</span>
               </label>
             )}
 
-            {/* Toggle Edit Controls Drawer */}
+            {/* 4. Toggle Edit Form */}
             <button
               type="button"
               onClick={() => setShowEditDrawer(!showEditDrawer)}
@@ -474,21 +761,17 @@ export default function DocumentGeneratorModal({
                 background: showEditDrawer ? '#3B82F6' : 'rgba(59, 130, 246, 0.15)',
                 color: showEditDrawer ? '#fff' : '#60A5FA',
                 border: '1px solid rgba(59, 130, 246, 0.35)',
-                padding: '6px 14px',
+                padding: '6px 12px',
                 borderRadius: '6px',
-                fontSize: '12.5px',
+                fontSize: '12px',
                 fontWeight: 700,
                 cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
               }}
             >
-              <span>✏️</span>
-              <span>{showEditDrawer ? 'Hide Edit Fields' : 'Edit Fields'}</span>
+              {showEditDrawer ? 'Hide Fields' : '✏️ Edit Fields'}
             </button>
 
-            {/* Print / Save PDF Button */}
+            {/* 5. Print / Save as PDF Button */}
             <button
               type="button"
               onClick={handlePrint}
@@ -496,7 +779,7 @@ export default function DocumentGeneratorModal({
                 background: '#10B981',
                 color: '#fff',
                 border: 'none',
-                padding: '7px 18px',
+                padding: '7px 16px',
                 borderRadius: '6px',
                 fontSize: '13px',
                 fontWeight: 700,
@@ -508,7 +791,7 @@ export default function DocumentGeneratorModal({
               }}
             >
               <span>🖨️</span>
-              <span>Print / Save as PDF</span>
+              <span>Print / Save PDF</span>
             </button>
 
             {/* Close Button */}
@@ -535,14 +818,14 @@ export default function DocumentGeneratorModal({
           </div>
         </div>
 
-        {/* WORKSPACE AREA: EDIT DRAWER (LEFT) + A4 PREVIEW (RIGHT) */}
+        {/* WORKSPACE AREA: EDIT DRAWER (LEFT) + A4 CANVAS PREVIEW (RIGHT) */}
         <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
           
-          {/* EDIT FORM DRAWER (Expandable) */}
+          {/* EDIT FORM DRAWER (LEFT) */}
           {showEditDrawer && (
             <div
               style={{
-                width: '360px',
+                width: '380px',
                 background: 'var(--bg1, #080A12)',
                 borderRight: '1px solid rgba(148, 163, 225, 0.15)',
                 padding: '16px',
@@ -550,14 +833,78 @@ export default function DocumentGeneratorModal({
                 fontSize: '12.5px',
               }}
             >
-              <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', color: '#fff' }}>
-                {mode === 'dubai_invoice' ? 'Edit Dubai Invoice Data' : 'Edit B2B Receipt Data'}
-              </h4>
+              {/* Header inside drawer */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                <h4 style={{ margin: 0, fontSize: '14px', color: '#fff', fontWeight: 700 }}>
+                  {mode === 'dubai_invoice' ? 'Student Document Editor' : 'B2B Remittance Editor'}
+                </h4>
+                {mode === 'dubai_invoice' && (
+                  <div style={{ display: 'inline-flex', background: 'rgba(255,255,255,0.06)', borderRadius: '6px', padding: '2px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setStudentDocType('invoice')}
+                      style={{
+                        padding: '3px 8px',
+                        borderRadius: '4px',
+                        border: 'none',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        background: studentDocType === 'invoice' ? '#4F46E5' : 'transparent',
+                        color: studentDocType === 'invoice' ? '#fff' : '#94A3B8',
+                      }}
+                    >
+                      Invoice
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setStudentDocType('receipt')}
+                      style={{
+                        padding: '3px 8px',
+                        borderRadius: '4px',
+                        border: 'none',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        background: studentDocType === 'receipt' ? '#059669' : 'transparent',
+                        color: studentDocType === 'receipt' ? '#fff' : '#94A3B8',
+                      }}
+                    >
+                      Receipt
+                    </button>
+                  </div>
+                )}
+              </div>
 
+              {/* MODE 1: STUDENT DUBAI INVOICE / RECEIPT CONTROLS */}
               {mode === 'dubai_invoice' ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  
+                  {/* Select Student from ERP Dropdown */}
+                  <div style={{ background: '#131B2E', padding: '10px', borderRadius: '8px', border: '1px solid #2B3A5A' }}>
+                    <label style={{ display: 'block', color: '#60A5FA', fontWeight: 700, marginBottom: '4px' }}>
+                      ⚡ Pick Existing Student from ERP:
+                    </label>
+                    <select
+                      value={selectedStudentId}
+                      onChange={(e) => {
+                        const sid = e.target.value;
+                        const match = erpStudentsList.find((s) => String(s.id) === String(sid));
+                        if (match) applyStudentToInvoice(match);
+                      }}
+                      style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#0B0F1C', border: '1px solid #3B82F6', color: '#fff', fontSize: '12px' }}
+                    >
+                      <option value="">-- Choose Student to Auto-fill --</option>
+                      {erpStudentsList.map((stu) => (
+                        <option key={stu.id} value={stu.id}>
+                          {stu.name} &bull; {stu.country || 'Global'} {stu.course ? `(${stu.course.substring(0, 22)})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
                   <div>
-                    <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Invoice #</label>
+                    <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Document #</label>
                     <input
                       type="text"
                       value={studentInvoice.invoiceNumber}
@@ -568,7 +915,7 @@ export default function DocumentGeneratorModal({
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                     <div>
-                      <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Date</label>
+                      <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Issue Date</label>
                       <input
                         type="text"
                         value={studentInvoice.invoiceDate}
@@ -588,23 +935,48 @@ export default function DocumentGeneratorModal({
                   </div>
 
                   <div>
-                    <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Bill TO (Student Name)</label>
+                    <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Student Name (Bill TO) *</label>
                     <input
                       type="text"
                       value={studentInvoice.studentName}
                       onChange={(e) => setStudentInvoice({ ...studentInvoice, studentName: e.target.value })}
-                      style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff' }}
+                      placeholder="e.g. JOICE SAMUEL"
+                      style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff', fontWeight: 600 }}
                     />
                   </div>
 
                   <div>
-                    <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Address / Country</label>
+                    <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Student Address / Country</label>
                     <input
                       type="text"
                       value={studentInvoice.studentAddress}
                       onChange={(e) => setStudentInvoice({ ...studentInvoice, studentAddress: e.target.value })}
+                      placeholder="e.g. INDIA or Kerala, India"
                       style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff' }}
                     />
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                    <div>
+                      <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Course / Program</label>
+                      <input
+                        type="text"
+                        value={studentInvoice.courseDetails}
+                        onChange={(e) => setStudentInvoice({ ...studentInvoice, courseDetails: e.target.value })}
+                        placeholder="Course title"
+                        style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Intake</label>
+                      <input
+                        type="text"
+                        value={studentInvoice.intake}
+                        onChange={(e) => setStudentInvoice({ ...studentInvoice, intake: e.target.value })}
+                        placeholder="e.g. Jan 2027"
+                        style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff' }}
+                      />
+                    </div>
                   </div>
 
                   <div>
@@ -622,14 +994,39 @@ export default function DocumentGeneratorModal({
                     </select>
                   </div>
 
-                  {/* Line Items */}
-                  <div style={{ marginTop: '10px' }}>
+                  {/* If Receipt Mode: Settlement Info */}
+                  {studentDocType === 'receipt' && (
+                    <div style={{ background: 'rgba(5, 150, 105, 0.12)', padding: '10px', borderRadius: '8px', border: '1px solid rgba(5, 150, 105, 0.3)' }}>
+                      <div style={{ color: '#34D399', fontWeight: 700, marginBottom: '6px', fontSize: '11.5px' }}>
+                        ✓ Student Payment Confirmation Details
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <input
+                          type="text"
+                          placeholder="Bank Transaction UTR / Ref #"
+                          value={studentInvoice.utrNumber}
+                          onChange={(e) => setStudentInvoice({ ...studentInvoice, utrNumber: e.target.value })}
+                          style={{ width: '100%', padding: '5px 8px', borderRadius: '4px', background: '#0B0F1C', border: '1px solid #2B3A5A', color: '#fff' }}
+                        />
+                        <input
+                          type="text"
+                          placeholder="Payment Mode (Wire / Online)"
+                          value={studentInvoice.paymentMode}
+                          onChange={(e) => setStudentInvoice({ ...studentInvoice, paymentMode: e.target.value })}
+                          style={{ width: '100%', padding: '5px 8px', borderRadius: '4px', background: '#0B0F1C', border: '1px solid #2B3A5A', color: '#fff' }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Line Items Editor */}
+                  <div style={{ marginTop: '6px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                       <label style={{ color: '#94A3B8', fontWeight: 600 }}>Invoice Line Items</label>
                       <button
                         type="button"
                         onClick={handleAddItem}
-                        style={{ background: '#4F46E5', color: '#fff', border: 'none', borderRadius: '4px', padding: '2px 8px', fontSize: '11px', cursor: 'pointer' }}
+                        style={{ background: '#4F46E5', color: '#fff', border: 'none', borderRadius: '4px', padding: '3px 8px', fontSize: '11px', cursor: 'pointer' }}
                       >
                         + Add Item
                       </button>
@@ -675,7 +1072,7 @@ export default function DocumentGeneratorModal({
                   </div>
 
                   {/* Bank Details Editor */}
-                  <div style={{ marginTop: '10px' }}>
+                  <div>
                     <label style={{ color: '#94A3B8', fontWeight: 600, display: 'block', marginBottom: '4px' }}>WIO Bank UAE Details</label>
                     <input
                       type="text"
@@ -701,8 +1098,30 @@ export default function DocumentGeneratorModal({
                   </div>
                 </div>
               ) : (
-                /* B2B Receipt Edit Form */
+                /* MODE 2: B2B REMITTANCE RECEIPT EDIT FORM */
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  
+                  {/* SELECT WHICH OF STERLING'S 4+ BANKS PAID THE MONEY */}
+                  <div style={{ background: '#131B2E', padding: '10px', borderRadius: '8px', border: '1px solid #3B82F6' }}>
+                    <label style={{ display: 'block', color: '#60A5FA', fontWeight: 700, marginBottom: '4px' }}>
+                      🏦 Paid From Sterling Bank (Our Bank) *:
+                    </label>
+                    <select
+                      value={b2bReceipt.selectedPayingBankId}
+                      onChange={(e) => handleSelectPayingBank(e.target.value)}
+                      style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#0B0F1C', border: '1px solid #3B82F6', color: '#fff', fontSize: '12px' }}
+                    >
+                      {companyBanks.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.label}
+                        </option>
+                      ))}
+                    </select>
+                    <div style={{ fontSize: '11px', color: '#94A3B8', marginTop: '4px' }}>
+                      Debited A/C: <span style={{ color: '#fff' }}>{b2bReceipt.debitAccount}</span>
+                    </div>
+                  </div>
+
                   <div>
                     <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Voucher / Receipt #</label>
                     <input
@@ -715,7 +1134,7 @@ export default function DocumentGeneratorModal({
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                     <div>
-                      <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Date</label>
+                      <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Voucher Date</label>
                       <input
                         type="text"
                         value={b2bReceipt.voucherDate}
@@ -735,12 +1154,12 @@ export default function DocumentGeneratorModal({
                   </div>
 
                   <div>
-                    <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>B2B Beneficiary Partner</label>
+                    <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>B2B Beneficiary Partner *</label>
                     <input
                       type="text"
                       value={b2bReceipt.partnerName}
                       onChange={(e) => setB2BReceipt({ ...b2bReceipt, partnerName: e.target.value })}
-                      style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff' }}
+                      style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff', fontWeight: 600 }}
                     />
                   </div>
 
@@ -839,7 +1258,7 @@ export default function DocumentGeneratorModal({
                   </div>
 
                   <div>
-                    <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Credited To (Account)</label>
+                    <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Credited To (Partner Account)</label>
                     <textarea
                       rows={2}
                       value={b2bReceipt.transferAccount}
@@ -852,7 +1271,7 @@ export default function DocumentGeneratorModal({
             </div>
           )}
 
-          {/* DOCUMENT PREVIEW CONTAINER (CENTERED A4 CANVAS) */}
+          {/* DOCUMENT PREVIEW CONTAINER (CENTERED A4 CANVAS WITH SOLID PITCH-BLACK FONT) */}
           <div
             style={{
               flex: 1,
@@ -865,11 +1284,12 @@ export default function DocumentGeneratorModal({
           >
             {/* A4 CANVAS SIMULATION */}
             <div
+              className="invoice-sheet-canvas"
               style={{
                 width: '794px', // 210mm at 96 DPI
                 minHeight: '1123px', // 297mm at 96 DPI
                 backgroundColor: '#ffffff',
-                color: '#111827',
+                color: '#000000',
                 boxShadow: '0 10px 40px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.1)',
                 borderRadius: '2px',
                 position: 'relative',
@@ -888,26 +1308,31 @@ export default function DocumentGeneratorModal({
               <div ref={printContainerRef} style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
                 
                 {/* ======================================================== */}
-                {/* 1. DUBAI STUDENT INVOICE (WIO Bank Layout) */}
+                {/* 1. DUBAI STUDENT INVOICE & OFFICIAL RECEIPT */}
                 {/* ======================================================== */}
                 {mode === 'dubai_invoice' && (
-                  <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between', position: 'relative' }}>
                     <div>
                       {/* Top Entity & Title */}
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '22px' }}>
                         <div>
-                          <div style={{ fontWeight: 800, fontSize: '15px', color: '#0F172A', letterSpacing: '-0.2px' }}>
+                          <div style={{ fontWeight: 900, fontSize: '16px', color: '#000000', letterSpacing: '-0.2px' }}>
                             Sterling Overseas Consultancy LLC
                           </div>
-                          <div style={{ fontSize: '11.5px', color: '#475569', fontWeight: 600, letterSpacing: '0.5px' }}>
+                          <div style={{ fontSize: '12px', color: '#000000', fontWeight: 700, letterSpacing: '0.5px' }}>
                             WIOBAEADXXX
                           </div>
                         </div>
 
                         <div style={{ textAlign: 'right' }}>
-                          <h1 style={{ margin: 0, fontSize: '26px', fontWeight: 900, color: '#0F172A', letterSpacing: '1px' }}>
-                            INVOICE
+                          <h1 style={{ margin: 0, fontSize: '26px', fontWeight: 900, color: '#000000', letterSpacing: '1px' }}>
+                            {studentDocType === 'receipt' ? 'OFFICIAL RECEIPT' : 'INVOICE'}
                           </h1>
+                          {studentDocType === 'receipt' && (
+                            <div style={{ fontSize: '11px', color: '#047857', fontWeight: 800 }}>
+                              SERVICE CHARGE PAYMENT RECEIPT
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -915,42 +1340,49 @@ export default function DocumentGeneratorModal({
                       <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '22px' }}>
                         <tbody>
                           <tr>
-                            <td style={{ border: '1.5px solid #0F172A', padding: '9px 12px', width: '52%', verticalAlign: 'top' }}>
-                              <div style={{ fontSize: '11px', color: '#475569', fontWeight: 700, textTransform: 'uppercase', marginBottom: '2px' }}>
-                                Bill TO:
+                            <td style={{ border: '1.5px solid #000000', padding: '9px 12px', width: '52%', verticalAlign: 'top', background: '#ffffff', color: '#000000' }}>
+                              <div style={{ fontSize: '11px', color: '#000000', fontWeight: 800, textTransform: 'uppercase', marginBottom: '2px' }}>
+                                {studentDocType === 'receipt' ? 'RECEIVED FROM:' : 'BILL TO:'}
                               </div>
-                              <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A', letterSpacing: '0.2px' }}>
-                                {studentInvoice.studentName}
+                              <div style={{ fontSize: '14.5px', fontWeight: 900, color: '#000000', letterSpacing: '0.2px' }}>
+                                {studentInvoice.studentName || 'STUDENT NAME'}
                               </div>
                             </td>
-                            <td style={{ border: '1.5px solid #0F172A', padding: '9px 12px', width: '48%', verticalAlign: 'top' }}>
+                            <td style={{ border: '1.5px solid #000000', padding: '9px 12px', width: '48%', verticalAlign: 'top', background: '#ffffff', color: '#000000' }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <span style={{ fontWeight: 700, color: '#0F172A' }}>Invoice #:</span>
-                                <span style={{ fontWeight: 800, color: '#0F172A' }}>{studentInvoice.invoiceNumber}</span>
+                                <span style={{ fontWeight: 800, color: '#000000' }}>{studentDocType === 'receipt' ? 'Receipt #:' : 'Invoice #:'}</span>
+                                <span style={{ fontWeight: 900, color: '#000000' }}>{studentInvoice.invoiceNumber}</span>
                               </div>
                             </td>
                           </tr>
                           <tr>
-                            <td style={{ border: '1.5px solid #0F172A', padding: '9px 12px', verticalAlign: 'top' }}>
-                              <span style={{ fontWeight: 700, color: '#0F172A' }}>Address: </span>
-                              <span style={{ fontWeight: 600, color: '#334155' }}>{studentInvoice.studentAddress}</span>
+                            <td style={{ border: '1.5px solid #000000', padding: '9px 12px', verticalAlign: 'top', background: '#ffffff', color: '#000000' }}>
+                              <span style={{ fontWeight: 800, color: '#000000' }}>Address: </span>
+                              <span style={{ fontWeight: 700, color: '#000000' }}>{studentInvoice.studentAddress || 'INDIA'}</span>
+                              {studentInvoice.courseDetails && (
+                                <div style={{ fontSize: '11.5px', color: '#000000', fontWeight: 600, marginTop: '2px' }}>
+                                  Program: {studentInvoice.courseDetails} {studentInvoice.intake ? `(${studentInvoice.intake})` : ''}
+                                </div>
+                              )}
                             </td>
-                            <td style={{ border: '1.5px solid #0F172A', padding: '9px 12px', verticalAlign: 'top' }}>
+                            <td style={{ border: '1.5px solid #000000', padding: '9px 12px', verticalAlign: 'top', background: '#ffffff', color: '#000000' }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <span style={{ fontWeight: 700, color: '#0F172A' }}>Date:</span>
-                                <span style={{ fontWeight: 600, color: '#334155' }}>{studentInvoice.invoiceDate}</span>
+                                <span style={{ fontWeight: 800, color: '#000000' }}>Date:</span>
+                                <span style={{ fontWeight: 700, color: '#000000' }}>{studentInvoice.invoiceDate}</span>
                               </div>
                             </td>
                           </tr>
                           <tr>
-                            <td style={{ border: '1.5px solid #0F172A', padding: '9px 12px', verticalAlign: 'top' }}>
-                              <span style={{ fontWeight: 700, color: '#0F172A' }}>Terms: </span>
-                              <span style={{ fontWeight: 600, color: '#334155' }}>{studentInvoice.terms}</span>
+                            <td style={{ border: '1.5px solid #000000', padding: '9px 12px', verticalAlign: 'top', background: '#ffffff', color: '#000000' }}>
+                              <span style={{ fontWeight: 800, color: '#000000' }}>Terms: </span>
+                              <span style={{ fontWeight: 700, color: '#000000' }}>{studentDocType === 'receipt' ? 'Paid in Full' : studentInvoice.terms}</span>
                             </td>
-                            <td style={{ border: '1.5px solid #0F172A', padding: '9px 12px', verticalAlign: 'top' }}>
+                            <td style={{ border: '1.5px solid #000000', padding: '9px 12px', verticalAlign: 'top', background: '#ffffff', color: '#000000' }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <span style={{ fontWeight: 700, color: '#0F172A' }}>Due On:</span>
-                                <span style={{ fontWeight: 600, color: '#334155' }}>{studentInvoice.dueDate}</span>
+                                <span style={{ fontWeight: 800, color: '#000000' }}>{studentDocType === 'receipt' ? 'Payment Status:' : 'Due On:'}</span>
+                                <span style={{ fontWeight: 800, color: studentDocType === 'receipt' ? '#047857' : '#000000' }}>
+                                  {studentDocType === 'receipt' ? 'PAID & RECEIVED' : studentInvoice.dueDate}
+                                </span>
                               </div>
                             </td>
                           </tr>
@@ -961,33 +1393,33 @@ export default function DocumentGeneratorModal({
                       <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '18px' }}>
                         <thead>
                           <tr style={{ background: '#E2E8F0' }}>
-                            <th style={{ border: '1.5px solid #0F172A', padding: '8px 10px', textAlign: 'center', width: '48px', fontWeight: 800 }}>Item</th>
-                            <th style={{ border: '1.5px solid #0F172A', padding: '8px 10px', textAlign: 'left', fontWeight: 800 }}>Description</th>
-                            <th style={{ border: '1.5px solid #0F172A', padding: '8px 10px', textAlign: 'center', width: '70px', fontWeight: 800 }}>Quantity</th>
-                            <th style={{ border: '1.5px solid #0F172A', padding: '8px 10px', textAlign: 'right', width: '110px', fontWeight: 800 }}>Unit Price</th>
-                            <th style={{ border: '1.5px solid #0F172A', padding: '8px 10px', textAlign: 'center', width: '70px', fontWeight: 800 }}>Tax (%)</th>
-                            <th style={{ border: '1.5px solid #0F172A', padding: '8px 10px', textAlign: 'right', width: '110px', fontWeight: 800 }}>Amount</th>
+                            <th style={{ border: '1.5px solid #000000', padding: '8px 10px', textAlign: 'center', width: '48px', fontWeight: 900, color: '#000000' }}>Item</th>
+                            <th style={{ border: '1.5px solid #000000', padding: '8px 10px', textAlign: 'left', fontWeight: 900, color: '#000000' }}>Description</th>
+                            <th style={{ border: '1.5px solid #000000', padding: '8px 10px', textAlign: 'center', width: '70px', fontWeight: 900, color: '#000000' }}>Quantity</th>
+                            <th style={{ border: '1.5px solid #000000', padding: '8px 10px', textAlign: 'right', width: '110px', fontWeight: 900, color: '#000000' }}>Unit Price</th>
+                            <th style={{ border: '1.5px solid #000000', padding: '8px 10px', textAlign: 'center', width: '70px', fontWeight: 900, color: '#000000' }}>Tax (%)</th>
+                            <th style={{ border: '1.5px solid #000000', padding: '8px 10px', textAlign: 'right', width: '110px', fontWeight: 900, color: '#000000' }}>Amount</th>
                           </tr>
                         </thead>
                         <tbody>
                           {studentInvoice.items.map((it, idx) => (
                             <tr key={it.id || idx}>
-                              <td style={{ border: '1.5px solid #0F172A', padding: '10px 10px', textAlign: 'center', fontWeight: 700 }}>
+                              <td style={{ border: '1.5px solid #000000', padding: '10px 10px', textAlign: 'center', fontWeight: 800, color: '#000000' }}>
                                 {idx + 1}
                               </td>
-                              <td style={{ border: '1.5px solid #0F172A', padding: '10px 10px', fontStyle: 'italic', fontWeight: 500 }}>
+                              <td style={{ border: '1.5px solid #000000', padding: '10px 10px', fontStyle: 'italic', fontWeight: 700, color: '#000000' }}>
                                 {it.description}
                               </td>
-                              <td style={{ border: '1.5px solid #0F172A', padding: '10px 10px', textAlign: 'center', fontWeight: 600 }}>
+                              <td style={{ border: '1.5px solid #000000', padding: '10px 10px', textAlign: 'center', fontWeight: 700, color: '#000000' }}>
                                 {it.quantity}
                               </td>
-                              <td style={{ border: '1.5px solid #0F172A', padding: '10px 10px', textAlign: 'right', fontWeight: 600 }}>
+                              <td style={{ border: '1.5px solid #000000', padding: '10px 10px', textAlign: 'right', fontWeight: 700, color: '#000000' }}>
                                 {Number(it.unitPrice).toLocaleString()} {studentInvoice.currency}
                               </td>
-                              <td style={{ border: '1.5px solid #0F172A', padding: '10px 10px', textAlign: 'center', fontWeight: 600 }}>
+                              <td style={{ border: '1.5px solid #000000', padding: '10px 10px', textAlign: 'center', fontWeight: 700, color: '#000000' }}>
                                 {it.taxPercent.toFixed(2)}
                               </td>
-                              <td style={{ border: '1.5px solid #0F172A', padding: '10px 10px', textAlign: 'right', fontWeight: 700 }}>
+                              <td style={{ border: '1.5px solid #000000', padding: '10px 10px', textAlign: 'right', fontWeight: 900, color: '#000000' }}>
                                 {Number(it.amount).toLocaleString()} {studentInvoice.currency}
                               </td>
                             </tr>
@@ -998,15 +1430,15 @@ export default function DocumentGeneratorModal({
                       {/* Totals Section */}
                       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '22px' }}>
                         <div style={{ width: '280px', fontSize: '13px', lineHeight: 1.8 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, color: '#000000' }}>
                             <span>Sub Total:</span>
                             <span>{Number(studentInvoice.subTotal).toLocaleString()} {studentInvoice.currency}</span>
                           </div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, color: '#000000' }}>
                             <span>Total (Tax):</span>
                             <span>0.00</span>
                           </div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '14px', borderTop: '1.5px solid #0F172A', paddingTop: '4px', marginTop: '4px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 900, fontSize: '15px', borderTop: '2px solid #000000', paddingTop: '4px', marginTop: '4px', color: '#000000' }}>
                             <span>Total:</span>
                             <span>{Number(studentInvoice.grandTotal).toLocaleString()} {studentInvoice.currency}</span>
                           </div>
@@ -1015,65 +1447,106 @@ export default function DocumentGeneratorModal({
 
                       {/* Official WIO Bank Details Table */}
                       <div style={{ marginBottom: '14px' }}>
-                        <div style={{ fontWeight: 800, fontSize: '12px', fontStyle: 'italic', marginBottom: '4px', color: '#0F172A' }}>
+                        <div style={{ fontWeight: 900, fontSize: '12px', fontStyle: 'italic', marginBottom: '4px', color: '#000000' }}>
                           Bank Details:
                         </div>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11.5px' }}>
                           <tbody>
                             <tr>
-                              <td style={{ border: '1.5px solid #0F172A', padding: '5px 10px', width: '32%', fontWeight: 700 }}>Account Holder:</td>
-                              <td style={{ border: '1.5px solid #0F172A', padding: '5px 10px', fontWeight: 700 }}>{studentInvoice.bankDetails.accountHolder}</td>
+                              <td style={{ border: '1.5px solid #000000', padding: '6px 10px', width: '32%', fontWeight: 800, color: '#000000' }}>Account Holder:</td>
+                              <td style={{ border: '1.5px solid #000000', padding: '6px 10px', fontWeight: 800, color: '#000000' }}>{studentInvoice.bankDetails.accountHolder}</td>
                             </tr>
                             <tr>
-                              <td style={{ border: '1.5px solid #0F172A', padding: '5px 10px', fontWeight: 700 }}>Business Identification No:</td>
-                              <td style={{ border: '1.5px solid #0F172A', padding: '5px 10px', fontWeight: 600 }}>{studentInvoice.bankDetails.businessId}</td>
+                              <td style={{ border: '1.5px solid #000000', padding: '6px 10px', fontWeight: 800, color: '#000000' }}>Business Identification No:</td>
+                              <td style={{ border: '1.5px solid #000000', padding: '6px 10px', fontWeight: 700, color: '#000000' }}>{studentInvoice.bankDetails.businessId}</td>
                             </tr>
                             <tr>
-                              <td style={{ border: '1.5px solid #0F172A', padding: '5px 10px', fontWeight: 700 }}>Bank Name:</td>
-                              <td style={{ border: '1.5px solid #0F172A', padding: '5px 10px', fontWeight: 700, color: '#047857' }}>{studentInvoice.bankDetails.bankName}</td>
+                              <td style={{ border: '1.5px solid #000000', padding: '6px 10px', fontWeight: 800, color: '#000000' }}>Bank Name:</td>
+                              <td style={{ border: '1.5px solid #000000', padding: '6px 10px', fontWeight: 900, color: '#047857' }}>{studentInvoice.bankDetails.bankName}</td>
                             </tr>
                             <tr>
-                              <td style={{ border: '1.5px solid #0F172A', padding: '5px 10px', fontWeight: 700 }}>Address:</td>
-                              <td style={{ border: '1.5px solid #0F172A', padding: '5px 10px', fontWeight: 500 }}>{studentInvoice.bankDetails.address}</td>
+                              <td style={{ border: '1.5px solid #000000', padding: '6px 10px', fontWeight: 800, color: '#000000' }}>Address:</td>
+                              <td style={{ border: '1.5px solid #000000', padding: '6px 10px', fontWeight: 600, color: '#000000' }}>{studentInvoice.bankDetails.address}</td>
                             </tr>
                             <tr>
-                              <td style={{ border: '1.5px solid #0F172A', padding: '5px 10px', fontWeight: 700 }}>Account No:</td>
-                              <td style={{ border: '1.5px solid #0F172A', padding: '5px 10px', fontWeight: 800, letterSpacing: '0.5px' }}>{studentInvoice.bankDetails.accountNumber}</td>
+                              <td style={{ border: '1.5px solid #000000', padding: '6px 10px', fontWeight: 800, color: '#000000' }}>Account No:</td>
+                              <td style={{ border: '1.5px solid #000000', padding: '6px 10px', fontWeight: 900, color: '#000000', letterSpacing: '0.5px' }}>{studentInvoice.bankDetails.accountNumber}</td>
                             </tr>
                             <tr>
-                              <td style={{ border: '1.5px solid #0F172A', padding: '5px 10px', fontWeight: 700 }}>IBAN:</td>
-                              <td style={{ border: '1.5px solid #0F172A', padding: '5px 10px', fontWeight: 800, letterSpacing: '0.5px' }}>{studentInvoice.bankDetails.iban}</td>
+                              <td style={{ border: '1.5px solid #000000', padding: '6px 10px', fontWeight: 800, color: '#000000' }}>IBAN:</td>
+                              <td style={{ border: '1.5px solid #000000', padding: '6px 10px', fontWeight: 900, color: '#000000', letterSpacing: '0.5px' }}>{studentInvoice.bankDetails.iban}</td>
                             </tr>
                             <tr>
-                              <td style={{ border: '1.5px solid #0F172A', padding: '5px 10px', fontWeight: 700 }}>SWIFT Code:</td>
-                              <td style={{ border: '1.5px solid #0F172A', padding: '5px 10px', fontWeight: 800, letterSpacing: '0.5px' }}>{studentInvoice.bankDetails.swiftCode}</td>
+                              <td style={{ border: '1.5px solid #000000', padding: '6px 10px', fontWeight: 800, color: '#000000' }}>SWIFT Code:</td>
+                              <td style={{ border: '1.5px solid #000000', padding: '6px 10px', fontWeight: 900, color: '#000000', letterSpacing: '0.5px' }}>{studentInvoice.bankDetails.swiftCode}</td>
                             </tr>
                           </tbody>
                         </table>
                       </div>
 
                       {/* Note */}
-                      <div style={{ fontSize: '11px', color: '#334155', fontStyle: 'italic', fontWeight: 500 }}>
+                      <div style={{ fontSize: '11px', color: '#000000', fontStyle: 'italic', fontWeight: 600 }}>
                         {studentInvoice.footerNote}
                       </div>
                     </div>
 
+                    {/* If Receipt Mode: Paid Seal */}
+                    {studentDocType === 'receipt' && (
+                      <div
+                        className="rubber-stamp"
+                        style={{
+                          position: 'absolute',
+                          bottom: '60px',
+                          right: '25px',
+                          border: '3.5px dashed #047857',
+                          color: '#047857',
+                          padding: '12px 18px',
+                          borderRadius: '12px',
+                          textAlign: 'center',
+                          fontWeight: 900,
+                          transform: 'rotate(-7deg)',
+                          background: 'rgba(240, 253, 244, 0.95)',
+                          boxShadow: '0 0 0 4px rgba(4, 120, 87, 0.2)',
+                          zIndex: 20,
+                          pointerEvents: 'none',
+                        }}
+                      >
+                        <div style={{ fontSize: '10px', letterSpacing: '1px', textTransform: 'uppercase', opacity: 0.9, color: '#047857' }}>
+                          STERLING OVERSEAS LLC
+                        </div>
+                        <div style={{ fontSize: '20px', fontWeight: 900, letterSpacing: '1.5px', margin: '2px 0', color: '#047857' }}>
+                          ★ PAID &amp; RECEIVED ★
+                        </div>
+                        <div style={{ fontSize: '10.5px', fontWeight: 800, color: '#047857' }}>
+                          DATE: {studentInvoice.invoiceDate}
+                        </div>
+                        {studentInvoice.utrNumber && (
+                          <div style={{ fontSize: '9.5px', fontWeight: 700, letterSpacing: '0.4px', marginTop: '2px', color: '#047857' }}>
+                            REF: {studentInvoice.utrNumber}
+                          </div>
+                        )}
+                        <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '3px', opacity: 0.85, color: '#047857' }}>
+                          OFFICIAL RECEIPT
+                        </div>
+                      </div>
+                    )}
+
                     {/* Authorized Signature Block */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '30px' }}>
-                      <div style={{ fontSize: '10px', color: '#64748B' }}>
-                        This is an official computer generated tax invoice issued by Sterling Overseas Consultancy LLC.
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '26px' }}>
+                      <div style={{ fontSize: '10px', color: '#000000', fontWeight: 600 }}>
+                        Official computer generated {studentDocType === 'receipt' ? 'receipt' : 'tax invoice'} issued by Sterling Overseas Consultancy LLC.
                       </div>
                       <div style={{ textAlign: 'center', width: '220px' }}>
-                        <div style={{ height: '36px', borderBottom: '1.5px solid #0F172A', marginBottom: '6px' }}></div>
-                        <div style={{ fontWeight: 800, fontSize: '11px', color: '#0F172A' }}>Sterling Overseas Consultancy LLC</div>
-                        <div style={{ fontSize: '10px', color: '#475569' }}>Authorized Signatory</div>
+                        <div style={{ height: '36px', borderBottom: '1.5px solid #000000', marginBottom: '6px' }}></div>
+                        <div style={{ fontWeight: 900, fontSize: '11px', color: '#000000' }}>Sterling Overseas Consultancy LLC</div>
+                        <div style={{ fontSize: '10px', color: '#000000', fontWeight: 600 }}>Authorized Signatory</div>
                       </div>
                     </div>
                   </div>
                 )}
 
                 {/* ======================================================== */}
-                {/* 2. B2B REMITTANCE RECEIPT (with Official PAID Seal) */}
+                {/* 2. B2B REMITTANCE RECEIPT (with Official PAID Seal & House Bank) */}
                 {/* ======================================================== */}
                 {mode === 'b2b_receipt' && (
                   <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between', position: 'relative' }}>
@@ -1081,20 +1554,20 @@ export default function DocumentGeneratorModal({
                       {/* Top Entity & Title */}
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
                         <div>
-                          <div style={{ fontWeight: 800, fontSize: '15px', color: '#0F172A' }}>
-                            Sterling Study Abroad & Overseas Consultancy
+                          <div style={{ fontWeight: 900, fontSize: '16px', color: '#000000' }}>
+                            Sterling Study Abroad &amp; Overseas Consultancy
                           </div>
-                          <div style={{ fontSize: '11px', color: '#475569', fontWeight: 600 }}>
-                            Central Accounts & Disbursements Division
+                          <div style={{ fontSize: '11.5px', color: '#000000', fontWeight: 700 }}>
+                            Central Accounts &amp; Disbursements Division
                           </div>
                         </div>
 
                         <div style={{ textAlign: 'right' }}>
-                          <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 900, color: '#0F172A', letterSpacing: '0.5px' }}>
+                          <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 900, color: '#000000', letterSpacing: '0.5px' }}>
                             PAYMENT REMITTANCE RECEIPT
                           </h2>
-                          <div style={{ fontSize: '11px', color: '#059669', fontWeight: 700, marginTop: '2px' }}>
-                            SETTLEMENT & DISBURSEMENT VOUCHER
+                          <div style={{ fontSize: '11.5px', color: '#047857', fontWeight: 800, marginTop: '2px' }}>
+                            DISBURSEMENT VOUCHER &amp; PAYMENT ADVICE
                           </div>
                         </div>
                       </div>
@@ -1103,69 +1576,69 @@ export default function DocumentGeneratorModal({
                       <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '18px' }}>
                         <tbody>
                           <tr>
-                            <td style={{ border: '1.5px solid #0F172A', padding: '8px 12px', width: '52%', verticalAlign: 'top' }}>
-                              <div style={{ fontSize: '11px', color: '#475569', fontWeight: 700 }}>PAID TO / BENEFICIARY:</div>
-                              <div style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A' }}>
-                                {b2bReceipt.partnerName}
+                            <td style={{ border: '1.5px solid #000000', padding: '8px 12px', width: '52%', verticalAlign: 'top', background: '#ffffff', color: '#000000' }}>
+                              <div style={{ fontSize: '11px', color: '#000000', fontWeight: 800 }}>PAID TO / BENEFICIARY:</div>
+                              <div style={{ fontSize: '15px', fontWeight: 900, color: '#000000' }}>
+                                {b2bReceipt.partnerName || 'PARTNER COMPANY'}
                               </div>
                             </td>
-                            <td style={{ border: '1.5px solid #0F172A', padding: '8px 12px', width: '48%', verticalAlign: 'top' }}>
+                            <td style={{ border: '1.5px solid #000000', padding: '8px 12px', width: '48%', verticalAlign: 'top', background: '#ffffff', color: '#000000' }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <span style={{ fontWeight: 700 }}>Voucher / Receipt #:</span>
-                                <span style={{ fontWeight: 800, color: '#0F172A' }}>{b2bReceipt.receiptNumber}</span>
+                                <span style={{ fontWeight: 800, color: '#000000' }}>Voucher / Receipt #:</span>
+                                <span style={{ fontWeight: 900, color: '#000000' }}>{b2bReceipt.receiptNumber}</span>
                               </div>
                             </td>
                           </tr>
                           <tr>
-                            <td style={{ border: '1.5px solid #0F172A', padding: '8px 12px', verticalAlign: 'top' }}>
-                              <div style={{ fontSize: '11px', color: '#475569', fontWeight: 700 }}>FOR STUDENT(S):</div>
-                              <div style={{ fontSize: '13px', fontWeight: 700, color: '#1E293B' }}>
-                                {b2bReceipt.studentNames}
+                            <td style={{ border: '1.5px solid #000000', padding: '8px 12px', verticalAlign: 'top', background: '#ffffff', color: '#000000' }}>
+                              <div style={{ fontSize: '11px', color: '#000000', fontWeight: 800 }}>FOR STUDENT(S):</div>
+                              <div style={{ fontSize: '13px', fontWeight: 800, color: '#000000' }}>
+                                {b2bReceipt.studentNames || 'General'}
                               </div>
                             </td>
-                            <td style={{ border: '1.5px solid #0F172A', padding: '8px 12px', verticalAlign: 'top' }}>
+                            <td style={{ border: '1.5px solid #000000', padding: '8px 12px', verticalAlign: 'top', background: '#ffffff', color: '#000000' }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <span style={{ fontWeight: 700 }}>Payment Settled Date:</span>
-                                <span style={{ fontWeight: 700, color: '#059669' }}>{b2bReceipt.settledDate}</span>
+                                <span style={{ fontWeight: 800, color: '#000000' }}>Payment Settled Date:</span>
+                                <span style={{ fontWeight: 800, color: '#047857' }}>{b2bReceipt.settledDate}</span>
                               </div>
                             </td>
                           </tr>
                           <tr>
-                            <td style={{ border: '1.5px solid #0F172A', padding: '8px 12px', verticalAlign: 'top' }}>
-                              <span style={{ fontWeight: 700 }}>Purpose: </span>
-                              <span style={{ fontWeight: 500, color: '#334155' }}>{b2bReceipt.purpose}</span>
+                            <td style={{ border: '1.5px solid #000000', padding: '8px 12px', verticalAlign: 'top', background: '#ffffff', color: '#000000' }}>
+                              <span style={{ fontWeight: 800, color: '#000000' }}>Purpose: </span>
+                              <span style={{ fontWeight: 600, color: '#000000' }}>{b2bReceipt.purpose}</span>
                             </td>
-                            <td style={{ border: '1.5px solid #0F172A', padding: '8px 12px', verticalAlign: 'top' }}>
+                            <td style={{ border: '1.5px solid #000000', padding: '8px 12px', verticalAlign: 'top', background: '#ffffff', color: '#000000' }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <span style={{ fontWeight: 700 }}>Payment Status:</span>
-                                <span style={{ fontWeight: 800, color: '#059669' }}>✓ SETTLED & PAID</span>
+                                <span style={{ fontWeight: 800, color: '#000000' }}>Payment Status:</span>
+                                <span style={{ fontWeight: 900, color: '#047857' }}>✓ SETTLED &amp; PAID</span>
                               </div>
                             </td>
                           </tr>
                         </tbody>
                       </table>
 
-                      {/* Transaction Audit Execution Box */}
-                      <div style={{ border: '1.5px solid #0F172A', background: '#F8FAFC', padding: '10px 14px', borderRadius: '4px', marginBottom: '18px' }}>
-                        <div style={{ fontWeight: 800, fontSize: '11.5px', color: '#0F172A', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                          🏦 Electronic Fund Transfer & Remittance Audit
+                      {/* Transaction Audit Execution Box (Both Our Bank & Partner Bank) */}
+                      <div style={{ border: '1.5px solid #000000', background: '#F8FAFC', padding: '12px 14px', borderRadius: '4px', marginBottom: '18px' }}>
+                        <div style={{ fontWeight: 900, fontSize: '12px', color: '#000000', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                          🏦 Electronic Fund Transfer &amp; Bank Clearance Audit
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '11.5px' }}>
                           <div>
-                            <span style={{ color: '#475569', fontWeight: 600 }}>Payment Mode: </span>
-                            <strong style={{ color: '#0F172A' }}>{b2bReceipt.paymentMode}</strong>
+                            <span style={{ color: '#000000', fontWeight: 800 }}>Payment Mode: </span>
+                            <strong style={{ color: '#000000' }}>{b2bReceipt.paymentMode}</strong>
                           </div>
                           <div>
-                            <span style={{ color: '#475569', fontWeight: 600 }}>Bank UTR / Transaction Ref: </span>
+                            <span style={{ color: '#000000', fontWeight: 800 }}>Bank UTR / Transaction Ref: </span>
                             <strong style={{ color: '#047857', letterSpacing: '0.5px' }}>{b2bReceipt.utrNumber}</strong>
                           </div>
                           <div style={{ gridColumn: 'span 2' }}>
-                            <span style={{ color: '#475569', fontWeight: 600 }}>Credited Beneficiary Account: </span>
-                            <strong style={{ color: '#0F172A' }}>{b2bReceipt.transferAccount}</strong>
+                            <span style={{ color: '#000000', fontWeight: 800 }}>Debited From (Our Bank): </span>
+                            <strong style={{ color: '#000000' }}>{b2bReceipt.debitAccount}</strong>
                           </div>
                           <div style={{ gridColumn: 'span 2' }}>
-                            <span style={{ color: '#475569', fontWeight: 600 }}>Disbursed From: </span>
-                            <span style={{ color: '#334155' }}>{b2bReceipt.debitAccount}</span>
+                            <span style={{ color: '#000000', fontWeight: 800 }}>Credited To (Beneficiary Bank): </span>
+                            <strong style={{ color: '#000000' }}>{b2bReceipt.transferAccount}</strong>
                           </div>
                         </div>
                       </div>
@@ -1174,36 +1647,36 @@ export default function DocumentGeneratorModal({
                       <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '18px' }}>
                         <thead>
                           <tr style={{ background: '#E2E8F0' }}>
-                            <th style={{ border: '1.5px solid #0F172A', padding: '8px 10px', textAlign: 'left', fontWeight: 800 }}>Disbursement Particulars</th>
-                            <th style={{ border: '1.5px solid #0F172A', padding: '8px 10px', textAlign: 'center', width: '110px', fontWeight: 800 }}>Tax / GST</th>
-                            <th style={{ border: '1.5px solid #0F172A', padding: '8px 10px', textAlign: 'right', width: '140px', fontWeight: 800 }}>Amount Disbursed</th>
+                            <th style={{ border: '1.5px solid #000000', padding: '8px 10px', textAlign: 'left', fontWeight: 900, color: '#000000' }}>Disbursement Particulars</th>
+                            <th style={{ border: '1.5px solid #000000', padding: '8px 10px', textAlign: 'center', width: '110px', fontWeight: 900, color: '#000000' }}>Tax / GST</th>
+                            <th style={{ border: '1.5px solid #000000', padding: '8px 10px', textAlign: 'right', width: '140px', fontWeight: 900, color: '#000000' }}>Amount Disbursed</th>
                           </tr>
                         </thead>
                         <tbody>
                           <tr>
-                            <td style={{ border: '1.5px solid #0F172A', padding: '10px', fontWeight: 600 }}>
+                            <td style={{ border: '1.5px solid #000000', padding: '10px', fontWeight: 700, color: '#000000' }}>
                               Base Professional Commission / Sub-Agent Fee
-                              <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 400 }}>
-                                Candidate(s): {b2bReceipt.studentNames}
+                              <div style={{ fontSize: '11px', color: '#000000', fontWeight: 500 }}>
+                                Candidate(s): {b2bReceipt.studentNames || 'General'}
                               </div>
                             </td>
-                            <td style={{ border: '1.5px solid #0F172A', padding: '10px', textAlign: 'center', fontWeight: 600 }}>
+                            <td style={{ border: '1.5px solid #000000', padding: '10px', textAlign: 'center', fontWeight: 700, color: '#000000' }}>
                               {b2bReceipt.gstRate > 0 ? `${b2bReceipt.gstRate}% GST` : '0% (Exempt)'}
                             </td>
-                            <td style={{ border: '1.5px solid #0F172A', padding: '10px', textAlign: 'right', fontWeight: 700 }}>
+                            <td style={{ border: '1.5px solid #000000', padding: '10px', textAlign: 'right', fontWeight: 800, color: '#000000' }}>
                               {Number(b2bReceipt.baseAmount).toLocaleString()} {b2bReceipt.currency}
                             </td>
                           </tr>
 
                           {b2bReceipt.gstAmount > 0 && (
                             <tr>
-                              <td style={{ border: '1.5px solid #0F172A', padding: '8px 10px', fontWeight: 600 }}>
+                              <td style={{ border: '1.5px solid #000000', padding: '8px 10px', fontWeight: 700, color: '#000000' }}>
                                 Goods and Services Tax (GST 18%)
                               </td>
-                              <td style={{ border: '1.5px solid #0F172A', padding: '8px 10px', textAlign: 'center', fontWeight: 600 }}>
+                              <td style={{ border: '1.5px solid #000000', padding: '8px 10px', textAlign: 'center', fontWeight: 700, color: '#000000' }}>
                                 18.00%
                               </td>
-                              <td style={{ border: '1.5px solid #0F172A', padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: '#D97706' }}>
+                              <td style={{ border: '1.5px solid #000000', padding: '8px 10px', textAlign: 'right', fontWeight: 800, color: '#000000' }}>
                                 +{Number(b2bReceipt.gstAmount).toLocaleString()} {b2bReceipt.currency}
                               </td>
                             </tr>
@@ -1211,13 +1684,13 @@ export default function DocumentGeneratorModal({
 
                           {/* Grand Total Row */}
                           <tr style={{ background: '#F1F5F9' }}>
-                            <td style={{ border: '1.5px solid #0F172A', padding: '10px', fontWeight: 800, fontSize: '13px' }}>
+                            <td style={{ border: '1.5px solid #000000', padding: '10px', fontWeight: 900, fontSize: '13px', color: '#000000' }}>
                               TOTAL REMITTANCE SETTLED (NET PAID)
                             </td>
-                            <td style={{ border: '1.5px solid #0F172A', padding: '10px', textAlign: 'center', fontWeight: 700 }}>
+                            <td style={{ border: '1.5px solid #000000', padding: '10px', textAlign: 'center', fontWeight: 800, color: '#000000' }}>
                               FULL
                             </td>
-                            <td style={{ border: '1.5px solid #0F172A', padding: '10px', textAlign: 'right', fontWeight: 900, fontSize: '14px', color: '#047857' }}>
+                            <td style={{ border: '1.5px solid #000000', padding: '10px', textAlign: 'right', fontWeight: 900, fontSize: '14.5px', color: '#047857' }}>
                               {Number(b2bReceipt.totalDisbursed).toLocaleString()} {b2bReceipt.currency}
                             </td>
                           </tr>
@@ -1225,7 +1698,7 @@ export default function DocumentGeneratorModal({
                       </table>
 
                       {/* Remarks */}
-                      <div style={{ fontSize: '11px', color: '#475569', fontStyle: 'italic', marginBottom: '20px' }}>
+                      <div style={{ fontSize: '11px', color: '#000000', fontStyle: 'italic', marginBottom: '20px', fontWeight: 600 }}>
                         Note: {b2bReceipt.remarks}
                       </div>
                     </div>
@@ -1238,32 +1711,32 @@ export default function DocumentGeneratorModal({
                           position: 'absolute',
                           bottom: '65px',
                           right: '25px',
-                          border: '3.5px dashed #059669',
-                          color: '#059669',
+                          border: '3.5px dashed #047857',
+                          color: '#047857',
                           padding: '12px 18px',
                           borderRadius: '12px',
                           textAlign: 'center',
-                          fontWeight: 800,
+                          fontWeight: 900,
                           transform: 'rotate(-6deg)',
-                          background: 'rgba(240, 253, 244, 0.92)',
-                          boxShadow: '0 0 0 3px rgba(5, 150, 105, 0.15)',
+                          background: 'rgba(240, 253, 244, 0.95)',
+                          boxShadow: '0 0 0 4px rgba(4, 120, 87, 0.2)',
                           zIndex: 20,
                           pointerEvents: 'none',
                         }}
                       >
-                        <div style={{ fontSize: '10px', letterSpacing: '1px', textTransform: 'uppercase', opacity: 0.9 }}>
+                        <div style={{ fontSize: '10px', letterSpacing: '1px', textTransform: 'uppercase', opacity: 0.9, color: '#047857' }}>
                           STERLING OVERSEAS
                         </div>
-                        <div style={{ fontSize: '20px', fontWeight: 900, letterSpacing: '1.5px', margin: '2px 0' }}>
+                        <div style={{ fontSize: '20px', fontWeight: 900, letterSpacing: '1.5px', margin: '2px 0', color: '#047857' }}>
                           ★ PAID ★
                         </div>
-                        <div style={{ fontSize: '10.5px', fontWeight: 700 }}>
+                        <div style={{ fontSize: '10.5px', fontWeight: 800, color: '#047857' }}>
                           DATE: {b2bReceipt.settledDate}
                         </div>
-                        <div style={{ fontSize: '9.5px', fontWeight: 600, letterSpacing: '0.4px', marginTop: '2px' }}>
+                        <div style={{ fontSize: '9.5px', fontWeight: 700, letterSpacing: '0.4px', marginTop: '2px', color: '#047857' }}>
                           UTR: {b2bReceipt.utrNumber}
                         </div>
-                        <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '3px', opacity: 0.85 }}>
+                        <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '3px', opacity: 0.85, color: '#047857' }}>
                           VERIFIED REMITTANCE
                         </div>
                       </div>
@@ -1271,15 +1744,15 @@ export default function DocumentGeneratorModal({
 
                     {/* Bottom Signatory */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '30px' }}>
-                      <div style={{ fontSize: '10px', color: '#64748B' }}>
+                      <div style={{ fontSize: '10px', color: '#000000', fontWeight: 600 }}>
                         This disbursement receipt is an official audit-proof remittance voucher generated by Sterling ERP.
                       </div>
                       <div style={{ textAlign: 'center', width: '220px' }}>
-                        <div style={{ height: '36px', borderBottom: '1.5px solid #0F172A', marginBottom: '6px' }}></div>
-                        <div style={{ fontWeight: 800, fontSize: '11px', color: '#0F172A' }}>
+                        <div style={{ height: '36px', borderBottom: '1.5px solid #000000', marginBottom: '6px' }}></div>
+                        <div style={{ fontWeight: 900, fontSize: '11px', color: '#000000' }}>
                           Sterling Overseas Consultancy
                         </div>
-                        <div style={{ fontSize: '10px', color: '#475569' }}>
+                        <div style={{ fontSize: '10px', color: '#000000', fontWeight: 600 }}>
                           Authorized Accounts Signatory
                         </div>
                       </div>

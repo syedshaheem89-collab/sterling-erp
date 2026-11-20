@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabase';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
-import DocumentGeneratorModal from '../components/DocumentGeneratorModal';
+import DocumentGeneratorModal, { STERLING_COMPANY_BANKS_DEFAULT } from '../components/DocumentGeneratorModal';
 import B2BInvoiceViewerModal from '../components/B2BInvoiceViewerModal';
 
 /**
@@ -397,6 +397,9 @@ const INITIAL_B2B_PAYMENTS = [
     created_at: '2026-11-05T10:00:00.000Z',
     settled_at: '2026-11-10T16:20:00.000Z',
     payment_mode: 'UPI / GPay',
+    paying_bank_id: 'comp-bank-fed-1',
+    paying_bank_name: 'Federal Bank',
+    debit_account: 'Federal Bank Current A/C: 14200200039281 (Valanchery Main)',
     utr_number: 'UPI/638291048291',
     invoice_file_name: 'EduGlobal_Commission_Invoice_512.svg',
     invoice_file_data: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="750" viewBox="0 0 600 750"><rect width="600" height="750" fill="%23ffffff"/><rect x="30" y="30" width="540" height="690" fill="%23f8fafc" stroke="%23cbd5e1" stroke-width="2" rx="10"/><text x="50" y="80" font-family="sans-serif" font-size="18" font-weight="bold" fill="%230f172a">EDUGLOBAL OVERSEAS SERVICES</text><text x="50" y="105" font-family="sans-serif" font-size="12" fill="%2364748b">INVOICE NO: EG-2026-512 | DATE: 05.11.2026</text><line x1="50" y1="125" x2="550" y2="125" stroke="%23e2e8f0" stroke-width="2"/><text x="50" y="155" font-family="sans-serif" font-size="12" font-weight="bold" fill="%23334155">BILLED TO: Sterling Overseas Consultancy LLC</text><text x="50" y="175" font-family="sans-serif" font-size="12" fill="%23475569">Candidate: Kiran Mathew</text><text x="50" y="230" font-family="sans-serif" font-size="13" font-weight="bold" fill="%230f172a">1. Student Onboarding &amp; Verification Fee</text><text x="50" y="260" font-family="sans-serif" font-size="12" fill="%23334155">Amount: INR 15,000</text><line x1="50" y1="290" x2="550" y2="290" stroke="%23cbd5e1" stroke-width="1.5"/><text x="50" y="325" font-family="sans-serif" font-size="16" font-weight="bold" fill="%23059669">TOTAL CLAIM: INR 15,000</text><text x="50" y="365" font-family="sans-serif" font-size="11" fill="%2364748b">Bank: ICICI Bank | A/C: 002905001829 | IFSC: ICIC0000029</text></svg>',
@@ -437,6 +440,7 @@ export const EXPORT_COLUMNS_DEF = [
   { id: 'category', label: 'Category', key: 'Category', default: false, wch: 20 },
   { id: 'settled_at', label: 'Settled Date', key: 'Settled Date', default: false, wch: 14 },
   { id: 'payment_mode', label: 'Payment Mode', key: 'Payment Mode', default: false, wch: 20 },
+  { id: 'paying_bank', label: 'Paid From (Sterling Bank)', key: 'Paid From (Sterling Bank)', default: true, wch: 30 },
   { id: 'utr_number', label: 'Bank UTR / Ref #', key: 'Bank UTR / Reference', default: false, wch: 22 },
   { id: 'notes', label: 'Remarks / Notes', key: 'Remarks / Notes', default: false, wch: 30 },
 ];
@@ -553,11 +557,45 @@ export default function B2BPayments({ setCurrentPage }) {
     upi_id: '',
   });
 
+  // Sterling's Company Bank Accounts (Our 4+ House Banks - Disbursing Accounts)
+  const [companyBanks, setCompanyBanks] = useState(() => {
+    try {
+      const saved = localStorage.getItem('sterling_company_banks');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.error(e);
+    }
+    return STERLING_COMPANY_BANKS_DEFAULT;
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('sterling_company_banks', JSON.stringify(companyBanks));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [companyBanks]);
+
+  const [payingBankFilter, setPayingBankFilter] = useState('All');
+  const [bankDirectoryTab, setBankDirectoryTab] = useState('company_banks'); // 'company_banks' | 'partner_banks'
+  const [isAddingNewCompanyBank, setIsAddingNewCompanyBank] = useState(false);
+  const [newCompanyBankForm, setNewCompanyBankForm] = useState({
+    label: '',
+    bank_name: '',
+    account_number: '',
+    ifsc: '',
+    branch: '',
+    currency: 'INR',
+  });
+
   // Settlement Modal State
   const [settlingPayment, setSettlingPayment] = useState(null);
   const [settlementData, setSettlementData] = useState({
     settled_at: new Date().toISOString().split('T')[0],
     payment_mode: 'Bank Transfer (IMPS / NEFT)',
+    paying_bank_id: 'comp-bank-fed-1',
+    paying_bank_name: 'Federal Bank',
+    debit_account: 'Federal Bank Current A/C: 14200200039281 (Valanchery Main)',
     utr_number: '',
     notes: '',
   });
@@ -907,7 +945,7 @@ export default function B2BPayments({ setCurrentPage }) {
       setPayments((prev) =>
         prev.map((p) =>
           p.id === payment.id
-            ? { ...p, status: 'pending', settled_at: null, payment_mode: null, utr_number: null }
+            ? { ...p, status: 'pending', settled_at: null, payment_mode: null, utr_number: null, paying_bank_id: null, paying_bank_name: null }
             : p
         )
       );
@@ -915,10 +953,15 @@ export default function B2BPayments({ setCurrentPage }) {
       return;
     }
 
+    const defaultBank = companyBanks.find((b) => b.id === payment.paying_bank_id) || companyBanks[0];
+
     setSettlingPayment(payment);
     setSettlementData({
       settled_at: new Date().toISOString().split('T')[0],
-      payment_mode: 'Bank Transfer (IMPS / NEFT)',
+      payment_mode: payment.currency !== 'INR' ? 'Forex Wire / Wise' : 'Bank Transfer (IMPS / NEFT)',
+      paying_bank_id: defaultBank.id,
+      paying_bank_name: defaultBank.bank_name,
+      debit_account: `${defaultBank.bank_name} A/C: ${defaultBank.account_number} (${defaultBank.branch})`,
       utr_number: '',
       notes: payment.notes || '',
     });
@@ -929,6 +972,8 @@ export default function B2BPayments({ setCurrentPage }) {
     e.preventDefault();
     if (!settlingPayment) return;
 
+    const chosenBank = companyBanks.find((b) => b.id === settlementData.paying_bank_id) || companyBanks[0];
+
     setPayments((prev) =>
       prev.map((p) =>
         p.id === settlingPayment.id
@@ -937,6 +982,9 @@ export default function B2BPayments({ setCurrentPage }) {
               status: 'completed',
               settled_at: settlementData.settled_at,
               payment_mode: settlementData.payment_mode,
+              paying_bank_id: chosenBank.id,
+              paying_bank_name: chosenBank.bank_name,
+              debit_account: `${chosenBank.bank_name} A/C: ${chosenBank.account_number} (${chosenBank.branch})`,
               utr_number: settlementData.utr_number.trim(),
               notes: settlementData.notes,
             }
@@ -945,8 +993,46 @@ export default function B2BPayments({ setCurrentPage }) {
     );
 
     const fin = calculateFinancials(settlingPayment);
-    toast.success(`Settled ${formatMoney(fin.totalAmount, settlingPayment.currency)} to ${settlingPayment.partner_name}!`);
+    toast.success(`Settled ${formatMoney(fin.totalAmount, settlingPayment.currency)} from ${chosenBank.bank_name} to ${settlingPayment.partner_name}!`);
     setSettlingPayment(null);
+  };
+
+  // Add a new House Bank for Sterling
+  const handleAddNewCompanyBank = (e) => {
+    e.preventDefault();
+    if (!newCompanyBankForm.bank_name.trim() || !newCompanyBankForm.account_number.trim()) {
+      toast.error('Bank Name and Account Number are required');
+      return;
+    }
+    const newBank = {
+      id: 'comp-bank-' + Date.now(),
+      label: newCompanyBankForm.label.trim() || `${newCompanyBankForm.bank_name} Current A/C`,
+      bank_name: newCompanyBankForm.bank_name.trim(),
+      account_number: newCompanyBankForm.account_number.trim(),
+      ifsc: newCompanyBankForm.ifsc.trim(),
+      branch: newCompanyBankForm.branch.trim(),
+      currency: newCompanyBankForm.currency,
+    };
+    setCompanyBanks((prev) => [...prev, newBank]);
+    setNewCompanyBankForm({
+      label: '',
+      bank_name: '',
+      account_number: '',
+      ifsc: '',
+      branch: '',
+      currency: 'INR',
+    });
+    setIsAddingNewCompanyBank(false);
+    toast.success(`Added ${newBank.bank_name} to Sterling's Paying Banks!`);
+  };
+
+  const handleRemoveCompanyBank = (id) => {
+    if (companyBanks.length <= 1) {
+      toast.error('You must keep at least one company paying bank');
+      return;
+    }
+    setCompanyBanks((prev) => prev.filter((b) => b.id !== id));
+    toast.success('Removed company bank account');
   };
 
   // Open Add Modal
@@ -1392,6 +1478,9 @@ export default function B2BPayments({ setCurrentPage }) {
           case 'payment_mode':
             row[col.key] = p.payment_mode || '';
             break;
+          case 'paying_bank':
+            row[col.key] = p.paying_bank_name || (p.status === 'completed' ? 'Federal Bank (Valanchery)' : 'Pending Allocation');
+            break;
           case 'utr_number':
             row[col.key] = p.utr_number || '';
             break;
@@ -1476,6 +1565,11 @@ export default function B2BPayments({ setCurrentPage }) {
       list = list.filter((p) => p.currency === currencyFilter);
     }
 
+    // Paying bank filter (Our company bank account)
+    if (payingBankFilter !== 'All') {
+      list = list.filter((p) => p.paying_bank_id === payingBankFilter || (p.paying_bank_name || '').toLowerCase() === payingBankFilter.toLowerCase());
+    }
+
     // Search query
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -1484,6 +1578,8 @@ export default function B2BPayments({ setCurrentPage }) {
           p.partner_name?.toLowerCase().includes(q) ||
           p.transfer_account?.toLowerCase().includes(q) ||
           p.student_names?.toLowerCase().includes(q) ||
+          p.paying_bank_name?.toLowerCase().includes(q) ||
+          p.debit_account?.toLowerCase().includes(q) ||
           p.notes?.toLowerCase().includes(q) ||
           p.utr_number?.toLowerCase().includes(q)
       );
@@ -1498,7 +1594,7 @@ export default function B2BPayments({ setCurrentPage }) {
     });
 
     return list;
-  }, [payments, statusFilter, currencyFilter, searchQuery]);
+  }, [payments, statusFilter, currencyFilter, searchQuery, payingBankFilter]);
 
   const allVisibleSelected =
     filteredList.length > 0 && filteredList.every((p) => selectedIds.has(p.id));
@@ -2197,8 +2293,8 @@ export default function B2BPayments({ setCurrentPage }) {
           </button>
         </div>
 
-        {/* Currency & Search */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        {/* Currency, Paying Bank & Search */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           <select
             value={currencyFilter}
             onChange={(e) => setCurrencyFilter(e.target.value)}
@@ -2216,6 +2312,28 @@ export default function B2BPayments({ setCurrentPage }) {
             <option value="USD">USD ($)</option>
             <option value="EUR">EUR (€)</option>
             <option value="GBP">GBP (£)</option>
+          </select>
+
+          {/* Sterling Disbursing Bank Filter */}
+          <select
+            value={payingBankFilter}
+            onChange={(e) => setPayingBankFilter(e.target.value)}
+            title="Filter by which Sterling Bank account disbursed the funds"
+            style={{
+              padding: '6px 10px',
+              borderRadius: '6px',
+              border: '1px solid var(--border, rgba(148, 163, 225, 0.25))',
+              background: 'var(--bg2, #ffffff)',
+              color: 'var(--text, #EDEFFA)',
+              fontSize: '12.5px',
+            }}
+          >
+            <option value="All">All Paying Banks (Our Accounts)</option>
+            {companyBanks.map((b) => (
+              <option key={b.id} value={b.id}>
+                🏦 {b.bank_name} ({b.account_number.slice(-4)})
+              </option>
+            ))}
           </select>
 
           <div className="simple-search-box">
@@ -2380,9 +2498,14 @@ export default function B2BPayments({ setCurrentPage }) {
                     {/* Due Date */}
                     <td>
                       {isCompleted ? (
-                        <span style={{ fontSize: '12px', color: '#10B981', fontWeight: 600 }}>
-                          ✓ Paid {payment.settled_at}
-                        </span>
+                        <div>
+                          <span style={{ fontSize: '12px', color: '#10B981', fontWeight: 700 }}>
+                            ✓ Paid {payment.settled_at}
+                          </span>
+                          <div style={{ fontSize: '11px', color: '#38BDF8', fontWeight: 600, marginTop: '2px' }} title={payment.debit_account || ''}>
+                            🏦 Via: {payment.paying_bank_name || 'Federal Bank'}
+                          </div>
+                        </div>
                       ) : (
                         <span
                           className="badge-due"
@@ -2534,13 +2657,53 @@ export default function B2BPayments({ setCurrentPage }) {
                 </div>
 
                 <div className="form-field">
-                  <label>Transfer Account (Where money was sent)</label>
+                  <label>Beneficiary Account (Where money was sent)</label>
                   <input
                     type="text"
                     readOnly
                     value={settlingPayment.transfer_account || 'Not provided'}
                     style={{ background: 'var(--bg, #F4F6FC)', opacity: 0.9 }}
                   />
+                </div>
+
+                {/* SELECT FROM WHICH OF STERLING'S 4+ BANKS THE PAYMENT WAS MADE */}
+                <div className="form-field" style={{ background: 'rgba(59, 130, 246, 0.08)', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(59, 130, 246, 0.3)' }}>
+                  <label style={{ display: 'flex', justifyContent: 'space-between', color: '#60A5FA', fontWeight: 700, marginBottom: '4px' }}>
+                    <span>Paid From Sterling Bank (Our Bank) *</span>
+                    <span style={{ fontSize: '11px', color: 'var(--muted, #8B949E)' }}>Select Disbursing Account</span>
+                  </label>
+                  <select
+                    value={settlementData.paying_bank_id}
+                    onChange={(e) => {
+                      const bId = e.target.value;
+                      const match = companyBanks.find((b) => b.id === bId) || companyBanks[0];
+                      setSettlementData({
+                        ...settlementData,
+                        paying_bank_id: bId,
+                        paying_bank_name: match.bank_name,
+                        debit_account: `${match.bank_name} A/C: ${match.account_number} (${match.branch})`,
+                      });
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 10px',
+                      borderRadius: '6px',
+                      background: 'var(--bg2, #ffffff)',
+                      border: '1px solid var(--border, rgba(148, 163, 225, 0.35))',
+                      color: 'var(--text, #EDEFFA)',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                    }}
+                  >
+                    {companyBanks.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        🏦 {b.label} &bull; {b.account_number}
+                      </option>
+                    ))}
+                  </select>
+                  <div style={{ fontSize: '11px', color: 'var(--muted, #8B949E)', marginTop: '4px' }}>
+                    Debited A/C: <strong style={{ color: 'var(--text, #EDEFFA)' }}>{settlementData.debit_account}</strong>
+                  </div>
                 </div>
 
                 <div className="form-row">
@@ -3047,18 +3210,18 @@ export default function B2BPayments({ setCurrentPage }) {
         </div>
       )}
 
-      {/* 9. B2B PARTNER BANK ACCOUNTS MANAGER MODAL (Add / Manage multiple accounts per company) */}
+      {/* 9. BANK ACCOUNTS MANAGER MODAL (Manage Sterling House Banks & B2B Partner Accounts) */}
       {showAccountsManagerModal && (
         <div className="b2b-modal-overlay" onClick={() => setShowAccountsManagerModal(false)}>
-          <div className="b2b-modal-card" style={{ maxWidth: '780px' }} onClick={(e) => e.stopPropagation()}>
+          <div className="b2b-modal-card" style={{ maxWidth: '820px' }} onClick={(e) => e.stopPropagation()}>
             <div className="b2b-modal-header">
               <div>
                 <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span>🏦</span>
-                  <span>B2B Partner Bank Accounts Directory</span>
+                  <span>Bank Accounts & Disbursing Setup (SAP / ERP Style)</span>
                 </h3>
                 <span style={{ fontSize: '12px', color: 'var(--muted, #8B949E)' }}>
-                  Manage multiple bank accounts per B2B company so you can select which account to pay in ERP and Excel.
+                  Manage Sterling's company disbursing accounts (our 4+ banks) and B2B partner beneficiary accounts.
                 </span>
               </div>
               <button
@@ -3069,8 +3232,229 @@ export default function B2BPayments({ setCurrentPage }) {
               </button>
             </div>
 
-            <div className="b2b-modal-body">
-              <div className="manager-layout">
+            <div className="b2b-modal-body" style={{ gap: '14px' }}>
+              {/* Dual Tab Switcher */}
+              <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid var(--border, rgba(148, 163, 225, 0.25))', paddingBottom: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => setBankDirectoryTab('company_banks')}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: bankDirectoryTab === 'company_banks' ? '#4F46E5' : 'var(--bg3, #F4F6FC)',
+                    color: bankDirectoryTab === 'company_banks' ? '#ffffff' : 'var(--text, #EDEFFA)',
+                    fontWeight: 700,
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    transition: 'all 0.2s ease',
+                  }}
+                >
+                  <span>🏢 Sterling Paying Banks (Our Accounts - {companyBanks.length})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBankDirectoryTab('partner_banks')}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: bankDirectoryTab === 'partner_banks' ? '#4F46E5' : 'var(--bg3, #F4F6FC)',
+                    color: bankDirectoryTab === 'partner_banks' ? '#ffffff' : 'var(--text, #EDEFFA)',
+                    fontWeight: 700,
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    transition: 'all 0.2s ease',
+                  }}
+                >
+                  <span>🤝 B2B Partner Beneficiary Accounts ({Object.keys(partnerAccounts).length} Companies)</span>
+                </button>
+              </div>
+
+              {/* TAB 1: STERLING COMPANY PAYING BANKS */}
+              {bankDirectoryTab === 'company_banks' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div>
+                      <div style={{ fontSize: '13.5px', fontWeight: 700, color: 'var(--text, #EDEFFA)' }}>
+                        Sterling's Disbursing Bank Accounts
+                      </div>
+                      <div style={{ fontSize: '11.5px', color: 'var(--muted, #8B949E)' }}>
+                        Accounts managers select from these accounts when recording payments to B2B vendors and printing remittance vouchers.
+                      </div>
+                    </div>
+                    {!isAddingNewCompanyBank && (
+                      <button
+                        type="button"
+                        className="btn-simple-primary"
+                        style={{ padding: '6px 14px', fontSize: '12px' }}
+                        onClick={() => setIsAddingNewCompanyBank(true)}
+                      >
+                        + Add Company Bank
+                      </button>
+                    )}
+                  </div>
+
+                  {/* List of Sterling's Paying Banks */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '10px' }}>
+                    {companyBanks.map((b) => (
+                      <div
+                        key={b.id}
+                        className="account-card-box"
+                        style={{
+                          padding: '12px 14px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '6px',
+                          background: 'var(--bg2, #ffffff)',
+                          border: '1px solid var(--border, rgba(148, 163, 225, 0.25))',
+                          borderRadius: '8px',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <strong style={{ fontSize: '13.5px', color: 'var(--text, #EDEFFA)' }}>
+                            🏦 {b.label}
+                          </strong>
+                          <span
+                            style={{
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              background: b.currency === 'INR' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(59, 130, 246, 0.15)',
+                              color: b.currency === 'INR' ? '#10B981' : '#3B82F6',
+                            }}
+                          >
+                            {b.currency}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: '12.5px', color: 'var(--text, #EDEFFA)' }}>
+                          <strong>{b.bank_name}</strong> &bull; A/C: <code>{b.account_number}</code>
+                        </div>
+                        <div style={{ fontSize: '11.5px', color: 'var(--muted, #8B949E)', display: 'flex', gap: '12px' }}>
+                          <span>IFSC / SWIFT: <strong>{b.ifsc || 'N/A'}</strong></span>
+                          <span>Branch: <strong>{b.branch || 'Main'}</strong></span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
+                          {companyBanks.length > 1 && (
+                            <button
+                              type="button"
+                              className="btn-table-action"
+                              style={{ color: '#EF4444', fontSize: '11.5px', padding: '2px 6px' }}
+                              onClick={() => handleRemoveCompanyBank(b.id)}
+                            >
+                              🗑️ Remove
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Add Company Bank Form */}
+                  {isAddingNewCompanyBank && (
+                    <div style={{ marginTop: '6px', padding: '14px', background: 'var(--bg3, #F4F6FC)', borderRadius: '8px', border: '1px solid #4F46E5' }}>
+                      <div style={{ fontSize: '13px', fontWeight: 700, color: '#4F46E5', marginBottom: '8px' }}>
+                        + Add New Sterling Disbursing Bank Account
+                      </div>
+                      <form onSubmit={handleAddNewCompanyBank} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <div className="form-row">
+                          <div className="form-field">
+                            <label>Account Label *</label>
+                            <input
+                              type="text"
+                              required
+                              placeholder="e.g. Axis Bank Operations A/C"
+                              value={newCompanyBankForm.label}
+                              onChange={(e) => setNewCompanyBankForm({ ...newCompanyBankForm, label: e.target.value })}
+                            />
+                          </div>
+                          <div className="form-field">
+                            <label>Bank Name *</label>
+                            <input
+                              type="text"
+                              required
+                              placeholder="e.g. Axis Bank, State Bank of India"
+                              value={newCompanyBankForm.bank_name}
+                              onChange={(e) => setNewCompanyBankForm({ ...newCompanyBankForm, bank_name: e.target.value })}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="form-row">
+                          <div className="form-field">
+                            <label>Account Number *</label>
+                            <input
+                              type="text"
+                              required
+                              placeholder="e.g. 921020019283719"
+                              value={newCompanyBankForm.account_number}
+                              onChange={(e) => setNewCompanyBankForm({ ...newCompanyBankForm, account_number: e.target.value })}
+                            />
+                          </div>
+                          <div className="form-field">
+                            <label>IFSC / SWIFT BIC *</label>
+                            <input
+                              type="text"
+                              placeholder="e.g. UTIB0000123 or SWIFT"
+                              value={newCompanyBankForm.ifsc}
+                              onChange={(e) => setNewCompanyBankForm({ ...newCompanyBankForm, ifsc: e.target.value })}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="form-row">
+                          <div className="form-field">
+                            <label>Branch / Location</label>
+                            <input
+                              type="text"
+                              placeholder="e.g. Valanchery Main / Calicut Bypass"
+                              value={newCompanyBankForm.branch}
+                              onChange={(e) => setNewCompanyBankForm({ ...newCompanyBankForm, branch: e.target.value })}
+                            />
+                          </div>
+                          <div className="form-field">
+                            <label>Currency</label>
+                            <select
+                              value={newCompanyBankForm.currency}
+                              onChange={(e) => setNewCompanyBankForm({ ...newCompanyBankForm, currency: e.target.value })}
+                            >
+                              <option value="INR">INR (₹)</option>
+                              <option value="USD">USD ($)</option>
+                              <option value="EUR">EUR (€)</option>
+                              <option value="AED">AED (د.إ)</option>
+                              <option value="GBP">GBP (£)</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '6px' }}>
+                          <button
+                            type="button"
+                            className="btn-cancel"
+                            onClick={() => setIsAddingNewCompanyBank(false)}
+                          >
+                            Cancel
+                          </button>
+                          <button type="submit" className="btn-simple-primary" style={{ background: '#10B981' }}>
+                            ✓ Save Company Bank
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* TAB 2: B2B PARTNER BENEFICIARY BANK ACCOUNTS */}
+              {bankDirectoryTab === 'partner_banks' && (
+                <div className="manager-layout">
                 {/* Left: Companies List */}
                 <div className="manager-companies-list">
                   <div style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--muted, #8B949E)', textTransform: 'uppercase', marginBottom: '4px' }}>
@@ -3285,6 +3669,7 @@ export default function B2BPayments({ setCurrentPage }) {
                   </div>
                 </div>
               </div>
+              )}
             </div>
 
             <div className="b2b-modal-footer">
@@ -3528,6 +3913,7 @@ export default function B2BPayments({ setCurrentPage }) {
         }}
         initialMode={docModalMode}
         b2bPaymentData={docModalPayment}
+        companyBanks={companyBanks}
       />
     </div>
   );
