@@ -604,8 +604,8 @@ export default function B2BPayments({ setCurrentPage }) {
   const [studentSuggestions, setStudentSuggestions] = useState([]);
   const [showStudentSuggestions, setShowStudentSuggestions] = useState(false);
 
-  // Director Payment Approval & Requisition Sheet Modal State
-  const [showDirectorModal, setShowDirectorModal] = useState(false);
+  // Accounts Payment Disbursement Sheet Modal State (for Sterling Accounts Team)
+  const [showAccountsSheetModal, setShowAccountsSheetModal] = useState(false);
 
   // Download / Export Customization Modal State
   const [showExportModal, setShowExportModal] = useState(false);
@@ -2165,19 +2165,19 @@ export default function B2BPayments({ setCurrentPage }) {
             </button>
           )}
 
-          {/* Director Approval Requisition Sheet */}
+          {/* Sterling Accounts Payment Disbursement Sheet */}
           <button
             className="btn-simple-download"
-            onClick={() => setShowDirectorModal(true)}
-            title="Executive summary sheet of all pending B2B payables for Director review, signature, and accounts release"
+            onClick={() => setShowAccountsSheetModal(true)}
+            title="Download / Print Accounts Payment Disbursement Sheet for Sterling Accounts Team"
             style={{
-              background: 'rgba(245, 158, 11, 0.15)',
-              borderColor: 'rgba(245, 158, 11, 0.35)',
-              color: '#F59E0B',
+              background: 'rgba(16, 185, 129, 0.12)',
+              borderColor: 'rgba(16, 185, 129, 0.35)',
+              color: '#10B981',
               fontWeight: 700,
             }}
           >
-            <span>👔 Director Approval Sheet ({metrics.pendingCount})</span>
+            <span>🏦 Accounts Payment Sheet ({metrics.pendingCount})</span>
           </button>
 
           {/* Download All / Custom Excel */}
@@ -3905,47 +3905,71 @@ export default function B2BPayments({ setCurrentPage }) {
         </div>
       )}
 
-      {/* 11. DIRECTOR PAYMENT APPROVAL & AUTHORIZATION SHEET MODAL */}
-      {showDirectorModal && (
-        <div className="b2b-modal-overlay" onClick={() => setShowDirectorModal(false)}>
+      {/* 11. STERLING ACCOUNTS PAYMENT DISBURSEMENT SHEET MODAL (FOR ACCOUNTS TEAM) */}
+      {showAccountsSheetModal && (
+        <div className="b2b-modal-overlay" onClick={() => setShowAccountsSheetModal(false)}>
           <div className="b2b-modal-card" style={{ maxWidth: '980px', maxHeight: '92vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }} onClick={(e) => e.stopPropagation()}>
             <div className="b2b-modal-header" style={{ padding: '12px 20px', borderBottom: '1px solid var(--border, rgba(148, 163, 225, 0.2))' }}>
               <div>
                 <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span>👔</span>
-                  <span>Director Payment Approval &amp; Authorization Sheet</span>
+                  <span>🏦</span>
+                  <span>Sterling Accounts Payment Disbursement Sheet</span>
                 </h3>
                 <span style={{ fontSize: '12px', color: 'var(--muted, #8B949E)' }}>
-                  Executive report of pending B2B liabilities for Director verification, authorization, and accounts handover.
+                  Internal accounts payment order and fund transfer tracking for Sterling Accounts Department.
                 </span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <button
                   type="button"
                   className="btn-simple-primary"
-                  style={{ background: '#4F46E5', padding: '6px 14px', fontSize: '12px' }}
+                  style={{ background: '#10B981', padding: '6px 14px', fontSize: '12px' }}
                   onClick={() => window.print()}
                 >
                   🖨️ Print / Save as PDF
                 </button>
                 <button
                   style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: 'var(--muted, #8B949E)' }}
-                  onClick={() => setShowDirectorModal(false)}
+                  onClick={() => setShowAccountsSheetModal(false)}
                 >
                   ✕
                 </button>
               </div>
             </div>
 
+            {/* Print Scoped Styles */}
+            <style>{`
+              @media print {
+                body * {
+                  visibility: hidden !important;
+                }
+                #accounts-disbursement-printable,
+                #accounts-disbursement-printable * {
+                  visibility: visible !important;
+                }
+                #accounts-disbursement-printable {
+                  position: absolute !important;
+                  left: 0 !important;
+                  top: 0 !important;
+                  width: 100% !important;
+                  margin: 0 !important;
+                  padding: 10px 15px !important;
+                  box-shadow: none !important;
+                  border: none !important;
+                }
+              }
+            `}</style>
+
             {/* Print-ready A4 Canvas Container */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '20px', background: 'var(--bg3, #F4F6FC)' }}>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '16px', background: 'var(--bg3, #F4F6FC)' }}>
               <div
+                id="accounts-disbursement-printable"
                 style={{
-                  maxWidth: '880px',
+                  maxWidth: '860px',
                   margin: '0 auto',
                   background: '#ffffff',
                   color: '#000000',
-                  padding: '30px 36px',
+                  padding: '24px 28px',
                   borderRadius: '6px',
                   boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
                   fontFamily: "'Inter', sans-serif",
@@ -3954,56 +3978,61 @@ export default function B2BPayments({ setCurrentPage }) {
                 }}
               >
                 {/* Header */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #000000', paddingBottom: '12px', marginBottom: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #000000', paddingBottom: '10px', marginBottom: '14px' }}>
                   <div>
-                    <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 900, color: '#000000' }}>
+                    <h2 style={{ margin: 0, fontSize: '17px', fontWeight: 900, color: '#000000' }}>
                       STERLING STUDY ABROAD &amp; OVERSEAS CONSULTANCY
                     </h2>
                     <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#000000', marginTop: '2px' }}>
-                      Central Operations &amp; Accounts Division &bull; Management Authorization
+                      Accounts &amp; Finance Department &bull; B2B Payment Disbursement Order
+                    </div>
+                    <div style={{ fontSize: '10px', color: '#475569', marginTop: '1px' }}>
+                      Calicut Hi-Lite Business Park &bull; Valanchery Main &bull; Abu Dhabi WIO Bank
                     </div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '14px', fontWeight: 900, color: '#D97706', letterSpacing: '0.5px' }}>
-                      DIRECTOR PAYMENT REQUISITION
+                    <div style={{ fontSize: '13.5px', fontWeight: 900, color: '#047857', letterSpacing: '0.4px' }}>
+                      ACCOUNTS DISBURSEMENT SHEET
                     </div>
                     <div style={{ fontSize: '11px', color: '#000000', fontWeight: 600 }}>
                       Date: {new Date().toLocaleDateString('en-GB').replace(/\//g, '.')}
+                    </div>
+                    <div style={{ fontSize: '10px', color: '#64748B' }}>
+                      Ref: STERLING-ACCOUNTS-PAY-{new Date().getFullYear()}
                     </div>
                   </div>
                 </div>
 
                 {/* Executive Summary Cards */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '18px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '16px' }}>
                   <div style={{ border: '1.5px solid #000000', padding: '8px 10px', borderRadius: '4px', background: '#F8FAFC' }}>
-                    <div style={{ fontSize: '10px', fontWeight: 800, color: '#64748B', textTransform: 'uppercase' }}>Total Items</div>
-                    <div style={{ fontSize: '16px', fontWeight: 900, color: '#000000' }}>{metrics.pendingCount} Pending</div>
+                    <div style={{ fontSize: '10px', fontWeight: 800, color: '#64748B', textTransform: 'uppercase' }}>Pending Transfers</div>
+                    <div style={{ fontSize: '15px', fontWeight: 900, color: '#000000' }}>{metrics.pendingCount} Items</div>
                   </div>
                   <div style={{ border: '1.5px solid #000000', padding: '8px 10px', borderRadius: '4px', background: '#F8FAFC' }}>
                     <div style={{ fontSize: '10px', fontWeight: 800, color: '#64748B', textTransform: 'uppercase' }}>Base Net (INR)</div>
-                    <div style={{ fontSize: '15px', fontWeight: 900, color: '#000000' }}>{formatMoney(metrics.pendingWithoutGstINR, 'INR')}</div>
+                    <div style={{ fontSize: '14.5px', fontWeight: 900, color: '#000000' }}>{formatMoney(metrics.pendingWithoutGstINR, 'INR')}</div>
                   </div>
                   <div style={{ border: '1.5px solid #000000', padding: '8px 10px', borderRadius: '4px', background: '#F8FAFC' }}>
-                    <div style={{ fontSize: '10px', fontWeight: 800, color: '#64748B', textTransform: 'uppercase' }}>GST 18%</div>
-                    <div style={{ fontSize: '15px', fontWeight: 900, color: '#D97706' }}>{formatMoney(metrics.pendingGstAmountINR, 'INR')}</div>
+                    <div style={{ fontSize: '10px', fontWeight: 800, color: '#64748B', textTransform: 'uppercase' }}>GST 18% Total</div>
+                    <div style={{ fontSize: '14.5px', fontWeight: 900, color: '#D97706' }}>{formatMoney(metrics.pendingGstAmountINR, 'INR')}</div>
                   </div>
                   <div style={{ border: '1.5px solid #047857', padding: '8px 10px', borderRadius: '4px', background: '#F0FDF4' }}>
-                    <div style={{ fontSize: '10px', fontWeight: 800, color: '#047857', textTransform: 'uppercase' }}>Total Payable (INR)</div>
-                    <div style={{ fontSize: '16px', fontWeight: 900, color: '#047857' }}>{formatMoney(metrics.pendingWithGstINR, 'INR')}</div>
+                    <div style={{ fontSize: '10px', fontWeight: 800, color: '#047857', textTransform: 'uppercase' }}>Total Net Payable</div>
+                    <div style={{ fontSize: '15.5px', fontWeight: 900, color: '#047857' }}>{formatMoney(metrics.pendingWithGstINR, 'INR')}</div>
                   </div>
                 </div>
 
-                {/* Pending Payments Table */}
-                <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '20px' }}>
+                {/* Pending Payments Table with 100% fixed widths and zero horizontal scroll */}
+                <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '18px', tableLayout: 'fixed' }}>
                   <thead>
                     <tr style={{ background: '#E2E8F0' }}>
-                      <th style={{ border: '1.5px solid #000000', padding: '6px 8px', textAlign: 'center', width: '30px', fontWeight: 900, color: '#000000' }}>#</th>
-                      <th style={{ border: '1.5px solid #000000', padding: '6px 8px', textAlign: 'left', fontWeight: 900, color: '#000000' }}>B2B Partner / Agency</th>
-                      <th style={{ border: '1.5px solid #000000', padding: '6px 8px', textAlign: 'left', fontWeight: 900, color: '#000000' }}>Candidate(s)</th>
-                      <th style={{ border: '1.5px solid #000000', padding: '6px 8px', textAlign: 'left', fontWeight: 900, color: '#000000' }}>Transfer Account</th>
-                      <th style={{ border: '1.5px solid #000000', padding: '6px 8px', textAlign: 'right', width: '110px', fontWeight: 900, color: '#000000' }}>Amount to Pay</th>
-                      <th style={{ border: '1.5px solid #000000', padding: '6px 8px', textAlign: 'center', width: '85px', fontWeight: 900, color: '#000000' }}>Due Date</th>
-                      <th style={{ border: '1.5px solid #000000', padding: '6px 8px', textAlign: 'center', width: '90px', fontWeight: 900, color: '#000000' }}>Decision</th>
+                      <th style={{ border: '1.5px solid #000000', padding: '6px 4px', textAlign: 'center', width: '28px', fontWeight: 900, color: '#000000' }}>#</th>
+                      <th style={{ border: '1.5px solid #000000', padding: '6px 8px', textAlign: 'left', width: '155px', fontWeight: 900, color: '#000000' }}>B2B Partner &amp; Category</th>
+                      <th style={{ border: '1.5px solid #000000', padding: '6px 8px', textAlign: 'left', width: '115px', fontWeight: 900, color: '#000000' }}>Candidate(s)</th>
+                      <th style={{ border: '1.5px solid #000000', padding: '6px 8px', textAlign: 'left', width: '220px', fontWeight: 900, color: '#000000' }}>Transfer Account (Beneficiary Bank / UPI)</th>
+                      <th style={{ border: '1.5px solid #000000', padding: '6px 8px', textAlign: 'right', width: '115px', fontWeight: 900, color: '#000000' }}>Amount to Pay</th>
+                      <th style={{ border: '1.5px solid #000000', padding: '6px 8px', textAlign: 'center', width: '115px', fontWeight: 900, color: '#000000' }}>Due &amp; Accounts Sign</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -4011,36 +4040,32 @@ export default function B2BPayments({ setCurrentPage }) {
                       const fin = calculateFinancials(p);
                       return (
                         <tr key={p.id}>
-                          <td style={{ border: '1.5px solid #000000', padding: '6px 8px', textAlign: 'center', fontWeight: 800, color: '#000000' }}>{idx + 1}</td>
-                          <td style={{ border: '1.5px solid #000000', padding: '6px 8px', color: '#000000' }}>
-                            <strong style={{ fontSize: '12px' }}>{p.partner_name}</strong>
+                          <td style={{ border: '1.5px solid #000000', padding: '6px 4px', textAlign: 'center', fontWeight: 800, color: '#000000', fontSize: '11px' }}>
+                            {idx + 1}
+                          </td>
+                          <td style={{ border: '1.5px solid #000000', padding: '6px 8px', color: '#000000', wordBreak: 'break-word' }}>
+                            <strong style={{ fontSize: '11.5px' }}>{p.partner_name}</strong>
                             <div style={{ fontSize: '10px', color: '#475569' }}>{p.category || 'Commission'}</div>
                           </td>
-                          <td style={{ border: '1.5px solid #000000', padding: '6px 8px', color: '#000000', fontWeight: 600 }}>
+                          <td style={{ border: '1.5px solid #000000', padding: '6px 8px', color: '#000000', fontWeight: 600, fontSize: '11px', wordBreak: 'break-word' }}>
                             {p.student_names || 'General'}
                           </td>
-                          <td style={{ border: '1.5px solid #000000', padding: '6px 8px', color: '#000000', fontSize: '10.5px' }}>
-                            {p.transfer_account || 'Not provided'}
+                          <td style={{ border: '1.5px solid #000000', padding: '6px 8px', color: '#000000', fontSize: '10px', lineHeight: '1.35', wordBreak: 'break-word' }}>
+                            {p.transfer_account || 'Account details pending'}
                           </td>
-                          <td style={{ border: '1.5px solid #000000', padding: '6px 8px', textAlign: 'right', fontWeight: 900, color: '#000000', fontSize: '12px' }}>
+                          <td style={{ border: '1.5px solid #000000', padding: '6px 8px', textAlign: 'right', fontWeight: 900, color: '#000000', fontSize: '11.5px', wordBreak: 'break-word' }}>
                             {formatMoney(fin.totalAmount, p.currency)}
                             {fin.gstAmount > 0 && (
-                              <div style={{ fontSize: '9.5px', color: '#64748B', fontWeight: 500 }}>(incl. 18% GST)</div>
+                              <div style={{ fontSize: '9px', color: '#64748B', fontWeight: 500 }}>(incl. 18% GST)</div>
                             )}
                           </td>
-                          <td style={{ border: '1.5px solid #000000', padding: '6px 8px', textAlign: 'center', color: '#000000', fontWeight: 700, fontSize: '10.5px' }}>
-                            {p.due_date || 'Immediate'}
-                          </td>
-                          <td style={{ border: '1.5px solid #000000', padding: '6px 8px', textAlign: 'center', color: '#000000', fontSize: '10px' }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'center' }}>
-                              <label style={{ display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer' }}>
-                                <input type="checkbox" defaultChecked />
-                                <span>Approve</span>
-                              </label>
-                              <label style={{ display: 'flex', alignItems: 'center', gap: '3px', opacity: 0.7, cursor: 'pointer' }}>
-                                <input type="checkbox" />
-                                <span>Hold</span>
-                              </label>
+                          <td style={{ border: '1.5px solid #000000', padding: '6px 6px', textAlign: 'center', color: '#000000', fontSize: '10px' }}>
+                            <div style={{ fontWeight: 700, color: '#1E293B', marginBottom: '3px' }}>
+                              Due: {p.due_date || 'Immediate'}
+                            </div>
+                            <div style={{ borderTop: '1px dashed #CBD5E1', paddingTop: '2px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                              <span style={{ fontSize: '9px', color: '#64748B' }}>[ ] Paid</span>
+                              <span style={{ fontSize: '8.5px', color: '#94A3B8' }}>UTR: ________</span>
                             </div>
                           </td>
                         </tr>
@@ -4049,26 +4074,26 @@ export default function B2BPayments({ setCurrentPage }) {
                   </tbody>
                 </table>
 
-                {/* Sign-off & Audit Trail */}
+                {/* Sign-off & Audit Trail (For Sterling Accounts Team) */}
                 <div style={{ border: '1.5px solid #000000', padding: '12px 14px', borderRadius: '4px', background: '#F8FAFC' }}>
-                  <div style={{ fontSize: '10.5px', fontWeight: 800, color: '#000000', textTransform: 'uppercase', marginBottom: '8px' }}>
-                    Executive Sign-off &amp; Accounts Authorization:
+                  <div style={{ fontSize: '10px', fontWeight: 800, color: '#000000', textTransform: 'uppercase', marginBottom: '8px' }}>
+                    Sterling Accounts Team Verification &amp; Bank Clearance Workflow:
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px', fontSize: '10.5px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', fontSize: '10px' }}>
                     <div style={{ border: '1px solid #000000', padding: '8px', borderRadius: '4px', background: '#ffffff' }}>
-                      <div style={{ fontWeight: 800, color: '#000000', marginBottom: '24px' }}>Requisition Prepared By:</div>
+                      <div style={{ fontWeight: 800, color: '#000000', marginBottom: '22px' }}>1. Prepared &amp; Reconciled By:</div>
                       <div style={{ borderBottom: '1px solid #000000', marginBottom: '4px' }}></div>
-                      <div style={{ color: '#000000', fontWeight: 600 }}>Operations / Counselor Sign &amp; Date</div>
+                      <div style={{ color: '#000000', fontWeight: 600 }}>Accounts Desk / Staff Sign &amp; Date</div>
                     </div>
-                    <div style={{ border: '1.5px solid #D97706', padding: '8px', borderRadius: '4px', background: '#FEF3C7' }}>
-                      <div style={{ fontWeight: 900, color: '#B45309', marginBottom: '24px' }}>Director Approval Signature:</div>
-                      <div style={{ borderBottom: '1px solid #B45309', marginBottom: '4px' }}></div>
-                      <div style={{ color: '#B45309', fontWeight: 700 }}>Director Sign-off &amp; Date</div>
+                    <div style={{ border: '1.5px solid #047857', padding: '8px', borderRadius: '4px', background: '#F0FDF4' }}>
+                      <div style={{ fontWeight: 900, color: '#047857', marginBottom: '22px' }}>2. Authorized for Payment:</div>
+                      <div style={{ borderBottom: '1px solid #047857', marginBottom: '4px' }}></div>
+                      <div style={{ color: '#047857', fontWeight: 700 }}>Accounts Manager Clearance &amp; Date</div>
                     </div>
                     <div style={{ border: '1px solid #000000', padding: '8px', borderRadius: '4px', background: '#ffffff' }}>
-                      <div style={{ fontWeight: 800, color: '#000000', marginBottom: '24px' }}>Accounts Disbursed &amp; Reconciled:</div>
+                      <div style={{ fontWeight: 800, color: '#000000', marginBottom: '22px' }}>3. Disbursed From Sterling Bank:</div>
                       <div style={{ borderBottom: '1px solid #000000', marginBottom: '4px' }}></div>
-                      <div style={{ color: '#000000', fontWeight: 600 }}>Bank A/C, UTR &amp; Date</div>
+                      <div style={{ color: '#000000', fontWeight: 600 }}>Debited Bank, Bank UTR &amp; Date</div>
                     </div>
                   </div>
                 </div>
@@ -4076,7 +4101,7 @@ export default function B2BPayments({ setCurrentPage }) {
             </div>
 
             <div className="b2b-modal-footer">
-              <button type="button" className="btn-cancel" onClick={() => setShowDirectorModal(false)}>
+              <button type="button" className="btn-cancel" onClick={() => setShowAccountsSheetModal(false)}>
                 Close
               </button>
             </div>

@@ -144,7 +144,7 @@ export default function DocumentGeneratorModal({
     debitAccount: 'Federal Bank Current A/C: 14200200039281 (Valanchery Main)',
     authorizedSignatory: 'Accounts Department - Sterling Overseas',
     status: 'PENDING_APPROVAL', // 'PAID' | 'PENDING_APPROVAL'
-    remarks: 'Payment requisition submitted for Director authorization & bank payout.',
+    remarks: 'Payment voucher submitted for Accounts verification & bank payout.',
   });
 
   // --- 3. UNIVERSITY COMMISSION CLAIM INVOICE STATE ---
@@ -263,7 +263,7 @@ export default function DocumentGeneratorModal({
           : `Proposed Disbursing Bank: ${matchedPayingBank.bank_name} (${matchedPayingBank.branch})`,
         authorizedSignatory: 'Accounts Department - Sterling Overseas',
         status: isCompleted ? 'PAID' : 'PENDING_APPROVAL',
-        remarks: b2bPaymentData.notes || (isCompleted ? 'Full payment settled and confirmed through electronic fund transfer.' : 'Payment requisition submitted for Director review & authorization.'),
+        remarks: b2bPaymentData.notes || (isCompleted ? 'Full payment settled and confirmed through electronic fund transfer.' : 'Payment voucher submitted for Accounts verification & payout.'),
       });
 
       // CRITICAL FIX: Only stamp PAID if ACTUALLY completed in ERP! Never on pending payables!
@@ -397,7 +397,7 @@ export default function DocumentGeneratorModal({
       debitAccount: `${firstBank.bank_name} A/C: ${firstBank.account_number} (${firstBank.branch})`,
       authorizedSignatory: 'Accounts Department - Sterling Overseas',
       status: 'PENDING_APPROVAL',
-      remarks: 'Payment requisition awaiting Director approval and bank release.',
+      remarks: 'Payment voucher awaiting Accounts clearance & bank transfer.',
     });
     setShowPaidSeal(false);
     toast.success('Reset to Blank B2B Payment Requisition template');
@@ -2082,10 +2082,10 @@ export default function DocumentGeneratorModal({
                           STERLING ERP
                         </div>
                         <div style={{ fontSize: '15px', fontWeight: 900, margin: '2px 0', color: '#D97706' }}>
-                          ⏳ PENDING APPROVAL
+                          ⏳ PENDING CLEARANCE
                         </div>
                         <div style={{ fontSize: '9.5px', fontWeight: 800, color: '#D97706' }}>
-                          Awaiting Director Sign-off
+                          Awaiting Accounts Clearance
                         </div>
                       </div>
                     )}
@@ -2109,23 +2109,23 @@ export default function DocumentGeneratorModal({
                     ) : (
                       <div style={{ marginTop: '20px', borderTop: '1.5px solid #000000', paddingTop: '10px' }}>
                         <div style={{ fontSize: '10.5px', fontWeight: 800, color: '#000000', marginBottom: '8px', textTransform: 'uppercase' }}>
-                          3-Tier Accounting Approval &amp; Authorization Workflow:
+                          Accounts Department Verification &amp; Authorization Workflow:
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', fontSize: '10px' }}>
                           <div style={{ border: '1px solid #000000', padding: '8px', borderRadius: '4px', background: '#F8FAFC' }}>
-                            <div style={{ fontWeight: 800, color: '#000000', marginBottom: '20px' }}>1. Requisitioned By (Counselor / Ops):</div>
+                            <div style={{ fontWeight: 800, color: '#000000', marginBottom: '20px' }}>1. Prepared By (Verification Desk):</div>
                             <div style={{ borderBottom: '1px solid #000000', marginBottom: '3px' }}></div>
                             <div style={{ color: '#000000', fontWeight: 600 }}>Signature &amp; Date</div>
                           </div>
-                          <div style={{ border: '1.5px solid #D97706', padding: '8px', borderRadius: '4px', background: '#FEF3C7' }}>
-                            <div style={{ fontWeight: 900, color: '#B45309', marginBottom: '20px' }}>2. Verified &amp; Approved (Director):</div>
-                            <div style={{ borderBottom: '1px solid #B45309', marginBottom: '3px' }}></div>
-                            <div style={{ color: '#B45309', fontWeight: 700 }}>Director Sign-off &amp; Approval</div>
+                          <div style={{ border: '1.5px solid #047857', padding: '8px', borderRadius: '4px', background: '#F0FDF4' }}>
+                            <div style={{ fontWeight: 900, color: '#047857', marginBottom: '20px' }}>2. Authorized (Accounts Manager):</div>
+                            <div style={{ borderBottom: '1px solid #047857', marginBottom: '3px' }}></div>
+                            <div style={{ color: '#047857', fontWeight: 700 }}>Accounts Clearance Sign &amp; Date</div>
                           </div>
                           <div style={{ border: '1px solid #000000', padding: '8px', borderRadius: '4px', background: '#F8FAFC' }}>
-                            <div style={{ fontWeight: 800, color: '#000000', marginBottom: '20px' }}>3. Payout Released (Accounts / Bank):</div>
+                            <div style={{ fontWeight: 800, color: '#000000', marginBottom: '20px' }}>3. Disbursed From Sterling Bank:</div>
                             <div style={{ borderBottom: '1px solid #000000', marginBottom: '3px' }}></div>
-                            <div style={{ color: '#000000', fontWeight: 600 }}>Bank Transfer Ref &amp; Date</div>
+                            <div style={{ color: '#000000', fontWeight: 600 }}>Bank A/C, UTR &amp; Date</div>
                           </div>
                         </div>
                       </div>
