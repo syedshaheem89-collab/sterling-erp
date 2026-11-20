@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import Overview from './Overview';
 import Students from './Students';
 import CourseFinder from './CourseFinder';
+import B2BPayments from './B2BPayments';
 import Ledger from './Ledger';
 import Users from './Users';
 import Admin from './Admin';
@@ -92,6 +93,7 @@ export default function Shell() {
     { id: 'overview', label: 'Overview', icon: '📊', minLevel: 1 },
     { id: 'students', label: 'Students', icon: '👥', minLevel: 1 },
     { id: 'course-finder', label: 'Course Finder', icon: '🎓', minLevel: 1 }, // Available to all staff & counselors
+    { id: 'b2b-payments', label: 'B2B Payments', icon: '🤝', minLevel: 1 }, // Microsoft To-Do style B2B Partner Reminders
     { id: 'country', label: 'Country', icon: '🌍', minLevel: 3 }, // director & above
     { id: 'admissions', label: 'Admissions', icon: '🏆', minLevel: 2 }, // manager & above
     { id: 'finance', label: 'Finance', icon: '💰', minLevel: 3 }, // director & above
@@ -123,6 +125,11 @@ export default function Shell() {
         return {
           title: 'Course Finder & University Research',
           description: 'Search global university courses, filter by entry criteria, import custom country spreadsheets, and access official research portals.',
+        };
+      case 'b2b-payments':
+        return {
+          title: 'B2B Payments & Partner Reminders',
+          description: 'Track payables owed to B2B sub-agents, partners, and vendors with smart due date reminders per student.',
         };
       case 'country':
         return {
@@ -199,6 +206,8 @@ export default function Shell() {
         return <Students setCurrentPage={setCurrentPage} />;
       case 'course-finder':
         return <CourseFinder setCurrentPage={setCurrentPage} />;
+      case 'b2b-payments':
+        return <B2BPayments setCurrentPage={setCurrentPage} />;
       case 'ledger':
         return <Ledger setCurrentPage={setCurrentPage} />;
       case 'users':
