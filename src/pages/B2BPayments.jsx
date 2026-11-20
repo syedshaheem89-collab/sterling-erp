@@ -213,6 +213,25 @@ const CURRENCIES = [
   { code: 'GBP', symbol: '£', label: 'GBP (£)' },
 ];
 
+export const EXPORT_COLUMNS_DEF = [
+  { id: 'sl_no', label: 'Sl No', key: 'Sl No', default: true, wch: 6 },
+  { id: 'partner_name', label: 'Partner / Beneficiary Name', key: 'Partner / Beneficiary', default: true, wch: 24 },
+  { id: 'transfer_account', label: 'Transfer To (Account Details)', key: 'Transfer To (Account Details)', default: true, wch: 38 },
+  { id: 'student_names', label: 'Linked Student(s)', key: 'Linked Student(s)', default: true, wch: 25 },
+  { id: 'total_amount', label: 'Total Amount (With GST)', key: 'Total Amount With GST', default: true, wch: 20 },
+  { id: 'base_amount', label: 'Base Amount (Without GST)', key: 'Amount Without GST', default: true, wch: 20 },
+  { id: 'gst_amount', label: 'GST (18%) Amount', key: 'GST 18% Amount', default: true, wch: 16 },
+  { id: 'gst_rate', label: 'GST Rate (%)', key: 'GST Rate (%)', default: false, wch: 12 },
+  { id: 'currency', label: 'Currency', key: 'Currency', default: true, wch: 10 },
+  { id: 'due_date', label: 'Due Date', key: 'Due Date', default: true, wch: 14 },
+  { id: 'status', label: 'Payment Status', key: 'Status', default: true, wch: 16 },
+  { id: 'category', label: 'Category', key: 'Category', default: false, wch: 20 },
+  { id: 'settled_at', label: 'Settled Date', key: 'Settled Date', default: false, wch: 14 },
+  { id: 'payment_mode', label: 'Payment Mode', key: 'Payment Mode', default: false, wch: 20 },
+  { id: 'utr_number', label: 'Bank UTR / Ref #', key: 'Bank UTR / Reference', default: false, wch: 22 },
+  { id: 'notes', label: 'Remarks / Notes', key: 'Remarks / Notes', default: false, wch: 30 },
+];
+
 export default function B2BPayments({ setCurrentPage }) {
   const { user } = useAuth();
 
@@ -273,6 +292,15 @@ export default function B2BPayments({ setCurrentPage }) {
   // Student suggestions dropdown
   const [studentSuggestions, setStudentSuggestions] = useState([]);
   const [showStudentSuggestions, setShowStudentSuggestions] = useState(false);
+
+  // Download / Export Customization Modal State (User selectable fields & scope)
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportScope, setExportScope] = useState('all'); // 'selected' | 'filtered' | 'all'
+  const [exportColIds, setExportColIds] = useState(() =>
+    new Set(EXPORT_COLUMNS_DEF.filter((c) => c.default).map((c) => c.id))
+  );
+  const [includeBottomTotal, setIncludeBottomTotal] = useState(true);
+  const [exportFormat, setExportFormat] = useState('xlsx'); // 'xlsx' | 'csv'
 
   // Persist payments to localStorage
   useEffect(() => {
@@ -642,15 +670,55 @@ export default function B2BPayments({ setCurrentPage }) {
     }
   };
 
-  // EXPORT EXCEL & CSV (Accounts Team Ready)
-  const handleDownloadExcel = (onlySelected = false) => {
+  // Open Export Customization Modal
+  const openExportModal = (scope = 'all') => {
+    if (scope === 'selected' && selectedIds.size === 0) {
+      toast.error('Please select at least one payment row first');
+      return;
+    }
+    setExportScope(scope);
+    setShowExportModal(true);
+  };
+
+  // Toggle single column selection
+  const handleToggleExportCol = (id) => {
+    setExportColIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  // Apply Quick Column Presets
+  const handleApplyExportPreset = (preset) => {
+    if (preset === 'accounts_quick') {
+      // Cleanest transfer list for Accounts to make payouts
+      setExportColIds(new Set(['sl_no', 'partner_name', 'transfer_account', 'student_names', 'total_amount', 'currency']));
+      toast.success('Applied "Accounts Quick Transfer" columns preset');
+    } else if (preset === 'accounts_gst') {
+      // Full accounts breakdown with Base + 18% GST + Total
+      setExportColIds(new Set(['sl_no', 'partner_name', 'transfer_account', 'student_names', 'base_amount', 'gst_amount', 'total_amount', 'currency', 'due_date']));
+      toast.success('Applied "Accounts with 18% GST" columns preset');
+    } else if (preset === 'all') {
+      setExportColIds(new Set(EXPORT_COLUMNS_DEF.map((c) => c.id)));
+      toast.success('Selected all columns');
+    } else if (preset === 'none') {
+      setExportColIds(new Set());
+    }
+  };
+
+  // Execute Excel / CSV Download with Chosen Columns & Scope
+  const handleExecuteExport = () => {
     let dataset = payments;
-    if (onlySelected) {
+    if (exportScope === 'selected') {
       if (selectedIds.size === 0) {
-        toast.error('Please select at least one payment to download');
+        toast.error('Please select at least one payment from the table');
         return;
       }
       dataset = payments.filter((p) => selectedIds.has(p.id));
+    } else if (exportScope === 'filtered') {
+      dataset = filteredList;
     }
 
     if (dataset.length === 0) {
@@ -658,90 +726,124 @@ export default function B2BPayments({ setCurrentPage }) {
       return;
     }
 
-    // Build Accounts-Ready Spreadsheet Rows
+    if (exportColIds.size === 0) {
+      toast.error('Please select at least one column to include in the Excel file');
+      return;
+    }
+
+    // Active chosen columns in defined order
+    const activeCols = EXPORT_COLUMNS_DEF.filter((c) => exportColIds.has(c.id));
+
+    // Map rows based ONLY on selected columns
     const rows = dataset.map((p, idx) => {
       const fin = calculateFinancials(p);
-      return {
-        'Sl No': idx + 1,
-        'Partner / Beneficiary': p.partner_name || '',
-        'Transfer To (Account Details)': p.transfer_account || 'Not Specified',
-        'Linked Student(s)': p.student_names || '',
-        'Category': p.category || '',
-        'Currency': p.currency || 'INR',
-        'Amount Without GST': fin.baseAmount,
-        'GST Rate (%)': fin.gstRate > 0 ? `${fin.gstRate}%` : '0% (Exempt)',
-        'GST 18% Amount': fin.gstAmount,
-        'Total Amount With GST': fin.totalAmount,
-        'Due Date': p.due_date || 'No Date',
-        'Status': p.status === 'completed' ? 'PAID / SETTLED' : 'PENDING PAYMENT',
-        'Settled Date': p.settled_at || '',
-        'Payment Mode': p.payment_mode || '',
-        'Bank UTR / Reference': p.utr_number || '',
-        'Remarks / Notes': p.notes || '',
-      };
+      const row = {};
+
+      activeCols.forEach((col) => {
+        switch (col.id) {
+          case 'sl_no':
+            row[col.key] = idx + 1;
+            break;
+          case 'partner_name':
+            row[col.key] = p.partner_name || '';
+            break;
+          case 'transfer_account':
+            row[col.key] = p.transfer_account || 'Not Specified';
+            break;
+          case 'student_names':
+            row[col.key] = p.student_names || '';
+            break;
+          case 'total_amount':
+            row[col.key] = fin.totalAmount;
+            break;
+          case 'base_amount':
+            row[col.key] = fin.baseAmount;
+            break;
+          case 'gst_amount':
+            row[col.key] = fin.gstAmount;
+            break;
+          case 'gst_rate':
+            row[col.key] = fin.gstRate > 0 ? `${fin.gstRate}%` : '0% (Exempt)';
+            break;
+          case 'currency':
+            row[col.key] = p.currency || 'INR';
+            break;
+          case 'due_date':
+            row[col.key] = p.due_date || 'No Date';
+            break;
+          case 'status':
+            row[col.key] = p.status === 'completed' ? 'PAID / SETTLED' : 'PENDING PAYMENT';
+            break;
+          case 'category':
+            row[col.key] = p.category || '';
+            break;
+          case 'settled_at':
+            row[col.key] = p.settled_at || '';
+            break;
+          case 'payment_mode':
+            row[col.key] = p.payment_mode || '';
+            break;
+          case 'utr_number':
+            row[col.key] = p.utr_number || '';
+            break;
+          case 'notes':
+            row[col.key] = p.notes || '';
+            break;
+          default:
+            break;
+        }
+      });
+
+      return row;
     });
 
-    // Add Summary Row at the bottom
-    let totalWithoutGstINR = 0;
-    let totalGstINR = 0;
-    let totalWithGstINR = 0;
-    dataset.forEach((p) => {
-      if (p.currency === 'INR') {
-        const fin = calculateFinancials(p);
-        totalWithoutGstINR += fin.baseAmount;
-        totalGstINR += fin.gstAmount;
-        totalWithGstINR += fin.totalAmount;
-      }
-    });
+    // Add Bottom Summary Row if requested
+    if (includeBottomTotal) {
+      let totalWithoutGstINR = 0;
+      let totalGstINR = 0;
+      let totalWithGstINR = 0;
+      dataset.forEach((p) => {
+        if (p.currency === 'INR') {
+          const fin = calculateFinancials(p);
+          totalWithoutGstINR += fin.baseAmount;
+          totalGstINR += fin.gstAmount;
+          totalWithGstINR += fin.totalAmount;
+        }
+      });
 
-    rows.push({
-      'Sl No': '',
-      'Partner / Beneficiary': 'TOTAL (INR Domestic)',
-      'Transfer To (Account Details)': '',
-      'Linked Student(s)': '',
-      'Category': '',
-      'Currency': 'INR',
-      'Amount Without GST': totalWithoutGstINR,
-      'GST Rate (%)': '18%',
-      'GST 18% Amount': totalGstINR,
-      'Total Amount With GST': totalWithGstINR,
-      'Due Date': '',
-      'Status': '',
-      'Settled Date': '',
-      'Payment Mode': '',
-      'Bank UTR / Reference': '',
-      'Remarks / Notes': 'Calculated for Accounts Transfer',
-    });
+      const totalRow = {};
+      activeCols.forEach((col) => {
+        if (col.id === 'sl_no') totalRow[col.key] = '';
+        else if (col.id === 'partner_name') totalRow[col.key] = 'TOTAL (INR Domestic)';
+        else if (col.id === 'base_amount') totalRow[col.key] = totalWithoutGstINR;
+        else if (col.id === 'gst_amount') totalRow[col.key] = totalGstINR;
+        else if (col.id === 'total_amount') totalRow[col.key] = totalWithGstINR;
+        else if (col.id === 'gst_rate') totalRow[col.key] = '18%';
+        else if (col.id === 'currency') totalRow[col.key] = 'INR';
+        else if (col.id === 'status') totalRow[col.key] = 'Calculated for Accounts';
+        else totalRow[col.key] = '';
+      });
+
+      rows.push(totalRow);
+    }
 
     const worksheet = XLSX.utils.json_to_sheet(rows);
-
-    // Set Column Widths for clean viewing in Excel
-    worksheet['!cols'] = [
-      { wch: 6 },  // Sl No
-      { wch: 22 }, // Partner
-      { wch: 38 }, // Account Details
-      { wch: 25 }, // Student
-      { wch: 20 }, // Category
-      { wch: 10 }, // Currency
-      { wch: 18 }, // Without GST
-      { wch: 12 }, // GST Rate
-      { wch: 16 }, // GST Amount
-      { wch: 20 }, // With GST
-      { wch: 14 }, // Due Date
-      { wch: 16 }, // Status
-      { wch: 14 }, // Settled Date
-      { wch: 20 }, // Mode
-      { wch: 20 }, // UTR
-      { wch: 30 }, // Remarks
-    ];
+    worksheet['!cols'] = activeCols.map((c) => ({ wch: c.wch }));
 
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'B2B Payables');
 
-    const fileName = `Sterling_B2B_Payables_${onlySelected ? 'Selected' : 'All'}_${new Date().toISOString().split('T')[0]}.xlsx`;
-    XLSX.writeFile(workbook, fileName);
+    const dateStr = new Date().toISOString().split('T')[0];
+    const fileBase = `Sterling_B2B_Payables_${exportScope}_${dateStr}`;
 
-    toast.success(`Downloaded ${onlySelected ? `${dataset.length} selected` : 'all'} payments as Excel file`);
+    if (exportFormat === 'csv') {
+      XLSX.writeFile(workbook, `${fileBase}.csv`, { bookType: 'csv' });
+    } else {
+      XLSX.writeFile(workbook, `${fileBase}.xlsx`);
+    }
+
+    setShowExportModal(false);
+    toast.success(`Exported ${dataset.length} payment(s) with ${activeCols.length} chosen columns!`);
   };
 
   // Filtered Payments List
@@ -1272,20 +1374,20 @@ export default function B2BPayments({ setCurrentPage }) {
           {selectedIds.size > 0 && (
             <button
               className="btn-simple-download selected-active"
-              onClick={() => handleDownloadExcel(true)}
-              title="Download selected payments formatted for accounts"
+              onClick={() => openExportModal('selected')}
+              title="Download selected payments with custom fields"
             >
-              <span>📥 Download Selected ({selectedIds.size}) for Accounts</span>
+              <span>📥 Download Selected ({selectedIds.size})...</span>
             </button>
           )}
 
-          {/* Download All Excel */}
+          {/* Download All / Custom Excel */}
           <button
             className="btn-simple-download"
-            onClick={() => handleDownloadExcel(false)}
-            title="Download full statement in Excel format with all columns"
+            onClick={() => openExportModal(selectedIds.size > 0 ? 'selected' : 'all')}
+            title="Choose columns and download custom Excel file"
           >
-            <span>📥 Download All (Excel)</span>
+            <span>📥 Download Excel / Choose Fields...</span>
           </button>
 
           {/* Add Payment Button */}
@@ -1421,9 +1523,9 @@ export default function B2BPayments({ setCurrentPage }) {
             <button
               className="btn-simple-primary"
               style={{ padding: '4px 12px', fontSize: '12px' }}
-              onClick={() => handleDownloadExcel(true)}
+              onClick={() => openExportModal('selected')}
             >
-              📥 Download Selected ({selectedIds.size}) for Accounts
+              📥 Download Selected ({selectedIds.size}) for Accounts...
             </button>
             <button
               className="btn-cancel"
@@ -1896,6 +1998,212 @@ export default function B2BPayments({ setCurrentPage }) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* 9. DOWNLOAD EXCEL CUSTOMIZATION MODAL (Select what to include in Excel) */}
+      {showExportModal && (
+        <div className="b2b-modal-overlay" onClick={() => setShowExportModal(false)}>
+          <div className="b2b-modal-card" style={{ maxWidth: '640px' }} onClick={(e) => e.stopPropagation()}>
+            <div className="b2b-modal-header">
+              <div>
+                <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>📥</span>
+                  <span>Select What to Include in Excel</span>
+                </h3>
+                <span style={{ fontSize: '12px', color: 'var(--muted, #8B949E)' }}>
+                  Choose which payments and columns to export for the accounts team.
+                </span>
+              </div>
+              <button
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: 'var(--muted, #8B949E)' }}
+                onClick={() => setShowExportModal(false)}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="b2b-modal-body" style={{ gap: '16px' }}>
+              {/* Step 1: Which Rows */}
+              <div>
+                <div style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--text, #EDEFFA)', marginBottom: '8px' }}>
+                  1. Which Payments to Export?
+                </div>
+                <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: selectedIds.size === 0 ? 'not-allowed' : 'pointer', fontSize: '13px' }}>
+                    <input
+                      type="radio"
+                      name="exportScope"
+                      value="selected"
+                      checked={exportScope === 'selected'}
+                      disabled={selectedIds.size === 0}
+                      onChange={(e) => setExportScope(e.target.value)}
+                    />
+                    <span style={{ opacity: selectedIds.size === 0 ? 0.45 : 1 }}>
+                      <strong>Selected Payments</strong> ({selectedIds.size} checked)
+                    </span>
+                  </label>
+
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px' }}>
+                    <input
+                      type="radio"
+                      name="exportScope"
+                      value="filtered"
+                      checked={exportScope === 'filtered'}
+                      onChange={(e) => setExportScope(e.target.value)}
+                    />
+                    <span>
+                      <strong>Filtered / Current View</strong> ({filteredList.length} items)
+                    </span>
+                  </label>
+
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px' }}>
+                    <input
+                      type="radio"
+                      name="exportScope"
+                      value="all"
+                      checked={exportScope === 'all'}
+                      onChange={(e) => setExportScope(e.target.value)}
+                    />
+                    <span>
+                      <strong>All Payments</strong> ({payments.length} items)
+                    </span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Step 2: Which Columns */}
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
+                  <div style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--text, #EDEFFA)' }}>
+                    2. Select Columns for Excel ({exportColIds.size} selected)
+                  </div>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <button
+                      type="button"
+                      className="btn-cancel"
+                      style={{ padding: '3px 8px', fontSize: '11px', background: 'rgba(79, 70, 229, 0.1)', color: '#4F46E5', borderColor: '#4F46E5' }}
+                      onClick={() => handleApplyExportPreset('accounts_quick')}
+                      title="Only Partner, Transfer Account, Student, Total to Pay"
+                    >
+                      🏦 Accounts Transfer
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-cancel"
+                      style={{ padding: '3px 8px', fontSize: '11px', background: 'rgba(245, 158, 11, 0.1)', color: '#F59E0B', borderColor: '#F59E0B' }}
+                      onClick={() => handleApplyExportPreset('accounts_gst')}
+                      title="Includes Base + 18% GST + Total with GST"
+                    >
+                      🧾 With 18% GST
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-cancel"
+                      style={{ padding: '3px 8px', fontSize: '11px' }}
+                      onClick={() => handleApplyExportPreset('all')}
+                    >
+                      Select All
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-cancel"
+                      style={{ padding: '3px 8px', fontSize: '11px' }}
+                      onClick={() => handleApplyExportPreset('none')}
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+                    gap: '8px 12px',
+                    padding: '12px 14px',
+                    background: 'var(--bg3, #F4F6FC)',
+                    borderRadius: '8px',
+                    border: '1px solid var(--border, rgba(148, 163, 225, 0.2))',
+                    maxHeight: '210px',
+                    overflowY: 'auto',
+                  }}
+                >
+                  {EXPORT_COLUMNS_DEF.map((col) => {
+                    const isChecked = exportColIds.has(col.id);
+                    return (
+                      <label
+                        key={col.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          fontSize: '12.5px',
+                          cursor: 'pointer',
+                          color: isChecked ? 'var(--text, #EDEFFA)' : 'var(--muted, #8B949E)',
+                          fontWeight: isChecked ? 600 : 400,
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => handleToggleExportCol(col.id)}
+                        />
+                        <span>{col.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Step 3: Total Row & Format */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', paddingTop: '4px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '12.5px' }}>
+                  <input
+                    type="checkbox"
+                    checked={includeBottomTotal}
+                    onChange={(e) => setIncludeBottomTotal(e.target.checked)}
+                  />
+                  <span>
+                    <strong>Include Summary Total Row</strong> (Calculates Base + GST + Total)
+                  </span>
+                </label>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '12.5px', color: 'var(--muted, #8B949E)' }}>Format:</span>
+                  <select
+                    value={exportFormat}
+                    onChange={(e) => setExportFormat(e.target.value)}
+                    style={{
+                      padding: '4px 8px',
+                      borderRadius: '6px',
+                      background: 'var(--bg2, #ffffff)',
+                      border: '1px solid var(--border, rgba(148, 163, 225, 0.3))',
+                      color: 'var(--text, #EDEFFA)',
+                      fontSize: '12px',
+                    }}
+                  >
+                    <option value="xlsx">Excel Spreadsheet (.xlsx)</option>
+                    <option value="csv">Comma-Separated (.csv)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="b2b-modal-footer">
+              <button type="button" className="btn-cancel" onClick={() => setShowExportModal(false)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn-simple-primary"
+                style={{ background: '#10B981', padding: '8px 18px' }}
+                onClick={handleExecuteExport}
+              >
+                📥 Download Excel ({exportColIds.size} Columns)
+              </button>
+            </div>
           </div>
         </div>
       )}
