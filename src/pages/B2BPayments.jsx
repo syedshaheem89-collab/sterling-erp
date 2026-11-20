@@ -341,7 +341,8 @@ const INITIAL_B2B_PAYMENTS = [
     partner_name: 'Comfort Travel',
     transfer_account: 'Federal Bank A/C: 14200200039281 | IFSC: FDRL0001420 | Ernakulam',
     selected_account_id: 'acc-ct-1',
-    student_names: 'Apostille Batch',
+    student_names: '30 Students (Apostille Batch)',
+    batch_count: 30,
     amount: 59550,
     currency: 'INR',
     has_gst: false,
@@ -349,14 +350,14 @@ const INITIAL_B2B_PAYMENTS = [
     due_date: new Date(Date.now() + 9 * 86400000).toISOString().split('T')[0],
     priority: false,
     status: 'pending',
-    notes: 'MEA document apostille and legal verification batch',
+    notes: 'MEA document apostille for 30 students batch (₹1,985 per student)',
     created_at: '2026-11-18T12:00:00.000Z',
     settled_at: null,
     payment_mode: null,
     utr_number: null,
-    invoice_file_name: 'Consult_Fox_Tax_Invoice_89.svg',
-    invoice_file_data: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="750" viewBox="0 0 600 750"><rect width="600" height="750" fill="%23ffffff"/><rect x="30" y="30" width="540" height="690" fill="%23f8fafc" stroke="%23cbd5e1" stroke-width="2" rx="10"/><text x="50" y="80" font-family="sans-serif" font-size="18" font-weight="bold" fill="%230f172a">CONSULT FOX EDUTECH PVT LTD</text><text x="50" y="105" font-family="sans-serif" font-size="12" fill="%2364748b">INVOICE NO: CF-2026-0089 | DATE: 15.11.2026</text><line x1="50" y1="125" x2="550" y2="125" stroke="%23e2e8f0" stroke-width="2"/><text x="50" y="155" font-family="sans-serif" font-size="12" font-weight="bold" fill="%23334155">BILLED TO: Sterling Overseas Consultancy LLC</text><text x="50" y="175" font-family="sans-serif" font-size="12" fill="%23475569">Candidate Referrals: Thejus &amp; Nivil</text><text x="50" y="230" font-family="sans-serif" font-size="13" font-weight="bold" fill="%230f172a">1. Higher Education Admission Commission</text><text x="50" y="260" font-family="sans-serif" font-size="12" fill="%23334155">Base Commission: INR 1,52,542</text><text x="50" y="285" font-family="sans-serif" font-size="12" fill="%23334155">Add 18% GST: INR 27,458</text><line x1="50" y1="310" x2="550" y2="310" stroke="%23cbd5e1" stroke-width="1.5"/><text x="50" y="340" font-family="sans-serif" font-size="16" font-weight="bold" fill="%23059669">TOTAL AMOUNT PAYABLE: INR 1,80,000</text><text x="50" y="380" font-family="sans-serif" font-size="11" fill="%2364748b">Bank: HDFC Bank | A/C: 50200038291048 | IFSC: HDFC0000240</text></svg>',
-    invoice_uploaded_at: '2026-11-15T10:15:00.000Z',
+    invoice_file_name: 'STERLING KERALA1111.pdf',
+    invoice_file_data: null,
+    invoice_uploaded_at: '2026-11-18T12:15:00.000Z',
   },
   {
     id: 'b2b-009',
@@ -503,11 +504,16 @@ export default function B2BPayments({ setCurrentPage }) {
   // Add / Edit Modal State
   const [showModal, setShowModal] = useState(false);
   const [editingPayment, setEditingPayment] = useState(null);
+  const [showBatchCalculator, setShowBatchCalculator] = useState(false);
+  const [batchStudentCount, setBatchStudentCount] = useState(30);
+  const [batchDescription, setBatchDescription] = useState('Apostille Batch (Malta / Europe)');
+
   const [formData, setFormData] = useState({
     partner_name: '',
     transfer_account: '',
     selected_account_id: '',
     student_names: '',
+    batch_count: null,
     amount: '',
     currency: 'INR',
     has_gst: false,
@@ -1041,11 +1047,15 @@ export default function B2BPayments({ setCurrentPage }) {
   // Open Add Modal
   const handleOpenAddModal = () => {
     setEditingPayment(null);
+    setShowBatchCalculator(false);
+    setBatchStudentCount(30);
+    setBatchDescription('Apostille Batch (Malta / Europe)');
     setFormData({
       partner_name: '',
       transfer_account: '',
       selected_account_id: '',
       student_names: '',
+      batch_count: null,
       amount: '',
       currency: 'INR',
       has_gst: false,
@@ -1067,12 +1077,16 @@ export default function B2BPayments({ setCurrentPage }) {
     setEditingPayment(payment);
     const partnerAccs = getAccountsForPartner(payment.partner_name);
     const matchedAcc = partnerAccs.find((a) => a.details_string === payment.transfer_account || a.id === payment.selected_account_id);
+    const count = payment.batch_count || (payment.student_names?.includes('30') ? 30 : (payment.category === 'Apostille Charges' ? 30 : null));
+    setBatchStudentCount(count || 30);
+    setShowBatchCalculator(!!count || payment.category === 'Apostille Charges');
 
     setFormData({
       partner_name: payment.partner_name || '',
       transfer_account: payment.transfer_account || '',
       selected_account_id: matchedAcc ? matchedAcc.id : (partnerAccs.length > 0 ? '__custom__' : ''),
-      student_names: payment.student_names || '',
+      student_names: payment.student_names || (payment.category === 'Apostille Charges' ? '30 Students (Apostille Batch)' : ''),
+      batch_count: count,
       amount: payment.amount || '',
       currency: payment.currency || 'INR',
       has_gst: payment.has_gst || false,
@@ -1204,6 +1218,22 @@ export default function B2BPayments({ setCurrentPage }) {
       }
     }
 
+    let finalStudentNames = formData.student_names ? formData.student_names.trim() : '';
+    let finalBatchCount = formData.batch_count;
+    if (!finalStudentNames) {
+      if (formData.category === 'Apostille Charges' || formData.partner_name?.toLowerCase().includes('comfort')) {
+        finalStudentNames = '30 Students (Apostille Batch)';
+        finalBatchCount = finalBatchCount || 30;
+      } else {
+        finalStudentNames = 'Batch / Agency Service';
+      }
+    } else {
+      const match = finalStudentNames.match(/\b(\d+)\s*students?\b/i);
+      if (match && !finalBatchCount) {
+        finalBatchCount = parseInt(match[1]);
+      }
+    }
+
     if (editingPayment) {
       setPayments((prev) =>
         prev.map((p) =>
@@ -1213,7 +1243,8 @@ export default function B2BPayments({ setCurrentPage }) {
                 partner_name: formData.partner_name.trim(),
                 transfer_account: formData.transfer_account.trim(),
                 selected_account_id: formData.selected_account_id,
-                student_names: formData.student_names.trim(),
+                student_names: finalStudentNames,
+                batch_count: finalBatchCount,
                 amount: amt,
                 currency: formData.currency,
                 has_gst: finalHasGst,
@@ -1235,7 +1266,8 @@ export default function B2BPayments({ setCurrentPage }) {
         partner_name: formData.partner_name.trim(),
         transfer_account: formData.transfer_account.trim(),
         selected_account_id: formData.selected_account_id,
-        student_names: formData.student_names.trim(),
+        student_names: finalStudentNames,
+        batch_count: finalBatchCount,
         amount: amt,
         currency: formData.currency,
         has_gst: finalHasGst,
@@ -2505,12 +2537,45 @@ export default function B2BPayments({ setCurrentPage }) {
 
                     {/* Linked Student(s) */}
                     <td>
-                      <span style={{ fontWeight: 500 }}>{payment.student_names || 'General'}</span>
-                      {payment.category && (
-                        <div style={{ fontSize: '11px', color: 'var(--muted, #8B949E)' }}>
-                          {payment.category}
-                        </div>
-                      )}
+                      {(() => {
+                        const isBatch = payment.batch_count || payment.student_names?.includes('30') || payment.student_names?.toLowerCase().includes('batch');
+                        const stuCount = payment.batch_count || (payment.student_names?.match(/\b(\d+)\s*students?\b/i)?.[1] ? parseInt(payment.student_names.match(/\b(\d+)\s*students?\b/i)[1]) : (isBatch ? 30 : null));
+                        const perStuCost = stuCount && payment.amount ? Math.round(payment.amount / stuCount) : null;
+
+                        if (isBatch && stuCount) {
+                          return (
+                            <div>
+                              <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                background: 'rgba(139, 92, 246, 0.15)',
+                                border: '1px solid rgba(139, 92, 246, 0.4)',
+                                color: '#DDD6FE',
+                                padding: '2px 8px',
+                                borderRadius: '12px',
+                                fontSize: '11px',
+                                fontWeight: 700,
+                              }}>
+                                👥 {stuCount} Students {perStuCost ? `(₹${perStuCost.toLocaleString('en-IN')}/stu)` : ''}
+                              </span>
+                              <div style={{ fontSize: '11px', color: 'var(--muted, #8B949E)', marginTop: '2px' }}>
+                                {payment.category || 'Batch Processing'}
+                              </div>
+                            </div>
+                          );
+                        }
+                        return (
+                          <div>
+                            <span style={{ fontWeight: 500 }}>{payment.student_names || 'General'}</span>
+                            {payment.category && (
+                              <div style={{ fontSize: '11px', color: 'var(--muted, #8B949E)' }}>
+                                {payment.category}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </td>
 
                     {/* Due Date */}
@@ -2975,13 +3040,154 @@ export default function B2BPayments({ setCurrentPage }) {
                   )}
                 </div>
 
-                {/* Linked Student */}
+                {/* Linked Student(s) or Batch Selection */}
                 <div className="form-field">
-                  <label>Linked Student(s) *</label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <label style={{ margin: 0, fontWeight: 600 }}>Linked Student(s) or Batch</label>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button
+                        type="button"
+                        style={{
+                          background: 'linear-gradient(135deg, #8B5CF6, #6366F1)',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '6px',
+                          padding: '3px 9px',
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          boxShadow: '0 2px 4px rgba(139, 92, 246, 0.25)',
+                        }}
+                        onClick={() => {
+                          const count = 30;
+                          setBatchStudentCount(count);
+                          const amt = parseFloat(formData.amount) || 59550;
+                          const perStu = Math.round(amt / count);
+                          setFormData({
+                            ...formData,
+                            student_names: '30 Students (Apostille Batch)',
+                            batch_count: 30,
+                            category: formData.category || 'Apostille Charges',
+                            notes: (formData.notes ? `${formData.notes} | ` : '') + `Apostille for 30 students batch (~₹${perStu.toLocaleString('en-IN')}/student)`,
+                          });
+                          setShowBatchCalculator(true);
+                          toast.success(`Set 30 Students Batch (~₹${perStu.toLocaleString('en-IN')}/student)`);
+                        }}
+                      >
+                        👥 30 Students Batch
+                      </button>
+                      <button
+                        type="button"
+                        style={{
+                          background: showBatchCalculator ? 'rgba(99, 102, 241, 0.25)' : 'rgba(255, 255, 255, 0.08)',
+                          color: showBatchCalculator ? '#818CF8' : 'var(--muted, #94A3B8)',
+                          border: '1px solid rgba(148, 163, 225, 0.25)',
+                          borderRadius: '6px',
+                          padding: '3px 8px',
+                          fontSize: '11px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                        }}
+                        onClick={() => setShowBatchCalculator(!showBatchCalculator)}
+                      >
+                        🧮 {showBatchCalculator ? 'Hide Split Calc' : 'Batch Split Calc'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Expandable Batch Split Calculator */}
+                  {showBatchCalculator && (
+                    <div style={{
+                      background: 'rgba(139, 92, 246, 0.08)',
+                      border: '1px solid rgba(139, 92, 246, 0.35)',
+                      borderRadius: '8px',
+                      padding: '10px 12px',
+                      marginBottom: '8px',
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '12px', fontWeight: 700, color: '#C4B5FD', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          🧮 Batch Cost Split Calculator (Apostille / VFS / Insurance)
+                        </span>
+                        <span style={{ fontSize: '11px', color: '#94A3B8' }}>
+                          Auto-computes per-student debit
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr auto', gap: '8px', alignItems: 'center' }}>
+                        <div>
+                          <label style={{ fontSize: '10.5px', color: '#94A3B8', display: 'block', marginBottom: '2px' }}>Total Students</label>
+                          <input
+                            type="number"
+                            min="1"
+                            max="200"
+                            value={batchStudentCount}
+                            onChange={(e) => setBatchStudentCount(parseInt(e.target.value) || 1)}
+                            style={{ width: '100%', padding: '5px 8px', fontSize: '12px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#F8FAFC' }}
+                          />
+                        </div>
+
+                        <div>
+                          <label style={{ fontSize: '10.5px', color: '#94A3B8', display: 'block', marginBottom: '2px' }}>Batch Description</label>
+                          <input
+                            type="text"
+                            value={batchDescription}
+                            onChange={(e) => setBatchDescription(e.target.value)}
+                            placeholder="e.g. Apostille Batch (Malta / Europe)"
+                            style={{ width: '100%', padding: '5px 8px', fontSize: '12px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#F8FAFC' }}
+                          />
+                        </div>
+
+                        <div style={{ paddingTop: '16px' }}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const count = batchStudentCount || 30;
+                              const amt = parseFloat(formData.amount) || 59550;
+                              const perStudent = Math.round(amt / count);
+                              const formattedPerStudent = perStudent.toLocaleString('en-IN');
+                              setFormData({
+                                ...formData,
+                                student_names: `${count} Students (${batchDescription || 'Batch'})`,
+                                batch_count: count,
+                                notes: (formData.notes ? `${formData.notes} | ` : '') + `Total ${formData.currency || 'INR'} ${amt.toLocaleString('en-IN')} split for ${count} students (${formData.currency || 'INR'} ${formattedPerStudent}/student)`,
+                              });
+                              toast.success(`Applied: ${count} Students @ ₹${formattedPerStudent} per student`);
+                            }}
+                            style={{
+                              background: '#10B981',
+                              color: '#FFFFFF',
+                              border: 'none',
+                              borderRadius: '4px',
+                              padding: '6px 12px',
+                              fontSize: '11.5px',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            ✓ Apply to Payment
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Live Calculation preview */}
+                      <div style={{ marginTop: '8px', padding: '6px 10px', background: 'rgba(15, 23, 42, 0.6)', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ fontSize: '11.5px', color: '#E2E8F0' }}>
+                          <strong>Cost Breakdown:</strong> {formData.currency || 'INR'} {parseFloat(formData.amount || 59550).toLocaleString('en-IN')} ÷ {batchStudentCount || 30} Students
+                        </div>
+                        <div style={{ fontSize: '13px', fontWeight: 800, color: '#34D399' }}>
+                          = {formData.currency || 'INR'} {Math.round(parseFloat(formData.amount || 59550) / (batchStudentCount || 30)).toLocaleString('en-IN')} / student
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <input
                     type="text"
-                    required
-                    placeholder="Type student name(s) (e.g. Thejus & Nivil)"
+                    placeholder="Type student name(s) or select a Batch preset below"
                     value={formData.student_names}
                     onChange={(e) => {
                       const val = e.target.value;
@@ -2998,6 +3204,43 @@ export default function B2BPayments({ setCurrentPage }) {
                     }}
                     onBlur={() => setTimeout(() => setShowStudentSuggestions(false), 200)}
                   />
+
+                  {/* Quick Preset Buttons */}
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
+                    <span style={{ fontSize: '10.5px', color: '#94A3B8', alignSelf: 'center' }}>Quick Presets:</span>
+                    {[
+                      { label: '👥 30 Students (Apostille)', count: 30, desc: '30 Students (Apostille Batch)' },
+                      { label: '👥 20 Students Batch', count: 20, desc: '20 Students (Embassy/VFS Batch)' },
+                      { label: '👥 10 Students Batch', count: 10, desc: '10 Students Batch' },
+                      { label: '🏢 General Agency Batch', count: null, desc: 'Batch / General Agency Service' },
+                    ].map((preset) => (
+                      <button
+                        key={preset.label}
+                        type="button"
+                        onClick={() => {
+                          setFormData({
+                            ...formData,
+                            student_names: preset.desc,
+                            batch_count: preset.count,
+                          });
+                          if (preset.count) {
+                            setBatchStudentCount(preset.count);
+                          }
+                        }}
+                        style={{
+                          background: formData.student_names === preset.desc ? 'rgba(99, 102, 241, 0.3)' : 'rgba(255, 255, 255, 0.05)',
+                          border: formData.student_names === preset.desc ? '1px solid #818CF8' : '1px solid rgba(148, 163, 225, 0.2)',
+                          borderRadius: '12px',
+                          padding: '2px 8px',
+                          fontSize: '10.5px',
+                          color: formData.student_names === preset.desc ? '#C7D2FE' : '#94A3B8',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
 
                   {showStudentSuggestions && (
                     <div className="student-autocomplete-menu">
@@ -4048,7 +4291,21 @@ export default function B2BPayments({ setCurrentPage }) {
                             <div style={{ fontSize: '10px', color: '#475569' }}>{p.category || 'Commission'}</div>
                           </td>
                           <td style={{ border: '1.5px solid #000000', padding: '6px 8px', color: '#000000', fontWeight: 600, fontSize: '11px', wordBreak: 'break-word' }}>
-                            {p.student_names || 'General'}
+                            {(() => {
+                              const isBatch = p.batch_count || p.student_names?.includes('30') || p.student_names?.toLowerCase().includes('batch');
+                              const count = p.batch_count || (p.student_names?.match(/\b(\d+)\s*students?\b/i)?.[1] ? parseInt(p.student_names.match(/\b(\d+)\s*students?\b/i)[1]) : (isBatch ? 30 : null));
+                              const perCost = count && p.amount ? Math.round(p.amount / count) : null;
+                              return (
+                                <div>
+                                  <div>{p.student_names || 'General'}</div>
+                                  {count && perCost && (
+                                    <div style={{ fontSize: '9.5px', color: '#334155', fontWeight: 700, marginTop: '2px' }}>
+                                      👥 Cost/stu: {p.currency || 'INR'} {perCost.toLocaleString('en-IN')} ({count} students)
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })()}
                           </td>
                           <td style={{ border: '1.5px solid #000000', padding: '6px 8px', color: '#000000', fontSize: '10px', lineHeight: '1.35', wordBreak: 'break-word' }}>
                             {p.transfer_account || 'Account details pending'}
