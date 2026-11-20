@@ -1,8 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabase';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
+import DocumentGeneratorModal from '../components/DocumentGeneratorModal';
+import B2BInvoiceViewerModal from '../components/B2BInvoiceViewerModal';
 
 /**
  * INITIAL_PARTNER_ACCOUNTS
@@ -198,6 +200,9 @@ const INITIAL_B2B_PAYMENTS = [
     settled_at: null,
     payment_mode: null,
     utr_number: null,
+    invoice_file_name: 'Consult_Fox_Tax_Invoice_89.svg',
+    invoice_file_data: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="750" viewBox="0 0 600 750"><rect width="600" height="750" fill="%23ffffff"/><rect x="30" y="30" width="540" height="690" fill="%23f8fafc" stroke="%23cbd5e1" stroke-width="2" rx="10"/><text x="50" y="80" font-family="sans-serif" font-size="18" font-weight="bold" fill="%230f172a">CONSULT FOX EDUTECH PVT LTD</text><text x="50" y="105" font-family="sans-serif" font-size="12" fill="%2364748b">INVOICE NO: CF-2026-0089 | DATE: 15.11.2026</text><line x1="50" y1="125" x2="550" y2="125" stroke="%23e2e8f0" stroke-width="2"/><text x="50" y="155" font-family="sans-serif" font-size="12" font-weight="bold" fill="%23334155">BILLED TO: Sterling Overseas Consultancy LLC</text><text x="50" y="175" font-family="sans-serif" font-size="12" fill="%23475569">Candidate Referrals: Thejus &amp; Nivil</text><text x="50" y="230" font-family="sans-serif" font-size="13" font-weight="bold" fill="%230f172a">1. Higher Education Admission Commission</text><text x="50" y="260" font-family="sans-serif" font-size="12" fill="%23334155">Base Commission: INR 1,52,542</text><text x="50" y="285" font-family="sans-serif" font-size="12" fill="%23334155">Add 18% GST: INR 27,458</text><line x1="50" y1="310" x2="550" y2="310" stroke="%23cbd5e1" stroke-width="1.5"/><text x="50" y="340" font-family="sans-serif" font-size="16" font-weight="bold" fill="%23059669">TOTAL AMOUNT PAYABLE: INR 1,80,000</text><text x="50" y="380" font-family="sans-serif" font-size="11" fill="%2364748b">Bank: HDFC Bank | A/C: 50200038291048 | IFSC: HDFC0000240</text></svg>',
+    invoice_uploaded_at: '2026-11-15T10:15:00.000Z',
   },
   {
     id: 'b2b-002',
@@ -217,6 +222,9 @@ const INITIAL_B2B_PAYMENTS = [
     settled_at: null,
     payment_mode: null,
     utr_number: null,
+    invoice_file_name: 'Consult_Fox_Tax_Invoice_89.svg',
+    invoice_file_data: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="750" viewBox="0 0 600 750"><rect width="600" height="750" fill="%23ffffff"/><rect x="30" y="30" width="540" height="690" fill="%23f8fafc" stroke="%23cbd5e1" stroke-width="2" rx="10"/><text x="50" y="80" font-family="sans-serif" font-size="18" font-weight="bold" fill="%230f172a">CONSULT FOX EDUTECH PVT LTD</text><text x="50" y="105" font-family="sans-serif" font-size="12" fill="%2364748b">INVOICE NO: CF-2026-0089 | DATE: 15.11.2026</text><line x1="50" y1="125" x2="550" y2="125" stroke="%23e2e8f0" stroke-width="2"/><text x="50" y="155" font-family="sans-serif" font-size="12" font-weight="bold" fill="%23334155">BILLED TO: Sterling Overseas Consultancy LLC</text><text x="50" y="175" font-family="sans-serif" font-size="12" fill="%23475569">Candidate Referrals: Thejus &amp; Nivil</text><text x="50" y="230" font-family="sans-serif" font-size="13" font-weight="bold" fill="%230f172a">1. Higher Education Admission Commission</text><text x="50" y="260" font-family="sans-serif" font-size="12" fill="%23334155">Base Commission: INR 1,52,542</text><text x="50" y="285" font-family="sans-serif" font-size="12" fill="%23334155">Add 18% GST: INR 27,458</text><line x1="50" y1="310" x2="550" y2="310" stroke="%23cbd5e1" stroke-width="1.5"/><text x="50" y="340" font-family="sans-serif" font-size="16" font-weight="bold" fill="%23059669">TOTAL AMOUNT PAYABLE: INR 1,80,000</text><text x="50" y="380" font-family="sans-serif" font-size="11" fill="%2364748b">Bank: HDFC Bank | A/C: 50200038291048 | IFSC: HDFC0000240</text></svg>',
+    invoice_uploaded_at: '2026-11-15T10:15:00.000Z',
   },
   {
     id: 'b2b-003',
@@ -236,6 +244,9 @@ const INITIAL_B2B_PAYMENTS = [
     settled_at: null,
     payment_mode: null,
     utr_number: null,
+    invoice_file_name: 'Consult_Fox_Tax_Invoice_89.svg',
+    invoice_file_data: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="750" viewBox="0 0 600 750"><rect width="600" height="750" fill="%23ffffff"/><rect x="30" y="30" width="540" height="690" fill="%23f8fafc" stroke="%23cbd5e1" stroke-width="2" rx="10"/><text x="50" y="80" font-family="sans-serif" font-size="18" font-weight="bold" fill="%230f172a">CONSULT FOX EDUTECH PVT LTD</text><text x="50" y="105" font-family="sans-serif" font-size="12" fill="%2364748b">INVOICE NO: CF-2026-0089 | DATE: 15.11.2026</text><line x1="50" y1="125" x2="550" y2="125" stroke="%23e2e8f0" stroke-width="2"/><text x="50" y="155" font-family="sans-serif" font-size="12" font-weight="bold" fill="%23334155">BILLED TO: Sterling Overseas Consultancy LLC</text><text x="50" y="175" font-family="sans-serif" font-size="12" fill="%23475569">Candidate Referrals: Thejus &amp; Nivil</text><text x="50" y="230" font-family="sans-serif" font-size="13" font-weight="bold" fill="%230f172a">1. Higher Education Admission Commission</text><text x="50" y="260" font-family="sans-serif" font-size="12" fill="%23334155">Base Commission: INR 1,52,542</text><text x="50" y="285" font-family="sans-serif" font-size="12" fill="%23334155">Add 18% GST: INR 27,458</text><line x1="50" y1="310" x2="550" y2="310" stroke="%23cbd5e1" stroke-width="1.5"/><text x="50" y="340" font-family="sans-serif" font-size="16" font-weight="bold" fill="%23059669">TOTAL AMOUNT PAYABLE: INR 1,80,000</text><text x="50" y="380" font-family="sans-serif" font-size="11" fill="%2364748b">Bank: HDFC Bank | A/C: 50200038291048 | IFSC: HDFC0000240</text></svg>',
+    invoice_uploaded_at: '2026-11-15T10:15:00.000Z',
   },
   {
     id: 'b2b-004',
@@ -255,6 +266,9 @@ const INITIAL_B2B_PAYMENTS = [
     settled_at: null,
     payment_mode: null,
     utr_number: null,
+    invoice_file_name: 'Consult_Fox_Tax_Invoice_89.svg',
+    invoice_file_data: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="750" viewBox="0 0 600 750"><rect width="600" height="750" fill="%23ffffff"/><rect x="30" y="30" width="540" height="690" fill="%23f8fafc" stroke="%23cbd5e1" stroke-width="2" rx="10"/><text x="50" y="80" font-family="sans-serif" font-size="18" font-weight="bold" fill="%230f172a">CONSULT FOX EDUTECH PVT LTD</text><text x="50" y="105" font-family="sans-serif" font-size="12" fill="%2364748b">INVOICE NO: CF-2026-0089 | DATE: 15.11.2026</text><line x1="50" y1="125" x2="550" y2="125" stroke="%23e2e8f0" stroke-width="2"/><text x="50" y="155" font-family="sans-serif" font-size="12" font-weight="bold" fill="%23334155">BILLED TO: Sterling Overseas Consultancy LLC</text><text x="50" y="175" font-family="sans-serif" font-size="12" fill="%23475569">Candidate Referrals: Thejus &amp; Nivil</text><text x="50" y="230" font-family="sans-serif" font-size="13" font-weight="bold" fill="%230f172a">1. Higher Education Admission Commission</text><text x="50" y="260" font-family="sans-serif" font-size="12" fill="%23334155">Base Commission: INR 1,52,542</text><text x="50" y="285" font-family="sans-serif" font-size="12" fill="%23334155">Add 18% GST: INR 27,458</text><line x1="50" y1="310" x2="550" y2="310" stroke="%23cbd5e1" stroke-width="1.5"/><text x="50" y="340" font-family="sans-serif" font-size="16" font-weight="bold" fill="%23059669">TOTAL AMOUNT PAYABLE: INR 1,80,000</text><text x="50" y="380" font-family="sans-serif" font-size="11" fill="%2364748b">Bank: HDFC Bank | A/C: 50200038291048 | IFSC: HDFC0000240</text></svg>',
+    invoice_uploaded_at: '2026-11-15T10:15:00.000Z',
   },
   {
     id: 'b2b-005',
@@ -274,6 +288,9 @@ const INITIAL_B2B_PAYMENTS = [
     settled_at: null,
     payment_mode: null,
     utr_number: null,
+    invoice_file_name: 'Consult_Fox_Tax_Invoice_89.svg',
+    invoice_file_data: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="750" viewBox="0 0 600 750"><rect width="600" height="750" fill="%23ffffff"/><rect x="30" y="30" width="540" height="690" fill="%23f8fafc" stroke="%23cbd5e1" stroke-width="2" rx="10"/><text x="50" y="80" font-family="sans-serif" font-size="18" font-weight="bold" fill="%230f172a">CONSULT FOX EDUTECH PVT LTD</text><text x="50" y="105" font-family="sans-serif" font-size="12" fill="%2364748b">INVOICE NO: CF-2026-0089 | DATE: 15.11.2026</text><line x1="50" y1="125" x2="550" y2="125" stroke="%23e2e8f0" stroke-width="2"/><text x="50" y="155" font-family="sans-serif" font-size="12" font-weight="bold" fill="%23334155">BILLED TO: Sterling Overseas Consultancy LLC</text><text x="50" y="175" font-family="sans-serif" font-size="12" fill="%23475569">Candidate Referrals: Thejus &amp; Nivil</text><text x="50" y="230" font-family="sans-serif" font-size="13" font-weight="bold" fill="%230f172a">1. Higher Education Admission Commission</text><text x="50" y="260" font-family="sans-serif" font-size="12" fill="%23334155">Base Commission: INR 1,52,542</text><text x="50" y="285" font-family="sans-serif" font-size="12" fill="%23334155">Add 18% GST: INR 27,458</text><line x1="50" y1="310" x2="550" y2="310" stroke="%23cbd5e1" stroke-width="1.5"/><text x="50" y="340" font-family="sans-serif" font-size="16" font-weight="bold" fill="%23059669">TOTAL AMOUNT PAYABLE: INR 1,80,000</text><text x="50" y="380" font-family="sans-serif" font-size="11" fill="%2364748b">Bank: HDFC Bank | A/C: 50200038291048 | IFSC: HDFC0000240</text></svg>',
+    invoice_uploaded_at: '2026-11-15T10:15:00.000Z',
   },
   {
     id: 'b2b-006',
@@ -293,6 +310,9 @@ const INITIAL_B2B_PAYMENTS = [
     settled_at: null,
     payment_mode: null,
     utr_number: null,
+    invoice_file_name: 'Consult_Fox_Tax_Invoice_89.svg',
+    invoice_file_data: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="750" viewBox="0 0 600 750"><rect width="600" height="750" fill="%23ffffff"/><rect x="30" y="30" width="540" height="690" fill="%23f8fafc" stroke="%23cbd5e1" stroke-width="2" rx="10"/><text x="50" y="80" font-family="sans-serif" font-size="18" font-weight="bold" fill="%230f172a">CONSULT FOX EDUTECH PVT LTD</text><text x="50" y="105" font-family="sans-serif" font-size="12" fill="%2364748b">INVOICE NO: CF-2026-0089 | DATE: 15.11.2026</text><line x1="50" y1="125" x2="550" y2="125" stroke="%23e2e8f0" stroke-width="2"/><text x="50" y="155" font-family="sans-serif" font-size="12" font-weight="bold" fill="%23334155">BILLED TO: Sterling Overseas Consultancy LLC</text><text x="50" y="175" font-family="sans-serif" font-size="12" fill="%23475569">Candidate Referrals: Thejus &amp; Nivil</text><text x="50" y="230" font-family="sans-serif" font-size="13" font-weight="bold" fill="%230f172a">1. Higher Education Admission Commission</text><text x="50" y="260" font-family="sans-serif" font-size="12" fill="%23334155">Base Commission: INR 1,52,542</text><text x="50" y="285" font-family="sans-serif" font-size="12" fill="%23334155">Add 18% GST: INR 27,458</text><line x1="50" y1="310" x2="550" y2="310" stroke="%23cbd5e1" stroke-width="1.5"/><text x="50" y="340" font-family="sans-serif" font-size="16" font-weight="bold" fill="%23059669">TOTAL AMOUNT PAYABLE: INR 1,80,000</text><text x="50" y="380" font-family="sans-serif" font-size="11" fill="%2364748b">Bank: HDFC Bank | A/C: 50200038291048 | IFSC: HDFC0000240</text></svg>',
+    invoice_uploaded_at: '2026-11-15T10:15:00.000Z',
   },
   {
     id: 'b2b-007',
@@ -312,6 +332,9 @@ const INITIAL_B2B_PAYMENTS = [
     settled_at: null,
     payment_mode: null,
     utr_number: null,
+    invoice_file_name: 'Consult_Fox_Tax_Invoice_89.svg',
+    invoice_file_data: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="750" viewBox="0 0 600 750"><rect width="600" height="750" fill="%23ffffff"/><rect x="30" y="30" width="540" height="690" fill="%23f8fafc" stroke="%23cbd5e1" stroke-width="2" rx="10"/><text x="50" y="80" font-family="sans-serif" font-size="18" font-weight="bold" fill="%230f172a">CONSULT FOX EDUTECH PVT LTD</text><text x="50" y="105" font-family="sans-serif" font-size="12" fill="%2364748b">INVOICE NO: CF-2026-0089 | DATE: 15.11.2026</text><line x1="50" y1="125" x2="550" y2="125" stroke="%23e2e8f0" stroke-width="2"/><text x="50" y="155" font-family="sans-serif" font-size="12" font-weight="bold" fill="%23334155">BILLED TO: Sterling Overseas Consultancy LLC</text><text x="50" y="175" font-family="sans-serif" font-size="12" fill="%23475569">Candidate Referrals: Thejus &amp; Nivil</text><text x="50" y="230" font-family="sans-serif" font-size="13" font-weight="bold" fill="%230f172a">1. Higher Education Admission Commission</text><text x="50" y="260" font-family="sans-serif" font-size="12" fill="%23334155">Base Commission: INR 1,52,542</text><text x="50" y="285" font-family="sans-serif" font-size="12" fill="%23334155">Add 18% GST: INR 27,458</text><line x1="50" y1="310" x2="550" y2="310" stroke="%23cbd5e1" stroke-width="1.5"/><text x="50" y="340" font-family="sans-serif" font-size="16" font-weight="bold" fill="%23059669">TOTAL AMOUNT PAYABLE: INR 1,80,000</text><text x="50" y="380" font-family="sans-serif" font-size="11" fill="%2364748b">Bank: HDFC Bank | A/C: 50200038291048 | IFSC: HDFC0000240</text></svg>',
+    invoice_uploaded_at: '2026-11-15T10:15:00.000Z',
   },
   {
     id: 'b2b-008',
@@ -331,6 +354,9 @@ const INITIAL_B2B_PAYMENTS = [
     settled_at: null,
     payment_mode: null,
     utr_number: null,
+    invoice_file_name: 'Consult_Fox_Tax_Invoice_89.svg',
+    invoice_file_data: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="750" viewBox="0 0 600 750"><rect width="600" height="750" fill="%23ffffff"/><rect x="30" y="30" width="540" height="690" fill="%23f8fafc" stroke="%23cbd5e1" stroke-width="2" rx="10"/><text x="50" y="80" font-family="sans-serif" font-size="18" font-weight="bold" fill="%230f172a">CONSULT FOX EDUTECH PVT LTD</text><text x="50" y="105" font-family="sans-serif" font-size="12" fill="%2364748b">INVOICE NO: CF-2026-0089 | DATE: 15.11.2026</text><line x1="50" y1="125" x2="550" y2="125" stroke="%23e2e8f0" stroke-width="2"/><text x="50" y="155" font-family="sans-serif" font-size="12" font-weight="bold" fill="%23334155">BILLED TO: Sterling Overseas Consultancy LLC</text><text x="50" y="175" font-family="sans-serif" font-size="12" fill="%23475569">Candidate Referrals: Thejus &amp; Nivil</text><text x="50" y="230" font-family="sans-serif" font-size="13" font-weight="bold" fill="%230f172a">1. Higher Education Admission Commission</text><text x="50" y="260" font-family="sans-serif" font-size="12" fill="%23334155">Base Commission: INR 1,52,542</text><text x="50" y="285" font-family="sans-serif" font-size="12" fill="%23334155">Add 18% GST: INR 27,458</text><line x1="50" y1="310" x2="550" y2="310" stroke="%23cbd5e1" stroke-width="1.5"/><text x="50" y="340" font-family="sans-serif" font-size="16" font-weight="bold" fill="%23059669">TOTAL AMOUNT PAYABLE: INR 1,80,000</text><text x="50" y="380" font-family="sans-serif" font-size="11" fill="%2364748b">Bank: HDFC Bank | A/C: 50200038291048 | IFSC: HDFC0000240</text></svg>',
+    invoice_uploaded_at: '2026-11-15T10:15:00.000Z',
   },
   {
     id: 'b2b-009',
@@ -350,6 +376,9 @@ const INITIAL_B2B_PAYMENTS = [
     settled_at: null,
     payment_mode: null,
     utr_number: null,
+    invoice_file_name: 'Consult_Fox_Tax_Invoice_89.svg',
+    invoice_file_data: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="750" viewBox="0 0 600 750"><rect width="600" height="750" fill="%23ffffff"/><rect x="30" y="30" width="540" height="690" fill="%23f8fafc" stroke="%23cbd5e1" stroke-width="2" rx="10"/><text x="50" y="80" font-family="sans-serif" font-size="18" font-weight="bold" fill="%230f172a">CONSULT FOX EDUTECH PVT LTD</text><text x="50" y="105" font-family="sans-serif" font-size="12" fill="%2364748b">INVOICE NO: CF-2026-0089 | DATE: 15.11.2026</text><line x1="50" y1="125" x2="550" y2="125" stroke="%23e2e8f0" stroke-width="2"/><text x="50" y="155" font-family="sans-serif" font-size="12" font-weight="bold" fill="%23334155">BILLED TO: Sterling Overseas Consultancy LLC</text><text x="50" y="175" font-family="sans-serif" font-size="12" fill="%23475569">Candidate Referrals: Thejus &amp; Nivil</text><text x="50" y="230" font-family="sans-serif" font-size="13" font-weight="bold" fill="%230f172a">1. Higher Education Admission Commission</text><text x="50" y="260" font-family="sans-serif" font-size="12" fill="%23334155">Base Commission: INR 1,52,542</text><text x="50" y="285" font-family="sans-serif" font-size="12" fill="%23334155">Add 18% GST: INR 27,458</text><line x1="50" y1="310" x2="550" y2="310" stroke="%23cbd5e1" stroke-width="1.5"/><text x="50" y="340" font-family="sans-serif" font-size="16" font-weight="bold" fill="%23059669">TOTAL AMOUNT PAYABLE: INR 1,80,000</text><text x="50" y="380" font-family="sans-serif" font-size="11" fill="%2364748b">Bank: HDFC Bank | A/C: 50200038291048 | IFSC: HDFC0000240</text></svg>',
+    invoice_uploaded_at: '2026-11-15T10:15:00.000Z',
   },
   {
     id: 'b2b-010',
@@ -369,6 +398,9 @@ const INITIAL_B2B_PAYMENTS = [
     settled_at: '2026-11-10T16:20:00.000Z',
     payment_mode: 'UPI / GPay',
     utr_number: 'UPI/638291048291',
+    invoice_file_name: 'EduGlobal_Commission_Invoice_512.svg',
+    invoice_file_data: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="750" viewBox="0 0 600 750"><rect width="600" height="750" fill="%23ffffff"/><rect x="30" y="30" width="540" height="690" fill="%23f8fafc" stroke="%23cbd5e1" stroke-width="2" rx="10"/><text x="50" y="80" font-family="sans-serif" font-size="18" font-weight="bold" fill="%230f172a">EDUGLOBAL OVERSEAS SERVICES</text><text x="50" y="105" font-family="sans-serif" font-size="12" fill="%2364748b">INVOICE NO: EG-2026-512 | DATE: 05.11.2026</text><line x1="50" y1="125" x2="550" y2="125" stroke="%23e2e8f0" stroke-width="2"/><text x="50" y="155" font-family="sans-serif" font-size="12" font-weight="bold" fill="%23334155">BILLED TO: Sterling Overseas Consultancy LLC</text><text x="50" y="175" font-family="sans-serif" font-size="12" fill="%23475569">Candidate: Kiran Mathew</text><text x="50" y="230" font-family="sans-serif" font-size="13" font-weight="bold" fill="%230f172a">1. Student Onboarding &amp; Verification Fee</text><text x="50" y="260" font-family="sans-serif" font-size="12" fill="%23334155">Amount: INR 15,000</text><line x1="50" y1="290" x2="550" y2="290" stroke="%23cbd5e1" stroke-width="1.5"/><text x="50" y="325" font-family="sans-serif" font-size="16" font-weight="bold" fill="%23059669">TOTAL CLAIM: INR 15,000</text><text x="50" y="365" font-family="sans-serif" font-size="11" fill="%2364748b">Bank: ICICI Bank | A/C: 002905001829 | IFSC: ICIC0000029</text></svg>',
+    invoice_uploaded_at: '2026-11-06T11:00:00.000Z',
   },
 ];
 
@@ -479,8 +511,21 @@ export default function B2BPayments({ setCurrentPage }) {
     due_date: '',
     priority: false,
     notes: '',
+    invoice_file_name: '',
+    invoice_file_data: '',
+    invoice_uploaded_at: '',
     save_as_new_account: true,
   });
+
+  // Document Generator Modal State (Student Dubai Invoice & B2B Remittance Receipt)
+  const [showDocModal, setShowDocModal] = useState(false);
+  const [docModalMode, setDocModalMode] = useState('b2b_receipt');
+  const [docModalPayment, setDocModalPayment] = useState(null);
+
+  // B2B Invoice Viewer Lightbox State
+  const [viewingInvoicePayment, setViewingInvoicePayment] = useState(null);
+  const fileInputRowRef = useRef(null);
+  const [activeUploadPaymentId, setActiveUploadPaymentId] = useState(null);
 
   // Inline Account Add State inside Payment Modal
   const [isAddingInlineAccount, setIsAddingInlineAccount] = useState(false);
@@ -919,6 +964,9 @@ export default function B2BPayments({ setCurrentPage }) {
       due_date: new Date(Date.now() + 3 * 86400000).toISOString().split('T')[0],
       priority: false,
       notes: '',
+      invoice_file_name: '',
+      invoice_file_data: '',
+      invoice_uploaded_at: '',
       save_as_new_account: true,
     });
     setIsAddingInlineAccount(false);
@@ -943,10 +991,84 @@ export default function B2BPayments({ setCurrentPage }) {
       due_date: payment.due_date || '',
       priority: payment.priority || false,
       notes: payment.notes || '',
+      invoice_file_name: payment.invoice_file_name || '',
+      invoice_file_data: payment.invoice_file_data || '',
+      invoice_uploaded_at: payment.invoice_uploaded_at || '',
       save_as_new_account: true,
     });
     setIsAddingInlineAccount(false);
     setShowModal(true);
+  };
+
+  // Upload Invoice file inside Add/Edit Modal
+  const handleModalFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 8 * 1024 * 1024) {
+      toast.error('File exceeds 8MB limit');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setFormData((prev) => ({
+        ...prev,
+        invoice_file_name: file.name,
+        invoice_file_data: reader.result,
+        invoice_uploaded_at: new Date().toISOString(),
+      }));
+      toast.success(`Attached B2B invoice: ${file.name}`);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Direct table-row invoice upload
+  const handleTriggerRowUpload = (paymentId) => {
+    setActiveUploadPaymentId(paymentId);
+    if (fileInputRowRef.current) {
+      fileInputRowRef.current.value = '';
+      fileInputRowRef.current.click();
+    }
+  };
+
+  const handleRowFileSelected = (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !activeUploadPaymentId) return;
+
+    if (file.size > 8 * 1024 * 1024) {
+      toast.error('File exceeds 8MB limit');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setPayments((prev) =>
+        prev.map((p) =>
+          p.id === activeUploadPaymentId
+            ? {
+                ...p,
+                invoice_file_name: file.name,
+                invoice_file_data: reader.result,
+                invoice_uploaded_at: new Date().toISOString(),
+              }
+            : p
+        )
+      );
+      toast.success(`Attached invoice: ${file.name}`);
+      setActiveUploadPaymentId(null);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveInvoiceFromPayment = (paymentId) => {
+    setPayments((prev) =>
+      prev.map((p) =>
+        p.id === paymentId
+          ? { ...p, invoice_file_name: null, invoice_file_data: null, invoice_uploaded_at: null }
+          : p
+      )
+    );
+    setViewingInvoicePayment(null);
+    toast.success('Removed invoice attachment');
   };
 
   // Save Add/Edit Modal
@@ -1010,6 +1132,9 @@ export default function B2BPayments({ setCurrentPage }) {
                 due_date: formData.due_date,
                 priority: formData.priority,
                 notes: formData.notes.trim(),
+                invoice_file_name: formData.invoice_file_name || null,
+                invoice_file_data: formData.invoice_file_data || null,
+                invoice_uploaded_at: formData.invoice_uploaded_at || null,
               }
             : p
         )
@@ -1030,6 +1155,9 @@ export default function B2BPayments({ setCurrentPage }) {
         priority: formData.priority,
         status: 'pending',
         notes: formData.notes.trim(),
+        invoice_file_name: formData.invoice_file_name || null,
+        invoice_file_data: formData.invoice_file_data || null,
+        invoice_uploaded_at: formData.invoice_uploaded_at || null,
         created_at: new Date().toISOString(),
         settled_at: null,
         payment_mode: null,
@@ -1947,6 +2075,25 @@ export default function B2BPayments({ setCurrentPage }) {
             <span>📥 Download Excel / Choose Fields...</span>
           </button>
 
+          {/* Dubai Student Invoice & B2B Receipt Generator */}
+          <button
+            className="btn-simple-download"
+            onClick={() => {
+              setDocModalPayment(null);
+              setDocModalMode('dubai_invoice');
+              setShowDocModal(true);
+            }}
+            title="Generate Student Dubai Invoice or B2B Remittance Receipt on official Sterling letterhead"
+            style={{
+              background: 'rgba(79, 70, 229, 0.15)',
+              borderColor: 'rgba(79, 70, 229, 0.35)',
+              color: '#818CF8',
+              fontWeight: 700,
+            }}
+          >
+            <span>📄 Letterhead Invoices & Receipts</span>
+          </button>
+
           {/* Manage B2B Bank Accounts Button */}
           <button
             className="btn-simple-download"
@@ -2128,7 +2275,7 @@ export default function B2BPayments({ setCurrentPage }) {
               <th style={{ textAlign: 'right' }}>GST (18%)</th>
               <th style={{ textAlign: 'right' }}>Total to Pay</th>
               <th style={{ textAlign: 'center' }}>Status</th>
-              <th style={{ textAlign: 'center', width: '70px' }}>Actions</th>
+              <th style={{ textAlign: 'center', width: '135px' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -2167,6 +2314,57 @@ export default function B2BPayments({ setCurrentPage }) {
                       <span className="account-transfer-pill" title={payment.transfer_account || 'No account added'}>
                         🏦 <strong>Transfer to:</strong> {payment.transfer_account || 'Click edit to choose account'}
                       </span>
+
+                      {/* B2B Partner Invoice Attachment Chip */}
+                      <div style={{ marginTop: '5px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        {payment.invoice_file_name ? (
+                          <button
+                            type="button"
+                            onClick={() => setViewingInvoicePayment(payment)}
+                            title="Inspect attached B2B Partner Invoice / Bill"
+                            style={{
+                              background: 'rgba(59, 130, 246, 0.12)',
+                              border: '1px solid rgba(59, 130, 246, 0.35)',
+                              color: '#60A5FA',
+                              padding: '2px 8px',
+                              borderRadius: '6px',
+                              fontSize: '11px',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                            }}
+                          >
+                            <span>📎</span>
+                            <span>{payment.invoice_file_name.length > 20 ? payment.invoice_file_name.substring(0, 18) + '...' : payment.invoice_file_name}</span>
+                            {isCompleted && (
+                              <span style={{ color: '#10B981', fontSize: '10px', fontWeight: 800 }}>[PAID]</span>
+                            )}
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleTriggerRowUpload(payment.id)}
+                            title="Attach B2B partner invoice file"
+                            style={{
+                              background: 'transparent',
+                              border: '1px dashed rgba(148, 163, 225, 0.35)',
+                              color: 'var(--muted, #8B949E)',
+                              padding: '2px 8px',
+                              borderRadius: '6px',
+                              fontSize: '11px',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                            }}
+                          >
+                            <span>+</span>
+                            <span>Attach Invoice</span>
+                          </button>
+                        )}
+                      </div>
                     </td>
 
                     {/* Linked Student(s) */}
@@ -2244,23 +2442,51 @@ export default function B2BPayments({ setCurrentPage }) {
                       )}
                     </td>
 
-                    {/* Actions: Edit & Delete */}
+                    {/* Actions: Letterhead Remittance Receipt with PAID Seal, Edit & Delete */}
                     <td style={{ textAlign: 'center' }}>
-                      <button
-                        className="btn-table-action"
-                        title="Edit Details & Account"
-                        onClick={() => handleOpenEditModal(payment)}
-                      >
-                        ✏️
-                      </button>
-                      <button
-                        className="btn-table-action"
-                        title="Delete"
-                        onClick={() => handleDelete(payment.id, payment.partner_name)}
-                        style={{ color: '#EF4444' }}
-                      >
-                        🗑️
-                      </button>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <button
+                          className="btn-table-action"
+                          title={isCompleted ? "Download Official Remittance Receipt (with PAID Seal)" : "Generate Payment Remittance Voucher"}
+                          onClick={() => {
+                            setDocModalPayment(payment);
+                            setDocModalMode('b2b_receipt');
+                            setShowDocModal(true);
+                          }}
+                          style={{
+                            color: isCompleted ? '#10B981' : '#60A5FA',
+                            background: isCompleted ? 'rgba(16, 185, 129, 0.12)' : 'rgba(59, 130, 246, 0.12)',
+                            border: isCompleted ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(59, 130, 246, 0.3)',
+                            padding: '3px 7px',
+                            borderRadius: '6px',
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '3px',
+                          }}
+                        >
+                          <span>🧾</span>
+                          <span>{isCompleted ? 'Receipt' : 'Voucher'}</span>
+                        </button>
+
+                        <button
+                          className="btn-table-action"
+                          title="Edit Details & Account"
+                          onClick={() => handleOpenEditModal(payment)}
+                        >
+                          ✏️
+                        </button>
+                        <button
+                          className="btn-table-action"
+                          title="Delete"
+                          onClick={() => handleDelete(payment.id, payment.partner_name)}
+                          style={{ color: '#EF4444' }}
+                        >
+                          🗑️
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -2715,6 +2941,96 @@ export default function B2BPayments({ setCurrentPage }) {
                     value={formData.notes}
                     onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                   />
+                </div>
+
+                {/* Upload B2B Partner Invoice / Bill */}
+                <div className="form-field" style={{ marginTop: '6px' }}>
+                  <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>📎 Upload B2B Partner's Invoice / Bill</span>
+                    <span style={{ fontSize: '11px', color: 'var(--muted, #8B949E)' }}>PDF, PNG, JPG (Max 8MB)</span>
+                  </label>
+                  <div
+                    style={{
+                      border: '1px dashed var(--border, rgba(148, 163, 225, 0.35))',
+                      borderRadius: '8px',
+                      padding: '10px 14px',
+                      background: 'var(--bg3, #F4F6FC)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '10px',
+                    }}
+                  >
+                    {formData.invoice_file_name ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+                        <span style={{ fontSize: '20px' }}>📄</span>
+                        <div style={{ overflow: 'hidden' }}>
+                          <div
+                            style={{
+                              fontSize: '12.5px',
+                              fontWeight: 600,
+                              color: 'var(--text, #EDEFFA)',
+                              textOverflow: 'ellipsis',
+                              overflow: 'hidden',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {formData.invoice_file_name}
+                          </div>
+                          <div style={{ fontSize: '11px', color: '#10B981', fontWeight: 600 }}>✓ Attached successfully</div>
+                        </div>
+                      </div>
+                    ) : (
+                      <span style={{ fontSize: '12px', color: 'var(--muted, #8B949E)' }}>
+                        No invoice attached yet. Browse file to upload vendor bill.
+                      </span>
+                    )}
+
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <label
+                        style={{
+                          background: 'rgba(79, 70, 229, 0.15)',
+                          border: '1px solid rgba(79, 70, 229, 0.35)',
+                          color: '#818CF8',
+                          padding: '5px 12px',
+                          borderRadius: '6px',
+                          fontSize: '11.5px',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <span>{formData.invoice_file_name ? 'Replace File' : 'Browse File'}</span>
+                        <input
+                          type="file"
+                          accept=".pdf,image/*"
+                          style={{ display: 'none' }}
+                          onChange={handleModalFileUpload}
+                        />
+                      </label>
+                      {formData.invoice_file_name && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setFormData({
+                              ...formData,
+                              invoice_file_name: '',
+                              invoice_file_data: '',
+                              invoice_uploaded_at: '',
+                            })
+                          }
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: '#EF4444',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                          }}
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -3185,6 +3501,34 @@ export default function B2BPayments({ setCurrentPage }) {
           </div>
         </div>
       )}
+
+      {/* Hidden File Input for Direct Table-Row Invoice Upload */}
+      <input
+        type="file"
+        ref={fileInputRowRef}
+        accept=".pdf,image/*"
+        style={{ display: 'none' }}
+        onChange={handleRowFileSelected}
+      />
+
+      {/* B2B Vendor Invoice Lightbox Viewer Modal (with PAID Seal when settled) */}
+      <B2BInvoiceViewerModal
+        isOpen={!!viewingInvoicePayment}
+        onClose={() => setViewingInvoicePayment(null)}
+        payment={viewingInvoicePayment}
+        onRemoveInvoice={handleRemoveInvoiceFromPayment}
+      />
+
+      {/* Official Dubai Invoice & B2B Remittance Receipt Generator (Letterhead + PAID Seal) */}
+      <DocumentGeneratorModal
+        isOpen={showDocModal}
+        onClose={() => {
+          setShowDocModal(false);
+          setDocModalPayment(null);
+        }}
+        initialMode={docModalMode}
+        b2bPaymentData={docModalPayment}
+      />
     </div>
   );
 }

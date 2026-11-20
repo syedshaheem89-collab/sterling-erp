@@ -6,6 +6,7 @@ import * as XLSX from 'xlsx';
 import PaymentModal from '../components/PaymentModal';
 import GoogleSheetImporterModal from '../components/GoogleSheetImporterModal';
 import ReceiptViewerModal from '../components/ReceiptViewerModal';
+import DocumentGeneratorModal from '../components/DocumentGeneratorModal';
 import { extractReceiptUrl } from '../utils/paymentProofHelper';
 
 const COUNTRY_FLAGS = {
@@ -206,6 +207,8 @@ export default function Students({ setCurrentPage, initialFilter } = {}) {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showBulkLedgerModal, setShowBulkLedgerModal] = useState(false);
   const [showMasterImporterModal, setShowMasterImporterModal] = useState(false);
+  const [showDocModal, setShowDocModal] = useState(false);
+  const [docStudentData, setDocStudentData] = useState(null);
 
   // Active student & payment selections
   const [currentStudent, setCurrentStudent] = useState(null);
@@ -1042,6 +1045,33 @@ export default function Students({ setCurrentPage, initialFilter } = {}) {
             </button>
           )}
 
+          {/* Dubai Service Fee Invoice Generator */}
+          <button
+            type="button"
+            className="btn-glass"
+            onClick={() => {
+              setDocStudentData(null);
+              setShowDocModal(true);
+            }}
+            title="Generate Dubai Service Fee Invoice on official Sterling Letterhead"
+            style={{
+              padding: '9px 16px',
+              fontSize: '13px',
+              fontWeight: 700,
+              background: 'rgba(79, 70, 229, 0.15)',
+              border: '1px solid rgba(79, 70, 229, 0.35)',
+              color: '#818CF8',
+              borderRadius: '8px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              cursor: 'pointer',
+            }}
+          >
+            <span>📄</span>
+            <span>Dubai Invoice</span>
+          </button>
+
           {canAddStudent && (
             <button
               type="button"
@@ -1751,6 +1781,32 @@ export default function Students({ setCurrentPage, initialFilter } = {}) {
                             }}
                           >
                             <PlusIcon />
+                          </button>
+
+                          {/* Dubai Service Fee Invoice */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDocStudentData(s);
+                              setShowDocModal(true);
+                            }}
+                            title="Generate Dubai Service Fee Invoice (Letterhead)"
+                            style={{
+                              background: 'rgba(79, 70, 229, 0.12)',
+                              border: '1px solid rgba(79, 70, 229, 0.3)',
+                              color: '#818CF8',
+                              borderRadius: '6px',
+                              width: '28px',
+                              height: '28px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              fontSize: '13px',
+                            }}
+                          >
+                            📄
                           </button>
 
                           {/* Edit Button */}
@@ -3644,6 +3700,17 @@ function StudentDetailModal({
         amount={viewerReceipt?.amount || 0}
         date={viewerReceipt?.date}
         bank={viewerReceipt?.bank || ''}
+      />
+
+      {/* Official Dubai Student Invoice & B2B Receipt Generator */}
+      <DocumentGeneratorModal
+        isOpen={showDocModal}
+        onClose={() => {
+          setShowDocModal(false);
+          setDocStudentData(null);
+        }}
+        initialMode="dubai_invoice"
+        studentData={docStudentData}
       />
     </div>
   );
