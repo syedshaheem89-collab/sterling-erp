@@ -77,7 +77,7 @@ export default function DocumentGeneratorModal({
   const [mode, setMode] = useState(initialMode);
   const [studentDocType, setStudentDocType] = useState('invoice'); // 'invoice' | 'receipt'
   const [includeLetterheadBg, setIncludeLetterheadBg] = useState(true);
-  const [showPaidSeal, setShowPaidSeal] = useState(true);
+  const [showPaidSeal, setShowPaidSeal] = useState(false);
   const [showEditDrawer, setShowEditDrawer] = useState(true);
   const [erpStudentsList, setErpStudentsList] = useState([]);
   const [selectedStudentId, setSelectedStudentId] = useState('');
@@ -124,11 +124,11 @@ export default function DocumentGeneratorModal({
     footerNote: 'Note: Please note that the transfer fee of the banks are not included in this fee!',
   });
 
-  // --- 2. B2B PAYMENT REMITTANCE RECEIPT STATE (with PAID Seal) ---
+  // --- 2. B2B PAYMENT REMITTANCE RECEIPT / REQUISITION STATE ---
   const [b2bReceipt, setB2BReceipt] = useState({
-    receiptNumber: 'REC-B2B-2026-019',
+    receiptNumber: 'REQ-B2B-2026-019',
     voucherDate: new Date().toLocaleDateString('en-GB').replace(/\//g, '.'),
-    settledDate: new Date().toLocaleDateString('en-GB').replace(/\//g, '.'),
+    settledDate: 'Pending Disbursement',
     partnerName: 'Consult Fox Edutech Pvt Ltd',
     studentNames: 'Thejus & Nivil',
     purpose: 'B2B Sub-Agent Admission Commission & University Coordination',
@@ -138,13 +138,41 @@ export default function DocumentGeneratorModal({
     gstAmount: 27458,
     totalDisbursed: 180000,
     paymentMode: 'Bank Transfer (IMPS / NEFT)',
-    utrNumber: 'HDFC638291048291',
+    utrNumber: 'Pending Bank Transfer',
     transferAccount: 'HDFC Bank A/C: 50200038291048 | IFSC: HDFC0000240 | Beneficiary: Consult Fox Edutech Pvt Ltd',
     selectedPayingBankId: 'comp-bank-fed-1',
     debitAccount: 'Federal Bank Current A/C: 14200200039281 (Valanchery Main)',
     authorizedSignatory: 'Accounts Department - Sterling Overseas',
-    status: 'PAID',
-    remarks: 'Full settlement disbursed and cleared as per contract agreement.',
+    status: 'PENDING_APPROVAL', // 'PAID' | 'PENDING_APPROVAL'
+    remarks: 'Payment requisition submitted for Director authorization & bank payout.',
+  });
+
+  // --- 3. UNIVERSITY COMMISSION CLAIM INVOICE STATE ---
+  const [universityInvoice, setUniversityInvoice] = useState({
+    invoiceNumber: 'INV-UNI-2026-042',
+    invoiceDate: new Date().toLocaleDateString('en-GB').replace(/\//g, '.'),
+    dueDate: 'Due on Receipt',
+    universityName: 'MCAST - Malta College of Arts, Science and Technology',
+    universityCampus: 'Main Campus, Corradino Hill, Paola, Malta',
+    financeEmail: 'finance.admissions@mcast.edu.mt',
+    studentName: 'JOICE SAMUEL',
+    studentId: 'MCAST-2026-8910',
+    courseDetails: 'Introductory Certificate in Applied Science',
+    intake: 'February 2027',
+    tuitionFeePaid: 5400,
+    commissionPercent: 15,
+    commissionAmount: 810,
+    currency: 'EUR',
+    bankDetails: {
+      accountHolder: 'Sterling Overseas Consultancy LLC',
+      businessId: 'WIOBAEADXXX',
+      bankName: 'WIO BANK',
+      address: 'Etihad Airways Centre 5th Floor, Abu Dhabi, UAE',
+      accountNumber: 'AE620860000009569370024',
+      iban: 'AE620860000009569370024',
+      swiftCode: 'WIOBAEADXXX',
+    },
+    remarks: 'Official Agency Commission claim for student recruitment and enrollment.',
   });
 
   // Fetch all ERP Students for instant selection in the document editor
@@ -184,10 +212,11 @@ export default function DocumentGeneratorModal({
   // Handle B2B payment incoming prop
   useEffect(() => {
     if (b2bPaymentData) {
+      const isCompleted = b2bPaymentData.status === 'completed';
       const todayStr = new Date().toLocaleDateString('en-GB').replace(/\//g, '.');
       const settledStr = b2bPaymentData.settled_at 
         ? new Date(b2bPaymentData.settled_at).toLocaleDateString('en-GB').replace(/\//g, '.')
-        : todayStr;
+        : (isCompleted ? todayStr : 'Pending Clearance');
 
       const curr = b2bPaymentData.currency || 'INR';
       const tot = Number(b2bPaymentData.amount || 0);
@@ -212,7 +241,9 @@ export default function DocumentGeneratorModal({
       ) || companyBanks[0];
 
       setB2BReceipt({
-        receiptNumber: `REC-B2B-${new Date().getFullYear()}-${String(b2bPaymentData.id || Math.floor(1000 + Math.random() * 9000)).padStart(4, '0')}`,
+        receiptNumber: isCompleted
+          ? `REC-B2B-${new Date().getFullYear()}-${String(b2bPaymentData.id || 101).padStart(4, '0')}`
+          : `REQ-B2B-${new Date().getFullYear()}-${String(b2bPaymentData.id || 101).padStart(4, '0')}`,
         voucherDate: todayStr,
         settledDate: settledStr,
         partnerName: b2bPaymentData.partner_name || 'B2B Partner Company',
@@ -223,15 +254,20 @@ export default function DocumentGeneratorModal({
         gstRate: gstRate,
         gstAmount: gst,
         totalDisbursed: base + gst,
-        paymentMode: b2bPaymentData.payment_mode || 'Bank Transfer (IMPS / NEFT)',
-        utrNumber: b2bPaymentData.utr_number || `UTR/${Math.floor(100000000000 + Math.random() * 900000000000)}`,
+        paymentMode: isCompleted ? (b2bPaymentData.payment_mode || 'Bank Transfer (IMPS / NEFT)') : 'Bank Transfer (Awaiting Release)',
+        utrNumber: isCompleted ? (b2bPaymentData.utr_number || 'UTR-NOT-SPECIFIED') : 'Pending Bank Transfer',
         transferAccount: b2bPaymentData.transfer_account || 'Partner Bank Account',
         selectedPayingBankId: matchedPayingBank.id,
-        debitAccount: b2bPaymentData.debit_account || `${matchedPayingBank.bank_name} A/C: ${matchedPayingBank.account_number} (${matchedPayingBank.branch})`,
+        debitAccount: isCompleted 
+          ? (b2bPaymentData.debit_account || `${matchedPayingBank.bank_name} A/C: ${matchedPayingBank.account_number} (${matchedPayingBank.branch})`)
+          : `Proposed Disbursing Bank: ${matchedPayingBank.bank_name} (${matchedPayingBank.branch})`,
         authorizedSignatory: 'Accounts Department - Sterling Overseas',
-        status: b2bPaymentData.status === 'completed' ? 'PAID' : 'SETTLED',
-        remarks: b2bPaymentData.notes || 'Full payment settled and confirmed through electronic fund transfer.',
+        status: isCompleted ? 'PAID' : 'PENDING_APPROVAL',
+        remarks: b2bPaymentData.notes || (isCompleted ? 'Full payment settled and confirmed through electronic fund transfer.' : 'Payment requisition submitted for Director review & authorization.'),
       });
+
+      // CRITICAL FIX: Only stamp PAID if ACTUALLY completed in ERP! Never on pending payables!
+      setShowPaidSeal(isCompleted);
     }
   }, [b2bPaymentData, companyBanks]);
 
@@ -270,6 +306,26 @@ export default function DocumentGeneratorModal({
       subTotal: feeAmount,
       grandTotal: feeAmount,
     }));
+
+    // Also auto-populate University Commission Claim Invoice for this student
+    const uniFee = Number(stu.tuition_fee || stu.tuition || 5400);
+    const commRate = 15;
+    const commAmt = Math.round((uniFee * commRate) / 100);
+    const uniName = stu.university || stu.college || (stu.country === 'Malta' ? 'MCAST - Malta College of Arts, Science & Technology' : 'Partner European University');
+    setUniversityInvoice((prev) => ({
+      ...prev,
+      invoiceNumber: `INV-UNI-${new Date().getFullYear()}-${String(stu.id || Math.floor(100 + Math.random() * 900)).padStart(3, '0')}`,
+      studentName: (stu.name || 'STUDENT NAME').toUpperCase(),
+      studentId: stu.student_id || stu.passport_number || `STU-${stu.id || '2026'}`,
+      courseDetails: courseName,
+      intake: stu.intake || 'Upcoming Intake',
+      universityName: uniName,
+      tuitionFeePaid: uniFee,
+      commissionPercent: commRate,
+      commissionAmount: commAmt,
+      currency: feeCurr,
+    }));
+
     toast.success(`Loaded details for ${stu.name}`);
   };
 
@@ -318,14 +374,14 @@ export default function DocumentGeneratorModal({
     toast.success('Reset to Blank Invoice template');
   };
 
-  // Reset to a 100% Blank B2B Receipt
+  // Reset to a 100% Blank B2B Requisition / Receipt
   const handleResetToBlankReceipt = () => {
     const todayStr = new Date().toLocaleDateString('en-GB').replace(/\//g, '.');
     const firstBank = companyBanks[0] || STERLING_COMPANY_BANKS_DEFAULT[0];
     setB2BReceipt({
-      receiptNumber: `REC-B2B-${new Date().getFullYear()}-001`,
+      receiptNumber: `REQ-B2B-${new Date().getFullYear()}-001`,
       voucherDate: todayStr,
-      settledDate: todayStr,
+      settledDate: 'Pending Clearance',
       partnerName: '',
       studentNames: '',
       purpose: 'Sub-Agent Commission & University Admission Coordination',
@@ -335,15 +391,48 @@ export default function DocumentGeneratorModal({
       gstAmount: 0,
       totalDisbursed: 0,
       paymentMode: 'Bank Transfer (IMPS / NEFT)',
-      utrNumber: '',
+      utrNumber: 'Pending Transfer',
       transferAccount: '',
       selectedPayingBankId: firstBank.id,
       debitAccount: `${firstBank.bank_name} A/C: ${firstBank.account_number} (${firstBank.branch})`,
       authorizedSignatory: 'Accounts Department - Sterling Overseas',
-      status: 'PAID',
-      remarks: 'Payment settled and confirmed through electronic fund transfer.',
+      status: 'PENDING_APPROVAL',
+      remarks: 'Payment requisition awaiting Director approval and bank release.',
     });
-    toast.success('Reset to Blank B2B Receipt template');
+    setShowPaidSeal(false);
+    toast.success('Reset to Blank B2B Payment Requisition template');
+  };
+
+  // Reset to a 100% Blank University Commission Claim Invoice
+  const handleResetToBlankUniversityInvoice = () => {
+    const todayStr = new Date().toLocaleDateString('en-GB').replace(/\//g, '.');
+    setUniversityInvoice({
+      invoiceNumber: `INV-UNI-${new Date().getFullYear()}-001`,
+      invoiceDate: todayStr,
+      dueDate: 'Due on Receipt',
+      universityName: '',
+      universityCampus: '',
+      financeEmail: '',
+      studentName: '',
+      studentId: '',
+      courseDetails: '',
+      intake: '',
+      tuitionFeePaid: 0,
+      commissionPercent: 15,
+      commissionAmount: 0,
+      currency: 'EUR',
+      bankDetails: {
+        accountHolder: 'Sterling Overseas Consultancy LLC',
+        businessId: 'WIOBAEADXXX',
+        bankName: 'WIO BANK',
+        address: 'Etihad Airways Centre 5th Floor, Abu Dhabi, UAE',
+        accountNumber: 'AE620860000009569370024',
+        iban: 'AE620860000009569370024',
+        swiftCode: 'WIOBAEADXXX',
+      },
+      remarks: 'Official Agency Commission claim for student recruitment and enrollment.',
+    });
+    toast.success('Reset to Blank University Commission Claim Invoice');
   };
 
   // Recalculate Student Invoice totals
@@ -645,7 +734,7 @@ export default function DocumentGeneratorModal({
                   transition: 'all 0.15s ease',
                 }}
               >
-                🇦🇪 Student Dubai Invoices & Receipts
+                🎓 Student Invoice &amp; Receipt
               </button>
               <button
                 type="button"
@@ -657,12 +746,29 @@ export default function DocumentGeneratorModal({
                   fontSize: '12.5px',
                   fontWeight: 700,
                   cursor: 'pointer',
-                  background: mode === 'b2b_receipt' ? '#059669' : 'transparent',
+                  background: mode === 'b2b_receipt' ? (b2bReceipt.status === 'PAID' ? '#059669' : '#D97706') : 'transparent',
                   color: mode === 'b2b_receipt' ? '#fff' : '#94A3B8',
                   transition: 'all 0.15s ease',
                 }}
               >
-                🧾 B2B Remittance Receipt (PAID Seal)
+                🤝 {b2bReceipt.status === 'PAID' ? 'B2B Remittance Receipt (PAID)' : 'B2B Payment Requisition (Pending)'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode('university_commission')}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  fontSize: '12.5px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  background: mode === 'university_commission' ? '#2563EB' : 'transparent',
+                  color: mode === 'university_commission' ? '#fff' : '#94A3B8',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                🏛️ University Commission Claim
               </button>
             </div>
           </div>
@@ -711,7 +817,11 @@ export default function DocumentGeneratorModal({
             {/* 2. Reset to Blank Template Button */}
             <button
               type="button"
-              onClick={mode === 'dubai_invoice' ? handleResetToBlankInvoice : handleResetToBlankReceipt}
+              onClick={() => {
+                if (mode === 'dubai_invoice') handleResetToBlankInvoice();
+                else if (mode === 'b2b_receipt') handleResetToBlankReceipt();
+                else handleResetToBlankUniversityInvoice();
+              }}
               title="Clear all fields and start fresh with a blank document"
               style={{
                 background: 'rgba(255,255,255,0.06)',
@@ -724,7 +834,7 @@ export default function DocumentGeneratorModal({
                 cursor: 'pointer',
               }}
             >
-              ➕ Blank {mode === 'dubai_invoice' ? 'Invoice' : 'Receipt'}
+              ➕ Blank {mode === 'dubai_invoice' ? 'Student Doc' : mode === 'b2b_receipt' ? 'B2B Voucher' : 'Uni Invoice'}
             </button>
 
             {/* 3. Paid Seal Toggle for B2B Receipt */}
@@ -737,19 +847,28 @@ export default function DocumentGeneratorModal({
                   fontSize: '12px',
                   color: '#CBD5E1',
                   cursor: 'pointer',
-                  background: 'rgba(5, 150, 105, 0.15)',
+                  background: showPaidSeal ? 'rgba(5, 150, 105, 0.15)' : 'rgba(245, 158, 11, 0.15)',
                   padding: '5px 10px',
                   borderRadius: '6px',
-                  border: '1px solid rgba(5, 150, 105, 0.3)',
+                  border: showPaidSeal ? '1px solid rgba(5, 150, 105, 0.3)' : '1px solid rgba(245, 158, 11, 0.3)',
                 }}
-                title="Toggle official green PAID rubber seal stamp"
+                title="Toggle official green PAID rubber seal stamp (Only when funds have actually cleared)"
               >
                 <input
                   type="checkbox"
                   checked={showPaidSeal}
-                  onChange={(e) => setShowPaidSeal(e.target.checked)}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setShowPaidSeal(checked);
+                    setB2BReceipt((prev) => ({
+                      ...prev,
+                      status: checked ? 'PAID' : 'PENDING_APPROVAL',
+                    }));
+                  }}
                 />
-                <span style={{ color: '#34D399', fontWeight: 600 }}>PAID Seal</span>
+                <span style={{ color: showPaidSeal ? '#34D399' : '#F59E0B', fontWeight: 700 }}>
+                  {showPaidSeal ? '★ PAID Seal (ON)' : '⏳ Pending (NO Seal)'}
+                </span>
               </label>
             )}
 
@@ -1268,6 +1387,177 @@ export default function DocumentGeneratorModal({
                   </div>
                 </div>
               )}
+
+              {/* --- 3. UNIVERSITY COMMISSION CLAIM FORM --- */}
+              {mode === 'university_commission' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '12.5px', fontWeight: 700, color: '#60A5FA' }}>
+                      University Commission Claim
+                    </span>
+                    <span style={{ fontSize: '11px', color: '#94A3B8' }}>Billed to Partner University</span>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Invoice #</label>
+                    <input
+                      type="text"
+                      value={universityInvoice.invoiceNumber}
+                      onChange={(e) => setUniversityInvoice({ ...universityInvoice, invoiceNumber: e.target.value })}
+                      style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff' }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                    <div>
+                      <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Invoice Date</label>
+                      <input
+                        type="text"
+                        value={universityInvoice.invoiceDate}
+                        onChange={(e) => setUniversityInvoice({ ...universityInvoice, invoiceDate: e.target.value })}
+                        style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Terms</label>
+                      <input
+                        type="text"
+                        value={universityInvoice.dueDate}
+                        onChange={(e) => setUniversityInvoice({ ...universityInvoice, dueDate: e.target.value })}
+                        style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff' }}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>University Name *</label>
+                    <input
+                      type="text"
+                      value={universityInvoice.universityName}
+                      onChange={(e) => setUniversityInvoice({ ...universityInvoice, universityName: e.target.value })}
+                      style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff', fontWeight: 600 }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Campus / Address</label>
+                    <input
+                      type="text"
+                      value={universityInvoice.universityCampus}
+                      onChange={(e) => setUniversityInvoice({ ...universityInvoice, universityCampus: e.target.value })}
+                      style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff' }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Finance / Admissions Email</label>
+                    <input
+                      type="text"
+                      value={universityInvoice.financeEmail}
+                      onChange={(e) => setUniversityInvoice({ ...universityInvoice, financeEmail: e.target.value })}
+                      style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff' }}
+                    />
+                  </div>
+
+                  <div style={{ borderTop: '1px solid #2B3A5A', paddingTop: '10px' }}>
+                    <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#38BDF8', marginBottom: '6px' }}>Student & Commission Details</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+                      <div>
+                        <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Student Name *</label>
+                        <input
+                          type="text"
+                          value={universityInvoice.studentName}
+                          onChange={(e) => setUniversityInvoice({ ...universityInvoice, studentName: e.target.value })}
+                          style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Student / App #</label>
+                        <input
+                          type="text"
+                          value={universityInvoice.studentId}
+                          onChange={(e) => setUniversityInvoice({ ...universityInvoice, studentId: e.target.value })}
+                          style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff' }}
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ marginBottom: '8px' }}>
+                      <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Degree & Course</label>
+                      <input
+                        type="text"
+                        value={universityInvoice.courseDetails}
+                        onChange={(e) => setUniversityInvoice({ ...universityInvoice, courseDetails: e.target.value })}
+                        style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff' }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+                      <div>
+                        <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Intake</label>
+                        <input
+                          type="text"
+                          value={universityInvoice.intake}
+                          onChange={(e) => setUniversityInvoice({ ...universityInvoice, intake: e.target.value })}
+                          style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Currency</label>
+                        <select
+                          value={universityInvoice.currency}
+                          onChange={(e) => setUniversityInvoice({ ...universityInvoice, currency: e.target.value })}
+                          style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff' }}
+                        >
+                          <option value="EUR">EUR (€)</option>
+                          <option value="USD">USD ($)</option>
+                          <option value="GBP">GBP (£)</option>
+                          <option value="INR">INR (₹)</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                      <div>
+                        <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Tuition Fee Paid</label>
+                        <input
+                          type="number"
+                          value={universityInvoice.tuitionFeePaid}
+                          onChange={(e) => {
+                            const t = Number(e.target.value) || 0;
+                            const comm = Math.round((t * universityInvoice.commissionPercent) / 100);
+                            setUniversityInvoice({ ...universityInvoice, tuitionFeePaid: t, commissionAmount: comm });
+                          }}
+                          style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Commission Rate (%)</label>
+                        <input
+                          type="number"
+                          value={universityInvoice.commissionPercent}
+                          onChange={(e) => {
+                            const p = Number(e.target.value) || 0;
+                            const comm = Math.round((universityInvoice.tuitionFeePaid * p) / 100);
+                            setUniversityInvoice({ ...universityInvoice, commissionPercent: p, commissionAmount: comm });
+                          }}
+                          style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff' }}
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ marginTop: '8px' }}>
+                      <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Total Commission Claimed</label>
+                      <input
+                        type="number"
+                        value={universityInvoice.commissionAmount}
+                        onChange={(e) => setUniversityInvoice({ ...universityInvoice, commissionAmount: Number(e.target.value) || 0 })}
+                        style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#0B0F1C', border: '1px solid #2B3A5A', color: '#38BDF8', fontWeight: 700 }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -1546,7 +1836,7 @@ export default function DocumentGeneratorModal({
                 )}
 
                 {/* ======================================================== */}
-                {/* 2. B2B REMITTANCE RECEIPT (with Official PAID Seal & House Bank) */}
+                {/* 2. B2B REMITTANCE RECEIPT OR PAYMENT REQUISITION VOUCHER */}
                 {/* ======================================================== */}
                 {mode === 'b2b_receipt' && (
                   <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between', position: 'relative' }}>
@@ -1564,10 +1854,10 @@ export default function DocumentGeneratorModal({
 
                         <div style={{ textAlign: 'right' }}>
                           <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 900, color: '#000000', letterSpacing: '0.5px' }}>
-                            PAYMENT REMITTANCE RECEIPT
+                            {b2bReceipt.status === 'PAID' ? 'PAYMENT REMITTANCE RECEIPT' : 'PAYMENT REQUISITION & APPROVAL SLIP'}
                           </h2>
-                          <div style={{ fontSize: '11.5px', color: '#047857', fontWeight: 800, marginTop: '2px' }}>
-                            DISBURSEMENT VOUCHER &amp; PAYMENT ADVICE
+                          <div style={{ fontSize: '11.5px', color: b2bReceipt.status === 'PAID' ? '#047857' : '#D97706', fontWeight: 800, marginTop: '2px' }}>
+                            {b2bReceipt.status === 'PAID' ? 'DISBURSEMENT VOUCHER & PAYMENT ADVICE' : 'ACCOUNTS PAYABLE ORDER • AWAITING DIRECTOR APPROVAL'}
                           </div>
                         </div>
                       </div>
@@ -1577,29 +1867,37 @@ export default function DocumentGeneratorModal({
                         <tbody>
                           <tr>
                             <td style={{ border: '1.5px solid #000000', padding: '8px 12px', width: '52%', verticalAlign: 'top', background: '#ffffff', color: '#000000' }}>
-                              <div style={{ fontSize: '11px', color: '#000000', fontWeight: 800 }}>PAID TO / BENEFICIARY:</div>
+                              <div style={{ fontSize: '11px', color: '#000000', fontWeight: 800 }}>
+                                {b2bReceipt.status === 'PAID' ? 'PAID TO / BENEFICIARY:' : 'BENEFICIARY PAYEE:'}
+                              </div>
                               <div style={{ fontSize: '15px', fontWeight: 900, color: '#000000' }}>
                                 {b2bReceipt.partnerName || 'PARTNER COMPANY'}
                               </div>
                             </td>
                             <td style={{ border: '1.5px solid #000000', padding: '8px 12px', width: '48%', verticalAlign: 'top', background: '#ffffff', color: '#000000' }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <span style={{ fontWeight: 800, color: '#000000' }}>Voucher / Receipt #:</span>
+                                <span style={{ fontWeight: 800, color: '#000000' }}>
+                                  {b2bReceipt.status === 'PAID' ? 'Remittance Receipt #:' : 'Requisition Voucher #:'}
+                                </span>
                                 <span style={{ fontWeight: 900, color: '#000000' }}>{b2bReceipt.receiptNumber}</span>
                               </div>
                             </td>
                           </tr>
                           <tr>
                             <td style={{ border: '1.5px solid #000000', padding: '8px 12px', verticalAlign: 'top', background: '#ffffff', color: '#000000' }}>
-                              <div style={{ fontSize: '11px', color: '#000000', fontWeight: 800 }}>FOR STUDENT(S):</div>
+                              <div style={{ fontSize: '11px', color: '#000000', fontWeight: 800 }}>FOR CANDIDATE(S):</div>
                               <div style={{ fontSize: '13px', fontWeight: 800, color: '#000000' }}>
                                 {b2bReceipt.studentNames || 'General'}
                               </div>
                             </td>
                             <td style={{ border: '1.5px solid #000000', padding: '8px 12px', verticalAlign: 'top', background: '#ffffff', color: '#000000' }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <span style={{ fontWeight: 800, color: '#000000' }}>Payment Settled Date:</span>
-                                <span style={{ fontWeight: 800, color: '#047857' }}>{b2bReceipt.settledDate}</span>
+                                <span style={{ fontWeight: 800, color: '#000000' }}>
+                                  {b2bReceipt.status === 'PAID' ? 'Payment Settled Date:' : 'Requisition Date:'}
+                                </span>
+                                <span style={{ fontWeight: 800, color: b2bReceipt.status === 'PAID' ? '#047857' : '#D97706' }}>
+                                  {b2bReceipt.status === 'PAID' ? b2bReceipt.settledDate : b2bReceipt.voucherDate}
+                                </span>
                               </div>
                             </td>
                           </tr>
@@ -1611,7 +1909,18 @@ export default function DocumentGeneratorModal({
                             <td style={{ border: '1.5px solid #000000', padding: '8px 12px', verticalAlign: 'top', background: '#ffffff', color: '#000000' }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                 <span style={{ fontWeight: 800, color: '#000000' }}>Payment Status:</span>
-                                <span style={{ fontWeight: 900, color: '#047857' }}>✓ SETTLED &amp; PAID</span>
+                                <span
+                                  style={{
+                                    fontWeight: 900,
+                                    color: b2bReceipt.status === 'PAID' ? '#047857' : '#D97706',
+                                    background: b2bReceipt.status === 'PAID' ? '#E6F4EA' : '#FEF3C7',
+                                    padding: '2px 8px',
+                                    borderRadius: '4px',
+                                    fontSize: '11px',
+                                  }}
+                                >
+                                  {b2bReceipt.status === 'PAID' ? '✓ SETTLED & PAID' : '⏳ PENDING APPROVAL & RELEASE'}
+                                </span>
                               </div>
                             </td>
                           </tr>
@@ -1621,7 +1930,7 @@ export default function DocumentGeneratorModal({
                       {/* Transaction Audit Execution Box (Both Our Bank & Partner Bank) */}
                       <div style={{ border: '1.5px solid #000000', background: '#F8FAFC', padding: '12px 14px', borderRadius: '4px', marginBottom: '18px' }}>
                         <div style={{ fontWeight: 900, fontSize: '12px', color: '#000000', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                          🏦 Electronic Fund Transfer &amp; Bank Clearance Audit
+                          🏦 {b2bReceipt.status === 'PAID' ? 'Electronic Fund Transfer & Bank Clearance Audit' : 'Disbursing Account Recommendation & Payee Bank'}
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '11.5px' }}>
                           <div>
@@ -1630,10 +1939,14 @@ export default function DocumentGeneratorModal({
                           </div>
                           <div>
                             <span style={{ color: '#000000', fontWeight: 800 }}>Bank UTR / Transaction Ref: </span>
-                            <strong style={{ color: '#047857', letterSpacing: '0.5px' }}>{b2bReceipt.utrNumber}</strong>
+                            <strong style={{ color: b2bReceipt.status === 'PAID' ? '#047857' : '#D97706', letterSpacing: '0.5px' }}>
+                              {b2bReceipt.status === 'PAID' ? b2bReceipt.utrNumber : '[Pending Bank Transfer]'}
+                            </strong>
                           </div>
                           <div style={{ gridColumn: 'span 2' }}>
-                            <span style={{ color: '#000000', fontWeight: 800 }}>Debited From (Our Bank): </span>
+                            <span style={{ color: '#000000', fontWeight: 800 }}>
+                              {b2bReceipt.status === 'PAID' ? 'Debited From (Our Bank): ' : 'Proposed Disbursing Bank: '}
+                            </span>
                             <strong style={{ color: '#000000' }}>{b2bReceipt.debitAccount}</strong>
                           </div>
                           <div style={{ gridColumn: 'span 2' }}>
@@ -1649,7 +1962,9 @@ export default function DocumentGeneratorModal({
                           <tr style={{ background: '#E2E8F0' }}>
                             <th style={{ border: '1.5px solid #000000', padding: '8px 10px', textAlign: 'left', fontWeight: 900, color: '#000000' }}>Disbursement Particulars</th>
                             <th style={{ border: '1.5px solid #000000', padding: '8px 10px', textAlign: 'center', width: '110px', fontWeight: 900, color: '#000000' }}>Tax / GST</th>
-                            <th style={{ border: '1.5px solid #000000', padding: '8px 10px', textAlign: 'right', width: '140px', fontWeight: 900, color: '#000000' }}>Amount Disbursed</th>
+                            <th style={{ border: '1.5px solid #000000', padding: '8px 10px', textAlign: 'right', width: '140px', fontWeight: 900, color: '#000000' }}>
+                              {b2bReceipt.status === 'PAID' ? 'Amount Disbursed' : 'Amount to Disburse'}
+                            </th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1685,12 +2000,12 @@ export default function DocumentGeneratorModal({
                           {/* Grand Total Row */}
                           <tr style={{ background: '#F1F5F9' }}>
                             <td style={{ border: '1.5px solid #000000', padding: '10px', fontWeight: 900, fontSize: '13px', color: '#000000' }}>
-                              TOTAL REMITTANCE SETTLED (NET PAID)
+                              {b2bReceipt.status === 'PAID' ? 'TOTAL REMITTANCE SETTLED (NET PAID)' : 'TOTAL AMOUNT TO DISBURSE'}
                             </td>
                             <td style={{ border: '1.5px solid #000000', padding: '10px', textAlign: 'center', fontWeight: 800, color: '#000000' }}>
                               FULL
                             </td>
-                            <td style={{ border: '1.5px solid #000000', padding: '10px', textAlign: 'right', fontWeight: 900, fontSize: '14.5px', color: '#047857' }}>
+                            <td style={{ border: '1.5px solid #000000', padding: '10px', textAlign: 'right', fontWeight: 900, fontSize: '14.5px', color: b2bReceipt.status === 'PAID' ? '#047857' : '#D97706' }}>
                               {Number(b2bReceipt.totalDisbursed).toLocaleString()} {b2bReceipt.currency}
                             </td>
                           </tr>
@@ -1703,8 +2018,8 @@ export default function DocumentGeneratorModal({
                       </div>
                     </div>
 
-                    {/* OFFICIAL "PAID & SETTLED" RUBBER STAMP */}
-                    {showPaidSeal && (
+                    {/* OFFICIAL "PAID" RUBBER STAMP (ONLY IF ACTUALLY COMPLETED!) */}
+                    {b2bReceipt.status === 'PAID' && showPaidSeal && (
                       <div
                         className="rubber-stamp"
                         style={{
@@ -1742,19 +2057,245 @@ export default function DocumentGeneratorModal({
                       </div>
                     )}
 
-                    {/* Bottom Signatory */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '30px' }}>
+                    {/* PENDING APPROVAL RUBBER WATERMARK (WHEN AWAITING APPROVAL) */}
+                    {b2bReceipt.status !== 'PAID' && (
+                      <div
+                        className="rubber-stamp"
+                        style={{
+                          position: 'absolute',
+                          bottom: '85px',
+                          right: '25px',
+                          border: '3px dashed #D97706',
+                          color: '#D97706',
+                          padding: '10px 16px',
+                          borderRadius: '10px',
+                          textAlign: 'center',
+                          fontWeight: 900,
+                          transform: 'rotate(-5deg)',
+                          background: 'rgba(254, 243, 199, 0.95)',
+                          boxShadow: '0 0 0 4px rgba(217, 119, 6, 0.2)',
+                          zIndex: 20,
+                          pointerEvents: 'none',
+                        }}
+                      >
+                        <div style={{ fontSize: '9px', letterSpacing: '1px', textTransform: 'uppercase', color: '#D97706' }}>
+                          STERLING ERP
+                        </div>
+                        <div style={{ fontSize: '15px', fontWeight: 900, margin: '2px 0', color: '#D97706' }}>
+                          ⏳ PENDING APPROVAL
+                        </div>
+                        <div style={{ fontSize: '9.5px', fontWeight: 800, color: '#D97706' }}>
+                          Awaiting Director Sign-off
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Bottom Signatories: 1-Box for Paid, 3-Columns for Pending Authorization */}
+                    {b2bReceipt.status === 'PAID' ? (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '30px' }}>
+                        <div style={{ fontSize: '10px', color: '#000000', fontWeight: 600 }}>
+                          This disbursement receipt is an official audit-proof remittance voucher generated by Sterling ERP.
+                        </div>
+                        <div style={{ textAlign: 'center', width: '220px' }}>
+                          <div style={{ height: '36px', borderBottom: '1.5px solid #000000', marginBottom: '6px' }}></div>
+                          <div style={{ fontWeight: 900, fontSize: '11px', color: '#000000' }}>
+                            Sterling Overseas Consultancy
+                          </div>
+                          <div style={{ fontSize: '10px', color: '#000000', fontWeight: 600 }}>
+                            Authorized Accounts Signatory
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ marginTop: '20px', borderTop: '1.5px solid #000000', paddingTop: '10px' }}>
+                        <div style={{ fontSize: '10.5px', fontWeight: 800, color: '#000000', marginBottom: '8px', textTransform: 'uppercase' }}>
+                          3-Tier Accounting Approval &amp; Authorization Workflow:
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', fontSize: '10px' }}>
+                          <div style={{ border: '1px solid #000000', padding: '8px', borderRadius: '4px', background: '#F8FAFC' }}>
+                            <div style={{ fontWeight: 800, color: '#000000', marginBottom: '20px' }}>1. Requisitioned By (Counselor / Ops):</div>
+                            <div style={{ borderBottom: '1px solid #000000', marginBottom: '3px' }}></div>
+                            <div style={{ color: '#000000', fontWeight: 600 }}>Signature &amp; Date</div>
+                          </div>
+                          <div style={{ border: '1.5px solid #D97706', padding: '8px', borderRadius: '4px', background: '#FEF3C7' }}>
+                            <div style={{ fontWeight: 900, color: '#B45309', marginBottom: '20px' }}>2. Verified &amp; Approved (Director):</div>
+                            <div style={{ borderBottom: '1px solid #B45309', marginBottom: '3px' }}></div>
+                            <div style={{ color: '#B45309', fontWeight: 700 }}>Director Sign-off &amp; Approval</div>
+                          </div>
+                          <div style={{ border: '1px solid #000000', padding: '8px', borderRadius: '4px', background: '#F8FAFC' }}>
+                            <div style={{ fontWeight: 800, color: '#000000', marginBottom: '20px' }}>3. Payout Released (Accounts / Bank):</div>
+                            <div style={{ borderBottom: '1px solid #000000', marginBottom: '3px' }}></div>
+                            <div style={{ color: '#000000', fontWeight: 600 }}>Bank Transfer Ref &amp; Date</div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* ======================================================== */}
+                {/* 3. UNIVERSITY COMMISSION CLAIM INVOICE CANVAS            */}
+                {/* ======================================================== */}
+                {mode === 'university_commission' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between', position: 'relative' }}>
+                    <div>
+                      {/* Top Entity & Title */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
+                        <div>
+                          <div style={{ fontWeight: 900, fontSize: '16px', color: '#000000' }}>
+                            Sterling Study Abroad &amp; Overseas Consultancy LLC
+                          </div>
+                          <div style={{ fontSize: '11px', color: '#000000', fontWeight: 700 }}>
+                            Global University Partnerships &amp; Recruitment Division
+                          </div>
+                          <div style={{ fontSize: '10px', color: '#000000', marginTop: '2px' }}>
+                            Etihad Airways Centre 5th Floor, Abu Dhabi, UAE &bull; Hi-Lite Business Park, Calicut
+                          </div>
+                        </div>
+
+                        <div style={{ textAlign: 'right' }}>
+                          <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 900, color: '#000000', letterSpacing: '0.5px' }}>
+                            COMMISSION INVOICE
+                          </h2>
+                          <div style={{ fontSize: '11px', color: '#2563EB', fontWeight: 800, marginTop: '2px' }}>
+                            AGENCY ENROLMENT CLAIM
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Header Meta Table */}
+                      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '16px' }}>
+                        <tbody>
+                          <tr>
+                            <td style={{ border: '1.5px solid #000000', padding: '8px 12px', width: '55%', verticalAlign: 'top', background: '#ffffff', color: '#000000' }}>
+                              <div style={{ fontSize: '11px', color: '#000000', fontWeight: 800 }}>BILLED TO (PARTNER UNIVERSITY):</div>
+                              <div style={{ fontSize: '14.5px', fontWeight: 900, color: '#000000' }}>
+                                {universityInvoice.universityName || 'PARTNER UNIVERSITY'}
+                              </div>
+                              <div style={{ fontSize: '11px', color: '#000000', fontWeight: 600 }}>
+                                {universityInvoice.universityCampus}
+                              </div>
+                              {universityInvoice.financeEmail && (
+                                <div style={{ fontSize: '10.5px', color: '#000000', marginTop: '2px' }}>
+                                  Attn: Finance Department ({universityInvoice.financeEmail})
+                                </div>
+                              )}
+                            </td>
+                            <td style={{ border: '1.5px solid #000000', padding: '8px 12px', width: '45%', verticalAlign: 'top', background: '#ffffff', color: '#000000' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+                                <span style={{ fontWeight: 800, color: '#000000' }}>Invoice No:</span>
+                                <span style={{ fontWeight: 900, color: '#000000' }}>{universityInvoice.invoiceNumber}</span>
+                              </div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+                                <span style={{ fontWeight: 800, color: '#000000' }}>Invoice Date:</span>
+                                <span style={{ fontWeight: 700, color: '#000000' }}>{universityInvoice.invoiceDate}</span>
+                              </div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ fontWeight: 800, color: '#000000' }}>Payment Terms:</span>
+                                <span style={{ fontWeight: 700, color: '#2563EB' }}>{universityInvoice.dueDate}</span>
+                              </div>
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+
+                      {/* Candidate Enrolment Reference Table */}
+                      <div style={{ border: '1.5px solid #000000', background: '#F8FAFC', padding: '10px 12px', borderRadius: '4px', marginBottom: '16px' }}>
+                        <div style={{ fontWeight: 900, fontSize: '11.5px', color: '#000000', marginBottom: '6px', textTransform: 'uppercase' }}>
+                          🎓 Enrolled Candidate &amp; Program Verification
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px', fontSize: '11.5px' }}>
+                          <div>
+                            <span style={{ fontWeight: 800, color: '#000000' }}>Student Name: </span>
+                            <strong style={{ color: '#000000' }}>{universityInvoice.studentName}</strong>
+                          </div>
+                          <div>
+                            <span style={{ fontWeight: 800, color: '#000000' }}>Student / Application ID: </span>
+                            <strong style={{ color: '#000000' }}>{universityInvoice.studentId || 'N/A'}</strong>
+                          </div>
+                          <div>
+                            <span style={{ fontWeight: 800, color: '#000000' }}>Program / Degree: </span>
+                            <strong style={{ color: '#000000' }}>{universityInvoice.courseDetails}</strong>
+                          </div>
+                          <div>
+                            <span style={{ fontWeight: 800, color: '#000000' }}>Intake Session: </span>
+                            <strong style={{ color: '#000000' }}>{universityInvoice.intake}</strong>
+                          </div>
+                          <div style={{ gridColumn: 'span 2' }}>
+                            <span style={{ fontWeight: 800, color: '#000000' }}>Tuition Fee Paid to University: </span>
+                            <strong style={{ color: '#047857' }}>
+                              {Number(universityInvoice.tuitionFeePaid).toLocaleString()} {universityInvoice.currency}
+                            </strong>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Financial Commission Calculation Table */}
+                      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '16px' }}>
+                        <thead>
+                          <tr style={{ background: '#E2E8F0' }}>
+                            <th style={{ border: '1.5px solid #000000', padding: '8px 10px', textAlign: 'center', width: '45px', fontWeight: 900, color: '#000000' }}>#</th>
+                            <th style={{ border: '1.5px solid #000000', padding: '8px 10px', textAlign: 'left', fontWeight: 900, color: '#000000' }}>Service &amp; Commission Description</th>
+                            <th style={{ border: '1.5px solid #000000', padding: '8px 10px', textAlign: 'center', width: '120px', fontWeight: 900, color: '#000000' }}>Agreed Rate</th>
+                            <th style={{ border: '1.5px solid #000000', padding: '8px 10px', textAlign: 'right', width: '130px', fontWeight: 900, color: '#000000' }}>Claim Amount</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr>
+                            <td style={{ border: '1.5px solid #000000', padding: '10px', textAlign: 'center', fontWeight: 800, color: '#000000' }}>1</td>
+                            <td style={{ border: '1.5px solid #000000', padding: '10px', color: '#000000' }}>
+                              <div style={{ fontWeight: 800 }}>Student Recruitment &amp; Enrolment Agency Commission</div>
+                              <div style={{ fontSize: '11px', color: '#000000', marginTop: '2px' }}>
+                                Candidate: {universityInvoice.studentName} ({universityInvoice.courseDetails})
+                              </div>
+                            </td>
+                            <td style={{ border: '1.5px solid #000000', padding: '10px', textAlign: 'center', fontWeight: 800, color: '#000000' }}>
+                              {universityInvoice.commissionPercent}% of Tuition
+                            </td>
+                            <td style={{ border: '1.5px solid #000000', padding: '10px', textAlign: 'right', fontWeight: 900, color: '#000000' }}>
+                              {Number(universityInvoice.commissionAmount).toLocaleString()} {universityInvoice.currency}
+                            </td>
+                          </tr>
+
+                          {/* Grand Total */}
+                          <tr style={{ background: '#F1F5F9' }}>
+                            <td colSpan={3} style={{ border: '1.5px solid #000000', padding: '10px', fontWeight: 900, textAlign: 'right', color: '#000000' }}>
+                              TOTAL AGENCY COMMISSION PAYABLE:
+                            </td>
+                            <td style={{ border: '1.5px solid #000000', padding: '10px', textAlign: 'right', fontWeight: 900, fontSize: '15px', color: '#2563EB' }}>
+                              {Number(universityInvoice.commissionAmount).toLocaleString()} {universityInvoice.currency}
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+
+                      {/* Remittance Bank Information (Sterling WIO Bank Abu Dhabi) */}
+                      <div style={{ border: '1.5px solid #000000', padding: '10px 12px', background: '#ffffff', borderRadius: '4px', marginBottom: '14px' }}>
+                        <div style={{ fontSize: '11px', fontWeight: 900, color: '#000000', textTransform: 'uppercase', marginBottom: '4px' }}>
+                          🏦 Remittance Bank Details (Wire Payment to Sterling):
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3px 12px', fontSize: '11px', color: '#000000' }}>
+                          <div>Account Holder: <strong>{universityInvoice.bankDetails.accountHolder}</strong></div>
+                          <div>Bank Name: <strong style={{ color: '#047857' }}>{universityInvoice.bankDetails.bankName}</strong></div>
+                          <div>IBAN: <strong>{universityInvoice.bankDetails.iban}</strong></div>
+                          <div>SWIFT Code: <strong>{universityInvoice.bankDetails.swiftCode}</strong></div>
+                          <div style={{ gridColumn: 'span 2' }}>Bank Address: {universityInvoice.bankDetails.address}</div>
+                        </div>
+                        <div style={{ fontSize: '10px', fontStyle: 'italic', color: '#000000', marginTop: '4px', borderTop: '1px dashed #000000', paddingTop: '3px' }}>
+                          Note: Please quote Invoice #{universityInvoice.invoiceNumber} and Candidate Name on SWIFT transfer description.
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Authorized Signatory Block */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '20px' }}>
                       <div style={{ fontSize: '10px', color: '#000000', fontWeight: 600 }}>
-                        This disbursement receipt is an official audit-proof remittance voucher generated by Sterling ERP.
+                        Official tax invoice for international education consultancy &amp; student recruitment services.
                       </div>
                       <div style={{ textAlign: 'center', width: '220px' }}>
                         <div style={{ height: '36px', borderBottom: '1.5px solid #000000', marginBottom: '6px' }}></div>
-                        <div style={{ fontWeight: 900, fontSize: '11px', color: '#000000' }}>
-                          Sterling Overseas Consultancy
-                        </div>
-                        <div style={{ fontSize: '10px', color: '#000000', fontWeight: 600 }}>
-                          Authorized Accounts Signatory
-                        </div>
+                        <div style={{ fontWeight: 900, fontSize: '11px', color: '#000000' }}>Sterling Overseas Consultancy LLC</div>
+                        <div style={{ fontSize: '10px', color: '#000000', fontWeight: 600 }}>Director / Authorised Signatory</div>
                       </div>
                     </div>
                   </div>
