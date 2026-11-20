@@ -4180,8 +4180,32 @@ export default function B2BPayments({ setCurrentPage }) {
               </div>
             </div>
 
-            {/* Print Scoped Styles */}
+            {/* Scoped Styles for Screen and Print (Overrides global nowrap on th/td) */}
             <style>{`
+              #accounts-disbursement-printable table {
+                width: 100% !important;
+                table-layout: fixed !important;
+                border-collapse: collapse !important;
+              }
+              #accounts-disbursement-printable th {
+                white-space: normal !important;
+                word-wrap: break-word !important;
+                overflow-wrap: break-word !important;
+                word-break: normal !important;
+                letter-spacing: 0px !important;
+                text-transform: uppercase !important;
+                font-size: 10px !important;
+                line-height: 1.25 !important;
+                padding: 6px 5px !important;
+                box-sizing: border-box !important;
+              }
+              #accounts-disbursement-printable td {
+                white-space: normal !important;
+                word-wrap: break-word !important;
+                overflow-wrap: break-word !important;
+                padding: 6px 6px !important;
+                box-sizing: border-box !important;
+              }
               @media print {
                 body * {
                   visibility: hidden !important;
@@ -4268,14 +4292,22 @@ export default function B2BPayments({ setCurrentPage }) {
 
                 {/* Pending Payments Table with 100% fixed widths and zero horizontal scroll */}
                 <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '18px', tableLayout: 'fixed' }}>
+                  <colgroup>
+                    <col style={{ width: '4%' }} />
+                    <col style={{ width: '20%' }} />
+                    <col style={{ width: '17%' }} />
+                    <col style={{ width: '31%' }} />
+                    <col style={{ width: '14%' }} />
+                    <col style={{ width: '14%' }} />
+                  </colgroup>
                   <thead>
                     <tr style={{ background: '#E2E8F0' }}>
-                      <th style={{ border: '1.5px solid #000000', padding: '6px 4px', textAlign: 'center', width: '28px', fontWeight: 900, color: '#000000' }}>#</th>
-                      <th style={{ border: '1.5px solid #000000', padding: '6px 8px', textAlign: 'left', width: '155px', fontWeight: 900, color: '#000000' }}>B2B Partner &amp; Category</th>
-                      <th style={{ border: '1.5px solid #000000', padding: '6px 8px', textAlign: 'left', width: '115px', fontWeight: 900, color: '#000000' }}>Candidate(s)</th>
-                      <th style={{ border: '1.5px solid #000000', padding: '6px 8px', textAlign: 'left', width: '220px', fontWeight: 900, color: '#000000' }}>Transfer Account (Beneficiary Bank / UPI)</th>
-                      <th style={{ border: '1.5px solid #000000', padding: '6px 8px', textAlign: 'right', width: '115px', fontWeight: 900, color: '#000000' }}>Amount to Pay</th>
-                      <th style={{ border: '1.5px solid #000000', padding: '6px 8px', textAlign: 'center', width: '115px', fontWeight: 900, color: '#000000' }}>Due &amp; Accounts Sign</th>
+                      <th style={{ border: '1.5px solid #000000', padding: '6px 4px', textAlign: 'center', fontWeight: 900, color: '#000000', fontSize: '10px', whiteSpace: 'normal', letterSpacing: '0px' }}>#</th>
+                      <th style={{ border: '1.5px solid #000000', padding: '6px 6px', textAlign: 'left', fontWeight: 900, color: '#000000', fontSize: '10px', whiteSpace: 'normal', letterSpacing: '0px', wordBreak: 'break-word' }}>B2B Partner &amp; Category</th>
+                      <th style={{ border: '1.5px solid #000000', padding: '6px 6px', textAlign: 'left', fontWeight: 900, color: '#000000', fontSize: '10px', whiteSpace: 'normal', letterSpacing: '0px', wordBreak: 'break-word' }}>Candidate(s)</th>
+                      <th style={{ border: '1.5px solid #000000', padding: '6px 6px', textAlign: 'left', fontWeight: 900, color: '#000000', fontSize: '10px', whiteSpace: 'normal', letterSpacing: '0px', wordBreak: 'break-word' }}>Transfer Account (Beneficiary)</th>
+                      <th style={{ border: '1.5px solid #000000', padding: '6px 6px', textAlign: 'right', fontWeight: 900, color: '#000000', fontSize: '10px', whiteSpace: 'normal', letterSpacing: '0px', wordBreak: 'break-word' }}>Amount to Pay</th>
+                      <th style={{ border: '1.5px solid #000000', padding: '6px 6px', textAlign: 'center', fontWeight: 900, color: '#000000', fontSize: '10px', whiteSpace: 'normal', letterSpacing: '0px', wordBreak: 'break-word' }}>Due &amp; Clearance</th>
                     </tr>
                   </thead>
                   <tbody>
