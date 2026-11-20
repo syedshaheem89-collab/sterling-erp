@@ -5,18 +5,186 @@ import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 
 /**
+ * INITIAL_PARTNER_ACCOUNTS
+ * Stores multiple bank accounts per B2B partner/company.
+ * A company can have 1, 2, or more bank accounts (e.g. HDFC, ICICI, Foreign Wire, UPI).
+ */
+export const INITIAL_PARTNER_ACCOUNTS = {
+  'Consult Fox': [
+    {
+      id: 'acc-cf-1',
+      label: 'HDFC Primary Current A/C',
+      bank_name: 'HDFC Bank',
+      account_number: '50200038291048',
+      ifsc: 'HDFC0000240',
+      branch: 'MG Road, Bangalore',
+      beneficiary_name: 'Consult Fox Edutech Pvt Ltd',
+      upi_id: 'consultfox@hdfcbank',
+      details_string: 'HDFC Bank A/C: 50200038291048 | IFSC: HDFC0000240 | Beneficiary: Consult Fox Edutech Pvt Ltd',
+      is_default: true,
+    },
+    {
+      id: 'acc-cf-2',
+      label: 'ICICI Secondary A/C',
+      bank_name: 'ICICI Bank',
+      account_number: '002905008291',
+      ifsc: 'ICIC0000029',
+      branch: 'Indiranagar',
+      beneficiary_name: 'Consult Fox Edutech Pvt Ltd',
+      upi_id: '',
+      details_string: 'ICICI Bank A/C: 002905008291 | IFSC: ICIC0000029 | Beneficiary: Consult Fox Edutech',
+      is_default: false,
+    },
+  ],
+  'Future Factory': [
+    {
+      id: 'acc-ff-1',
+      label: 'Citibank USD Wire (Delaware)',
+      bank_name: 'Citibank N.A. New York',
+      account_number: 'US58CITI10009284102',
+      ifsc: 'CITIUS33',
+      branch: 'New York, USA',
+      beneficiary_name: 'Future Factory LLC, Delaware, USA',
+      upi_id: '',
+      details_string: 'Wire / Swift: US58CITI10009284102 | Swift: CITIUS33 | Future Factory LLC, Delaware, USA',
+      is_default: true,
+    },
+    {
+      id: 'acc-ff-2',
+      label: 'Wise Multi-Currency USD/EUR',
+      bank_name: 'Wise Payments Ltd',
+      account_number: 'WISE849201948',
+      ifsc: 'TRWIBEB1',
+      branch: 'Brussels / UK',
+      beneficiary_name: 'Future Factory Global',
+      upi_id: '',
+      details_string: 'Wise A/C: WISE849201948 | Swift: TRWIBEB1 | Future Factory Global',
+      is_default: false,
+    },
+  ],
+  'Rashin Team': [
+    {
+      id: 'acc-rt-1',
+      label: 'Primary UPI / GPay',
+      bank_name: 'Axis Bank / UPI',
+      account_number: '',
+      ifsc: '',
+      branch: '',
+      beneficiary_name: 'Rashin Team',
+      upi_id: 'rashin.team@okaxis',
+      details_string: 'UPI ID: rashin.team@okaxis | Beneficiary: Rashin Team',
+      is_default: true,
+    },
+    {
+      id: 'acc-rt-2',
+      label: 'Canara Bank Current A/C',
+      bank_name: 'Canara Bank',
+      account_number: '0849101004928',
+      ifsc: 'CNRB0000849',
+      branch: 'Calicut Main',
+      beneficiary_name: 'Rashin Team',
+      upi_id: '',
+      details_string: 'Canara Bank A/C: 0849101004928 | IFSC: CNRB0000849 | Rashin Team',
+      is_default: false,
+    },
+  ],
+  'Empire - Lithuania': [
+    {
+      id: 'acc-el-1',
+      label: 'Swedbank Vilnius IBAN (EUR)',
+      bank_name: 'Swedbank Vilnius',
+      account_number: 'LT427044060001829482',
+      ifsc: 'HABALT22',
+      branch: 'Vilnius, Lithuania',
+      beneficiary_name: 'Empire International Education UAB',
+      upi_id: '',
+      details_string: 'IBAN: LT427044060001829482 | Swedbank Vilnius | Empire Int. Edu',
+      is_default: true,
+    },
+  ],
+  'Abroad Angel Poland': [
+    {
+      id: 'acc-aa-1',
+      label: 'SBI Current A/C',
+      bank_name: 'State Bank of India',
+      account_number: '38291049281',
+      ifsc: 'SBIN0004829',
+      branch: 'Kochi Branch',
+      beneficiary_name: 'Abroad Angel Poland Edutech',
+      upi_id: '',
+      details_string: 'SBI Current A/C: 38291049281 | IFSC: SBIN0004829 | Kochi Branch',
+      is_default: true,
+    },
+  ],
+  'Comfort Travel': [
+    {
+      id: 'acc-ct-1',
+      label: 'Federal Bank Current A/C',
+      bank_name: 'Federal Bank',
+      account_number: '14200200039281',
+      ifsc: 'FDRL0001420',
+      branch: 'Ernakulam Marine Drive',
+      beneficiary_name: 'Comfort Travel & Apostille Services',
+      upi_id: 'comforttravel@federal',
+      details_string: 'Federal Bank A/C: 14200200039281 | IFSC: FDRL0001420 | Ernakulam',
+      is_default: true,
+    },
+  ],
+  'Medwizard': [
+    {
+      id: 'acc-mw-1',
+      label: 'Axis Bank Current A/C',
+      bank_name: 'Axis Bank',
+      account_number: '921020048291028',
+      ifsc: 'UTIB0000829',
+      branch: 'Kottayam',
+      beneficiary_name: 'Medwizard Overseas Admissions',
+      upi_id: 'medwizard@axisbank',
+      details_string: 'Axis Bank A/C: 921020048291028 | IFSC: UTIB0000829 | Beneficiary: Medwizard Overseas',
+      is_default: true,
+    },
+  ],
+  'VFS & Insurance': [
+    {
+      id: 'acc-vfs-1',
+      label: 'VFS Global Portal Virtual CMS A/C',
+      bank_name: 'ICICI Bank Virtual CMS',
+      account_number: 'VFS9948201',
+      ifsc: 'ICIC0000104',
+      branch: 'Mumbai Central',
+      beneficiary_name: 'VFS Global Services Pvt Ltd',
+      upi_id: '',
+      details_string: 'VFS Global Services / ICICI Portal Virtual A/C: VFS9948201',
+      is_default: true,
+    },
+  ],
+  'EduGlobal Services': [
+    {
+      id: 'acc-eg-1',
+      label: 'ICICI Bank Current A/C',
+      bank_name: 'ICICI Bank',
+      account_number: '002905001829',
+      ifsc: 'ICIC0000029',
+      branch: 'Kochi',
+      beneficiary_name: 'EduGlobal Services LLP',
+      upi_id: '',
+      details_string: 'ICICI Bank A/C: 002905001829 | IFSC: ICIC0000029',
+      is_default: true,
+    },
+  ],
+};
+
+/**
  * INITIAL_B2B_PAYMENTS
  * Pre-populated with the user's 9 live entries from Microsoft To-Do,
- * now enhanced with:
- * - Specific "Which Account to Transfer" beneficiary details for Accounts team
- * - 18% GST calculation (Base Amount, 18% GST Amount, Total With GST)
- * - Foreign payments explicitly exempt from GST (0% GST)
+ * linked to the partner accounts directory.
  */
 const INITIAL_B2B_PAYMENTS = [
   {
     id: 'b2b-001',
     partner_name: 'Consult Fox',
     transfer_account: 'HDFC Bank A/C: 50200038291048 | IFSC: HDFC0000240 | Beneficiary: Consult Fox Edutech Pvt Ltd',
+    selected_account_id: 'acc-cf-1',
     student_names: 'Thejus & Nivil',
     amount: 180000,
     currency: 'INR',
@@ -35,6 +203,7 @@ const INITIAL_B2B_PAYMENTS = [
     id: 'b2b-002',
     partner_name: 'VFS & Insurance',
     transfer_account: 'VFS Global Services / ICICI Portal Virtual A/C: VFS9948201',
+    selected_account_id: 'acc-vfs-1',
     student_names: 'Abhijith Bulgaria (Agiya & Lekshmipriya)',
     amount: 20780,
     currency: 'INR',
@@ -52,7 +221,8 @@ const INITIAL_B2B_PAYMENTS = [
   {
     id: 'b2b-003',
     partner_name: 'Rashin Team',
-    transfer_account: 'UPI ID: rashin.team@okaxis | Canara Bank A/C: 0849101004928',
+    transfer_account: 'UPI ID: rashin.team@okaxis | Beneficiary: Rashin Team',
+    selected_account_id: 'acc-rt-1',
     student_names: 'Liza',
     amount: 20000,
     currency: 'INR',
@@ -71,6 +241,7 @@ const INITIAL_B2B_PAYMENTS = [
     id: 'b2b-004',
     partner_name: 'Future Factory',
     transfer_account: 'Wire / Swift: US58CITI10009284102 | Future Factory LLC, Delaware, USA',
+    selected_account_id: 'acc-ff-1',
     student_names: 'Vivek & Hanock',
     amount: 500,
     currency: 'USD',
@@ -89,6 +260,7 @@ const INITIAL_B2B_PAYMENTS = [
     id: 'b2b-005',
     partner_name: 'Future Factory',
     transfer_account: 'Wire / Swift: US58CITI10009284102 | Future Factory LLC, Delaware, USA',
+    selected_account_id: 'acc-ff-1',
     student_names: 'Annalise & Megha',
     amount: 500,
     currency: 'USD',
@@ -107,6 +279,7 @@ const INITIAL_B2B_PAYMENTS = [
     id: 'b2b-006',
     partner_name: 'Empire - Lithuania',
     transfer_account: 'IBAN: LT427044060001829482 | Swedbank Vilnius | Empire Int. Edu',
+    selected_account_id: 'acc-el-1',
     student_names: 'Annlin v Jose',
     amount: 1000,
     currency: 'EUR',
@@ -125,6 +298,7 @@ const INITIAL_B2B_PAYMENTS = [
     id: 'b2b-007',
     partner_name: 'Abroad Angel Poland',
     transfer_account: 'SBI Current A/C: 38291049281 | IFSC: SBIN0004829 | Kochi Branch',
+    selected_account_id: 'acc-aa-1',
     student_names: 'Gayathri, Achsah, Anna Biju',
     amount: 70800,
     currency: 'INR',
@@ -143,6 +317,7 @@ const INITIAL_B2B_PAYMENTS = [
     id: 'b2b-008',
     partner_name: 'Comfort Travel',
     transfer_account: 'Federal Bank A/C: 14200200039281 | IFSC: FDRL0001420 | Ernakulam',
+    selected_account_id: 'acc-ct-1',
     student_names: 'Apostille Batch',
     amount: 59550,
     currency: 'INR',
@@ -161,6 +336,7 @@ const INITIAL_B2B_PAYMENTS = [
     id: 'b2b-009',
     partner_name: 'Medwizard',
     transfer_account: 'Axis Bank A/C: 921020048291028 | IFSC: UTIB0000829 | Beneficiary: Medwizard Overseas',
+    selected_account_id: 'acc-mw-1',
     student_names: 'Esabella',
     amount: 24000,
     currency: 'INR',
@@ -179,6 +355,7 @@ const INITIAL_B2B_PAYMENTS = [
     id: 'b2b-010',
     partner_name: 'EduGlobal Services',
     transfer_account: 'ICICI Bank A/C: 002905001829 | IFSC: ICIC0000029',
+    selected_account_id: 'acc-eg-1',
     student_names: 'Kiran Mathew',
     amount: 15000,
     currency: 'INR',
@@ -216,7 +393,7 @@ const CURRENCIES = [
 export const EXPORT_COLUMNS_DEF = [
   { id: 'sl_no', label: 'Sl No', key: 'Sl No', default: true, wch: 6 },
   { id: 'partner_name', label: 'Partner / Beneficiary Name', key: 'Partner / Beneficiary', default: true, wch: 24 },
-  { id: 'transfer_account', label: 'Transfer To (Account Details)', key: 'Transfer To (Account Details)', default: true, wch: 38 },
+  { id: 'transfer_account', label: 'Transfer To (Account Details)', key: 'Transfer To (Account Details)', default: true, wch: 40 },
   { id: 'student_names', label: 'Linked Student(s)', key: 'Linked Student(s)', default: true, wch: 25 },
   { id: 'total_amount', label: 'Total Amount (With GST)', key: 'Total Amount With GST', default: true, wch: 20 },
   { id: 'base_amount', label: 'Base Amount (Without GST)', key: 'Amount Without GST', default: true, wch: 20 },
@@ -235,7 +412,7 @@ export const EXPORT_COLUMNS_DEF = [
 export default function B2BPayments({ setCurrentPage }) {
   const { user } = useAuth();
 
-  // Primary State
+  // Primary Payments State
   const [payments, setPayments] = useState(() => {
     try {
       const saved = localStorage.getItem('sterling_b2b_payments');
@@ -248,6 +425,29 @@ export default function B2BPayments({ setCurrentPage }) {
     }
     return INITIAL_B2B_PAYMENTS;
   });
+
+  // Partner Bank Accounts Directory (Multiple accounts per B2B Company)
+  const [partnerAccounts, setPartnerAccounts] = useState(() => {
+    try {
+      const saved = localStorage.getItem('sterling_b2b_partner_accounts');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object') return parsed;
+      }
+    } catch (e) {
+      console.warn('Failed to parse saved partner accounts', e);
+    }
+    return INITIAL_PARTNER_ACCOUNTS;
+  });
+
+  // Sync Partner Accounts to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('sterling_b2b_partner_accounts', JSON.stringify(partnerAccounts));
+    } catch (e) {
+      console.error('Failed to save partner accounts to localStorage', e);
+    }
+  }, [partnerAccounts]);
 
   // ERP Students list for autocomplete
   const [erpStudents, setErpStudents] = useState([]);
@@ -270,6 +470,7 @@ export default function B2BPayments({ setCurrentPage }) {
   const [formData, setFormData] = useState({
     partner_name: '',
     transfer_account: '',
+    selected_account_id: '',
     student_names: '',
     amount: '',
     currency: 'INR',
@@ -278,6 +479,33 @@ export default function B2BPayments({ setCurrentPage }) {
     due_date: '',
     priority: false,
     notes: '',
+    save_as_new_account: true,
+  });
+
+  // Inline Account Add State inside Payment Modal
+  const [isAddingInlineAccount, setIsAddingInlineAccount] = useState(false);
+  const [inlineAccountData, setInlineAccountData] = useState({
+    label: '',
+    bank_name: '',
+    account_number: '',
+    ifsc: '',
+    beneficiary_name: '',
+    upi_id: '',
+  });
+
+  // Partner Bank Accounts Directory Manager Modal State
+  const [showAccountsManagerModal, setShowAccountsManagerModal] = useState(false);
+  const [selectedManagerCompany, setSelectedManagerCompany] = useState('Consult Fox');
+  const [isAddingNewCompany, setIsAddingNewCompany] = useState(false);
+  const [newCompanyNameInput, setNewCompanyNameInput] = useState('');
+  const [managerAccountForm, setManagerAccountForm] = useState({
+    label: '',
+    bank_name: '',
+    account_number: '',
+    ifsc: '',
+    branch: '',
+    beneficiary_name: '',
+    upi_id: '',
   });
 
   // Settlement Modal State
@@ -293,7 +521,7 @@ export default function B2BPayments({ setCurrentPage }) {
   const [studentSuggestions, setStudentSuggestions] = useState([]);
   const [showStudentSuggestions, setShowStudentSuggestions] = useState(false);
 
-  // Download / Export Customization Modal State (User selectable fields & scope)
+  // Download / Export Customization Modal State
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportScope, setExportScope] = useState('all'); // 'selected' | 'filtered' | 'all'
   const [exportColIds, setExportColIds] = useState(() =>
@@ -328,6 +556,16 @@ export default function B2BPayments({ setCurrentPage }) {
     }
     fetchStudents();
   }, []);
+
+  // Helper: Retrieve saved accounts for a partner (case-insensitive lookup)
+  const getAccountsForPartner = (partnerName) => {
+    if (!partnerName || !partnerName.trim()) return [];
+    const clean = partnerName.trim().toLowerCase();
+    const matchKey = Object.keys(partnerAccounts).find(
+      (k) => k.toLowerCase() === clean
+    );
+    return matchKey ? (partnerAccounts[matchKey] || []) : [];
+  };
 
   // Helper: Calculate GST (18%) and Totals
   const calculateFinancials = (payment) => {
@@ -448,6 +686,108 @@ export default function B2BPayments({ setCurrentPage }) {
     }
   };
 
+  // Partner Name Input Change in Payment Modal (Auto-selects partner's bank account)
+  const handlePartnerNameInput = (name) => {
+    const accs = getAccountsForPartner(name);
+    const def = accs.find((a) => a.is_default) || accs[0];
+    setFormData((prev) => ({
+      ...prev,
+      partner_name: name,
+      selected_account_id: def ? def.id : (accs.length > 0 ? '' : '__custom__'),
+      transfer_account: def ? def.details_string : (accs.length === 0 ? prev.transfer_account : ''),
+    }));
+    setIsAddingInlineAccount(false);
+  };
+
+  // Dropdown Account Selection
+  const handleAccountSelect = (accId) => {
+    if (accId === '__new__') {
+      setIsAddingInlineAccount(true);
+      return;
+    }
+    if (accId === '__custom__') {
+      setIsAddingInlineAccount(false);
+      setFormData((prev) => ({
+        ...prev,
+        selected_account_id: '__custom__',
+      }));
+      return;
+    }
+    const accs = getAccountsForPartner(formData.partner_name);
+    const found = accs.find((a) => a.id === accId);
+    if (found) {
+      setFormData((prev) => ({
+        ...prev,
+        selected_account_id: accId,
+        transfer_account: found.details_string,
+      }));
+      setIsAddingInlineAccount(false);
+    }
+  };
+
+  // Save Inline Account for a Partner
+  const handleSaveInlineAccount = (e) => {
+    e.preventDefault();
+    if (!formData.partner_name.trim()) {
+      toast.error('Please enter the partner name first');
+      return;
+    }
+    if (!inlineAccountData.bank_name && !inlineAccountData.account_number && !inlineAccountData.upi_id) {
+      toast.error('Please enter bank name, account number, or UPI ID');
+      return;
+    }
+
+    const partnerKey = formData.partner_name.trim();
+    const label = inlineAccountData.label.trim() || `${inlineAccountData.bank_name || 'Bank'} A/C`;
+
+    // Construct formatted transfer string
+    const parts = [];
+    if (inlineAccountData.bank_name) parts.push(inlineAccountData.bank_name);
+    if (inlineAccountData.account_number) parts.push(`A/C: ${inlineAccountData.account_number}`);
+    if (inlineAccountData.ifsc) parts.push(`IFSC/Swift: ${inlineAccountData.ifsc}`);
+    if (inlineAccountData.beneficiary_name) parts.push(`Beneficiary: ${inlineAccountData.beneficiary_name}`);
+    if (inlineAccountData.upi_id) parts.push(`UPI: ${inlineAccountData.upi_id}`);
+    const detailsStr = parts.join(' | ');
+
+    const newAcc = {
+      id: 'acc-' + Date.now(),
+      label: label,
+      bank_name: inlineAccountData.bank_name.trim(),
+      account_number: inlineAccountData.account_number.trim(),
+      ifsc: inlineAccountData.ifsc.trim(),
+      beneficiary_name: inlineAccountData.beneficiary_name.trim(),
+      upi_id: inlineAccountData.upi_id.trim(),
+      details_string: detailsStr,
+      is_default: false,
+    };
+
+    setPartnerAccounts((prev) => {
+      const matchKey = Object.keys(prev).find((k) => k.toLowerCase() === partnerKey.toLowerCase()) || partnerKey;
+      const currentList = prev[matchKey] || [];
+      return {
+        ...prev,
+        [matchKey]: [...currentList, newAcc],
+      };
+    });
+
+    setFormData((prev) => ({
+      ...prev,
+      selected_account_id: newAcc.id,
+      transfer_account: detailsStr,
+    }));
+
+    setIsAddingInlineAccount(false);
+    setInlineAccountData({
+      label: '',
+      bank_name: '',
+      account_number: '',
+      ifsc: '',
+      beneficiary_name: '',
+      upi_id: '',
+    });
+    toast.success(`Saved new account "${label}" for ${partnerKey}!`);
+  };
+
   // Quick Add Parser (Microsoft To-Do style)
   const handleQuickAddSubmit = (e) => {
     e.preventDefault();
@@ -484,12 +824,18 @@ export default function B2BPayments({ setCurrentPage }) {
     detectedPartner = detectedPartner.replace(/\b(\d+[\d,.]*|\$|€|£|inr|usd|eur|gbp)\b/gi, '').trim();
     if (!detectedPartner) detectedPartner = 'Partner Payable';
 
+    // Auto-link partner's default bank account if saved
+    const accs = getAccountsForPartner(detectedPartner);
+    const def = accs.find((a) => a.is_default) || accs[0];
+    const transferAcc = def ? def.details_string : '';
+
     const defaultDue = new Date(Date.now() + 3 * 86400000).toISOString().split('T')[0];
 
     const newPayment = {
       id: 'b2b-' + Date.now(),
       partner_name: detectedPartner,
-      transfer_account: '', // user can add later or in edit
+      transfer_account: transferAcc,
+      selected_account_id: def ? def.id : '',
       student_names: detectedStudent || 'Linked Student',
       amount: detectedAmount || 10000,
       currency: detectedCurrency,
@@ -564,6 +910,7 @@ export default function B2BPayments({ setCurrentPage }) {
     setFormData({
       partner_name: '',
       transfer_account: '',
+      selected_account_id: '',
       student_names: '',
       amount: '',
       currency: 'INR',
@@ -572,16 +919,22 @@ export default function B2BPayments({ setCurrentPage }) {
       due_date: new Date(Date.now() + 3 * 86400000).toISOString().split('T')[0],
       priority: false,
       notes: '',
+      save_as_new_account: true,
     });
+    setIsAddingInlineAccount(false);
     setShowModal(true);
   };
 
   // Open Edit Modal
   const handleOpenEditModal = (payment) => {
     setEditingPayment(payment);
+    const partnerAccs = getAccountsForPartner(payment.partner_name);
+    const matchedAcc = partnerAccs.find((a) => a.details_string === payment.transfer_account || a.id === payment.selected_account_id);
+
     setFormData({
       partner_name: payment.partner_name || '',
       transfer_account: payment.transfer_account || '',
+      selected_account_id: matchedAcc ? matchedAcc.id : (partnerAccs.length > 0 ? '__custom__' : ''),
       student_names: payment.student_names || '',
       amount: payment.amount || '',
       currency: payment.currency || 'INR',
@@ -590,7 +943,9 @@ export default function B2BPayments({ setCurrentPage }) {
       due_date: payment.due_date || '',
       priority: payment.priority || false,
       notes: payment.notes || '',
+      save_as_new_account: true,
     });
+    setIsAddingInlineAccount(false);
     setShowModal(true);
   };
 
@@ -611,6 +966,33 @@ export default function B2BPayments({ setCurrentPage }) {
     const isForeign = formData.currency !== 'INR';
     const finalHasGst = isForeign ? false : formData.has_gst;
 
+    // Auto-save new account into directory if partner was not registered before
+    const partnerKey = formData.partner_name.trim();
+    if (formData.save_as_new_account && formData.transfer_account.trim()) {
+      const existing = getAccountsForPartner(partnerKey);
+      const isAlreadySaved = existing.some((a) => a.details_string === formData.transfer_account.trim());
+      if (!isAlreadySaved) {
+        const autoAcc = {
+          id: 'acc-' + Date.now(),
+          label: 'Primary Account',
+          bank_name: '',
+          account_number: '',
+          ifsc: '',
+          beneficiary_name: '',
+          upi_id: '',
+          details_string: formData.transfer_account.trim(),
+          is_default: existing.length === 0,
+        };
+        setPartnerAccounts((prev) => {
+          const matchKey = Object.keys(prev).find((k) => k.toLowerCase() === partnerKey.toLowerCase()) || partnerKey;
+          return {
+            ...prev,
+            [matchKey]: [...(prev[matchKey] || []), autoAcc],
+          };
+        });
+      }
+    }
+
     if (editingPayment) {
       setPayments((prev) =>
         prev.map((p) =>
@@ -619,6 +1001,7 @@ export default function B2BPayments({ setCurrentPage }) {
                 ...p,
                 partner_name: formData.partner_name.trim(),
                 transfer_account: formData.transfer_account.trim(),
+                selected_account_id: formData.selected_account_id,
                 student_names: formData.student_names.trim(),
                 amount: amt,
                 currency: formData.currency,
@@ -637,6 +1020,7 @@ export default function B2BPayments({ setCurrentPage }) {
         id: 'b2b-' + Date.now(),
         partner_name: formData.partner_name.trim(),
         transfer_account: formData.transfer_account.trim(),
+        selected_account_id: formData.selected_account_id,
         student_names: formData.student_names.trim(),
         amount: amt,
         currency: formData.currency,
@@ -670,6 +1054,105 @@ export default function B2BPayments({ setCurrentPage }) {
     }
   };
 
+  // Partner Bank Accounts Manager: Add Account to Selected Company
+  const handleManagerAddAccount = (e) => {
+    e.preventDefault();
+    if (!selectedManagerCompany) return;
+    if (!managerAccountForm.bank_name && !managerAccountForm.account_number && !managerAccountForm.upi_id) {
+      toast.error('Please enter at least Bank Name, Account Number, or UPI ID');
+      return;
+    }
+
+    const parts = [];
+    if (managerAccountForm.bank_name) parts.push(managerAccountForm.bank_name);
+    if (managerAccountForm.account_number) parts.push(`A/C: ${managerAccountForm.account_number}`);
+    if (managerAccountForm.ifsc) parts.push(`IFSC/Swift: ${managerAccountForm.ifsc}`);
+    if (managerAccountForm.beneficiary_name) parts.push(`Beneficiary: ${managerAccountForm.beneficiary_name}`);
+    if (managerAccountForm.upi_id) parts.push(`UPI: ${managerAccountForm.upi_id}`);
+    const detailsStr = parts.join(' | ');
+
+    const newAcc = {
+      id: 'acc-' + Date.now(),
+      label: managerAccountForm.label.trim() || `${managerAccountForm.bank_name || 'Bank'} A/C`,
+      bank_name: managerAccountForm.bank_name.trim(),
+      account_number: managerAccountForm.account_number.trim(),
+      ifsc: managerAccountForm.ifsc.trim(),
+      branch: managerAccountForm.branch.trim(),
+      beneficiary_name: managerAccountForm.beneficiary_name.trim(),
+      upi_id: managerAccountForm.upi_id.trim(),
+      details_string: detailsStr,
+      is_default: false,
+    };
+
+    setPartnerAccounts((prev) => {
+      const currentList = prev[selectedManagerCompany] || [];
+      return {
+        ...prev,
+        [selectedManagerCompany]: [...currentList, newAcc],
+      };
+    });
+
+    setManagerAccountForm({
+      label: '',
+      bank_name: '',
+      account_number: '',
+      ifsc: '',
+      branch: '',
+      beneficiary_name: '',
+      upi_id: '',
+    });
+
+    toast.success(`Added new account for ${selectedManagerCompany}!`);
+  };
+
+  // Partner Bank Accounts Manager: Delete Account
+  const handleManagerDeleteAccount = (companyName, accId) => {
+    if (window.confirm('Delete this bank account from directory?')) {
+      setPartnerAccounts((prev) => {
+        const currentList = prev[companyName] || [];
+        return {
+          ...prev,
+          [companyName]: currentList.filter((a) => a.id !== accId),
+        };
+      });
+      toast.success('Account deleted');
+    }
+  };
+
+  // Partner Bank Accounts Manager: Set Default Account
+  const handleManagerSetDefault = (companyName, accId) => {
+    setPartnerAccounts((prev) => {
+      const currentList = prev[companyName] || [];
+      return {
+        ...prev,
+        [companyName]: currentList.map((a) => ({
+          ...a,
+          is_default: a.id === accId,
+        })),
+      };
+    });
+    toast.success('Set as primary transfer account');
+  };
+
+  // Partner Bank Accounts Manager: Add New B2B Company
+  const handleManagerAddCompany = (e) => {
+    e.preventDefault();
+    if (!newCompanyNameInput.trim()) return;
+    const name = newCompanyNameInput.trim();
+    if (partnerAccounts[name]) {
+      toast.error('This company already exists in directory');
+      return;
+    }
+    setPartnerAccounts((prev) => ({
+      ...prev,
+      [name]: [],
+    }));
+    setSelectedManagerCompany(name);
+    setIsAddingNewCompany(false);
+    setNewCompanyNameInput('');
+    toast.success(`Created company profile for ${name}`);
+  };
+
   // Open Export Customization Modal
   const openExportModal = (scope = 'all') => {
     if (scope === 'selected' && selectedIds.size === 0) {
@@ -693,11 +1176,9 @@ export default function B2BPayments({ setCurrentPage }) {
   // Apply Quick Column Presets
   const handleApplyExportPreset = (preset) => {
     if (preset === 'accounts_quick') {
-      // Cleanest transfer list for Accounts to make payouts
       setExportColIds(new Set(['sl_no', 'partner_name', 'transfer_account', 'student_names', 'total_amount', 'currency']));
       toast.success('Applied "Accounts Quick Transfer" columns preset');
     } else if (preset === 'accounts_gst') {
-      // Full accounts breakdown with Base + 18% GST + Total
       setExportColIds(new Set(['sl_no', 'partner_name', 'transfer_account', 'student_names', 'base_amount', 'gst_amount', 'total_amount', 'currency', 'due_date']));
       toast.success('Applied "Accounts with 18% GST" columns preset');
     } else if (preset === 'all') {
@@ -891,11 +1372,13 @@ export default function B2BPayments({ setCurrentPage }) {
     return list;
   }, [payments, statusFilter, currencyFilter, searchQuery]);
 
-  const pendingItems = filteredList.filter((p) => p.status === 'pending');
-  const completedItems = filteredList.filter((p) => p.status === 'completed');
-
   const allVisibleSelected =
     filteredList.length > 0 && filteredList.every((p) => selectedIds.has(p.id));
+
+  // Current accounts of the partner being edited in Add/Edit payment modal
+  const currentPartnerAccounts = useMemo(() => {
+    return getAccountsForPartner(formData.partner_name);
+  }, [formData.partner_name, partnerAccounts]);
 
   return (
     <div className="b2b-simple-container">
@@ -1172,7 +1655,7 @@ export default function B2BPayments({ setCurrentPage }) {
           font-size: 11.5px;
           color: var(--muted, #8B949E);
           margin-top: 3px;
-          max-width: 380px;
+          max-width: 420px;
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
@@ -1242,7 +1725,7 @@ export default function B2BPayments({ setCurrentPage }) {
           border: 1px solid var(--border-strong, rgba(148, 163, 225, 0.3));
           border-radius: 14px;
           width: 100%;
-          max-width: 540px;
+          max-width: 560px;
           max-height: 90vh;
           overflow-y: auto;
           box-shadow: 0 16px 40px rgba(0, 0, 0, 0.25);
@@ -1352,10 +1835,84 @@ export default function B2BPayments({ setCurrentPage }) {
           color: #ffffff;
         }
 
+        /* Accounts Directory Manager Styles */
+        .manager-layout {
+          display: grid;
+          grid-template-columns: 200px 1fr;
+          gap: 16px;
+          min-height: 380px;
+        }
+
+        .manager-companies-list {
+          border-right: 1px solid var(--border, rgba(148, 163, 225, 0.2));
+          padding-right: 12px;
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          overflow-y: auto;
+          max-height: 480px;
+        }
+
+        .manager-company-btn {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 8px 10px;
+          border-radius: 6px;
+          font-size: 12.5px;
+          font-weight: 600;
+          border: 1px solid transparent;
+          background: transparent;
+          color: var(--text, #EDEFFA);
+          cursor: pointer;
+          text-align: left;
+        }
+
+        .manager-company-btn:hover {
+          background: var(--bg3, #F4F6FC);
+        }
+
+        .manager-company-btn.active {
+          background: rgba(79, 70, 229, 0.12);
+          color: #4F46E5;
+          border-color: rgba(79, 70, 229, 0.3);
+        }
+
+        .acc-count-tag {
+          font-size: 11px;
+          padding: 1px 6px;
+          border-radius: 10px;
+          background: var(--bg3, #F4F6FC);
+          color: var(--muted, #8B949E);
+        }
+
+        .manager-accounts-area {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          overflow-y: auto;
+          max-height: 480px;
+          padding-right: 4px;
+        }
+
+        .account-card-box {
+          border: 1px solid var(--border, rgba(148, 163, 225, 0.2));
+          border-radius: 8px;
+          padding: 12px 14px;
+          background: var(--bg3, #F4F6FC);
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 12px;
+        }
+
         @media (max-width: 900px) {
           .simple-table {
             display: block;
             overflow-x: auto;
+          }
+          .manager-layout {
+            grid-template-columns: 1fr;
           }
         }
       `}</style>
@@ -1365,7 +1922,7 @@ export default function B2BPayments({ setCurrentPage }) {
         <div className="header-title-box">
           <h1>B2B Partner Payments & Accounts Reminders</h1>
           <p>
-            Track transfers owed to B2B sub-agents & university partners with 18% GST and beneficiary account details.
+            Track transfers owed to B2B sub-agents & university partners with multiple bank accounts and 18% GST.
           </p>
         </div>
 
@@ -1388,6 +1945,19 @@ export default function B2BPayments({ setCurrentPage }) {
             title="Choose columns and download custom Excel file"
           >
             <span>📥 Download Excel / Choose Fields...</span>
+          </button>
+
+          {/* Manage B2B Bank Accounts Button */}
+          <button
+            className="btn-simple-download"
+            onClick={() => {
+              const firstCompany = Object.keys(partnerAccounts)[0] || 'Consult Fox';
+              setSelectedManagerCompany(firstCompany);
+              setShowAccountsManagerModal(true);
+            }}
+            title="View and add multiple bank accounts for each B2B company"
+          >
+            <span>🏦 Partner Bank Accounts</span>
           </button>
 
           {/* Add Payment Button */}
@@ -1595,7 +2165,7 @@ export default function B2BPayments({ setCurrentPage }) {
                         {payment.priority && <span title="High Priority" style={{ color: '#F59E0B' }}>★</span>}
                       </div>
                       <span className="account-transfer-pill" title={payment.transfer_account || 'No account added'}>
-                        🏦 <strong>Transfer to:</strong> {payment.transfer_account || 'Click edit to add account details'}
+                        🏦 <strong>Transfer to:</strong> {payment.transfer_account || 'Click edit to choose account'}
                       </span>
                     </td>
 
@@ -1797,7 +2367,7 @@ export default function B2BPayments({ setCurrentPage }) {
         </div>
       )}
 
-      {/* 8. ADD / EDIT MODAL */}
+      {/* 8. ADD / EDIT PAYMENT MODAL (With Bank Account Selection & Multi-Account Support) */}
       {showModal && (
         <div className="b2b-modal-overlay" onClick={() => setShowModal(false)}>
           <div className="b2b-modal-card" onClick={(e) => e.stopPropagation()}>
@@ -1813,7 +2383,7 @@ export default function B2BPayments({ setCurrentPage }) {
 
             <form onSubmit={handleSaveModal}>
               <div className="b2b-modal-body">
-                {/* Partner Name */}
+                {/* Partner Name with Datalist Suggestions */}
                 <div className="form-field">
                   <label>Partner / Agency / Beneficiary Name *</label>
                   <input
@@ -1821,22 +2391,181 @@ export default function B2BPayments({ setCurrentPage }) {
                     required
                     placeholder="e.g. Consult Fox, Future Factory, Medwizard..."
                     value={formData.partner_name}
-                    onChange={(e) => setFormData({ ...formData, partner_name: e.target.value })}
+                    onChange={(e) => handlePartnerNameInput(e.target.value)}
+                    list="registered-partners-list"
                   />
+                  <datalist id="registered-partners-list">
+                    {Object.keys(partnerAccounts).map((name) => (
+                      <option key={name} value={name} />
+                    ))}
+                  </datalist>
                 </div>
 
-                {/* WHICH ACCOUNT TO TRANSFER (Accounts Team requirement) */}
+                {/* WHICH ACCOUNT TO TRANSFER (SELECT FROM PARTNER'S SAVED ACCOUNTS) */}
                 <div className="form-field">
-                  <label>Which Account to Transfer (Bank A/c, IFSC, Branch, UPI or Wire) *</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. HDFC Bank A/C: 502000... | IFSC: HDFC0000240 | UPI: id@okaxis"
-                    value={formData.transfer_account}
-                    onChange={(e) => setFormData({ ...formData, transfer_account: e.target.value })}
-                  />
-                  <span style={{ fontSize: '11px', color: 'var(--muted, #8B949E)' }}>
-                    This appears in the Accounts spreadsheet for the finance team to disburse directly.
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2px' }}>
+                    <label>
+                      Which Account to Transfer *{' '}
+                      {currentPartnerAccounts.length > 0 && (
+                        <span style={{ color: '#4F46E5', fontWeight: 600 }}>
+                          ({currentPartnerAccounts.length} account{currentPartnerAccounts.length > 1 ? 's' : ''} available)
+                        </span>
+                      )}
+                    </label>
+                    {formData.partner_name.trim() && (
+                      <button
+                        type="button"
+                        onClick={() => setIsAddingInlineAccount(!isAddingInlineAccount)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#4F46E5',
+                          fontSize: '11.5px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {isAddingInlineAccount ? '✕ Cancel' : `+ Add Another Account for ${formData.partner_name}`}
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Dropdown to pick from partner's accounts */}
+                  {currentPartnerAccounts.length > 0 && !isAddingInlineAccount && (
+                    <select
+                      value={formData.selected_account_id}
+                      onChange={(e) => handleAccountSelect(e.target.value)}
+                      style={{ padding: '8px 12px', borderRadius: '6px', fontSize: '13px' }}
+                    >
+                      <option value="">-- Choose Account to Pay --</option>
+                      {currentPartnerAccounts.map((acc) => (
+                        <option key={acc.id} value={acc.id}>
+                          {acc.label} {acc.bank_name ? `(${acc.bank_name} - ${acc.account_number || acc.upi_id})` : ''} {acc.is_default ? '★ Primary' : ''}
+                        </option>
+                      ))}
+                      <option value="__custom__">✏️ Custom / Different Account</option>
+                      <option value="__new__">+ Register New Account for this Company...</option>
+                    </select>
+                  )}
+
+                  {/* Formatted Account Preview Pill */}
+                  {!isAddingInlineAccount && formData.transfer_account && (
+                    <div
+                      style={{
+                        fontSize: '11.5px',
+                        color: '#10B981',
+                        background: 'rgba(16, 185, 129, 0.08)',
+                        border: '1px solid rgba(16, 185, 129, 0.25)',
+                        borderRadius: '6px',
+                        padding: '6px 10px',
+                        marginTop: '4px',
+                      }}
+                    >
+                      🏦 <strong>Transfer details:</strong> {formData.transfer_account}
+                    </div>
+                  )}
+
+                  {/* Manual / Custom account input if partner has no accounts or user picked custom */}
+                  {(!currentPartnerAccounts.length || formData.selected_account_id === '__custom__') && !isAddingInlineAccount && (
+                    <div>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. HDFC Bank A/C: 502000... | IFSC: HDFC0000240 | Beneficiary: ..."
+                        value={formData.transfer_account}
+                        onChange={(e) => setFormData({ ...formData, transfer_account: e.target.value })}
+                        style={{ marginTop: '4px' }}
+                      />
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', marginTop: '4px', cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={formData.save_as_new_account}
+                          onChange={(e) => setFormData({ ...formData, save_as_new_account: e.target.checked })}
+                        />
+                        <span>Save this bank account for <strong>{formData.partner_name || 'this company'}</strong> for future payments</span>
+                      </label>
+                    </div>
+                  )}
+
+                  {/* Inline New Account Creation for Partner */}
+                  {isAddingInlineAccount && (
+                    <div
+                      style={{
+                        padding: '12px 14px',
+                        background: 'var(--bg3, #F4F6FC)',
+                        borderRadius: '8px',
+                        border: '1px solid rgba(79, 70, 229, 0.3)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '8px',
+                        marginTop: '4px',
+                      }}
+                    >
+                      <div style={{ fontSize: '12px', fontWeight: 700, color: '#4F46E5' }}>
+                        Add Another Bank Account for {formData.partner_name}:
+                      </div>
+                      <div className="form-row">
+                        <input
+                          type="text"
+                          placeholder="Account Label (e.g. Secondary Current, Wise, Wire)"
+                          value={inlineAccountData.label}
+                          onChange={(e) => setInlineAccountData({ ...inlineAccountData, label: e.target.value })}
+                        />
+                        <input
+                          type="text"
+                          placeholder="Bank Name (e.g. HDFC Bank, SBI, Citibank)"
+                          value={inlineAccountData.bank_name}
+                          onChange={(e) => setInlineAccountData({ ...inlineAccountData, bank_name: e.target.value })}
+                        />
+                      </div>
+                      <div className="form-row">
+                        <input
+                          type="text"
+                          placeholder="Account Number / IBAN"
+                          value={inlineAccountData.account_number}
+                          onChange={(e) => setInlineAccountData({ ...inlineAccountData, account_number: e.target.value })}
+                        />
+                        <input
+                          type="text"
+                          placeholder="IFSC / Swift BIC Code"
+                          value={inlineAccountData.ifsc}
+                          onChange={(e) => setInlineAccountData({ ...inlineAccountData, ifsc: e.target.value })}
+                        />
+                      </div>
+                      <div className="form-row">
+                        <input
+                          type="text"
+                          placeholder="Beneficiary Name (Account Holder)"
+                          value={inlineAccountData.beneficiary_name}
+                          onChange={(e) => setInlineAccountData({ ...inlineAccountData, beneficiary_name: e.target.value })}
+                        />
+                        <input
+                          type="text"
+                          placeholder="UPI ID (Optional, e.g. consult@okaxis)"
+                          value={inlineAccountData.upi_id}
+                          onChange={(e) => setInlineAccountData({ ...inlineAccountData, upi_id: e.target.value })}
+                        />
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '2px' }}>
+                        <button
+                          type="button"
+                          className="btn-cancel"
+                          style={{ padding: '4px 10px', fontSize: '12px' }}
+                          onClick={() => setIsAddingInlineAccount(false)}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-simple-primary"
+                          style={{ padding: '4px 14px', fontSize: '12px' }}
+                          onClick={handleSaveInlineAccount}
+                        >
+                          ✓ Save Account & Use
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Linked Student */}
@@ -2002,7 +2731,256 @@ export default function B2BPayments({ setCurrentPage }) {
         </div>
       )}
 
-      {/* 9. DOWNLOAD EXCEL CUSTOMIZATION MODAL (Select what to include in Excel) */}
+      {/* 9. B2B PARTNER BANK ACCOUNTS MANAGER MODAL (Add / Manage multiple accounts per company) */}
+      {showAccountsManagerModal && (
+        <div className="b2b-modal-overlay" onClick={() => setShowAccountsManagerModal(false)}>
+          <div className="b2b-modal-card" style={{ maxWidth: '780px' }} onClick={(e) => e.stopPropagation()}>
+            <div className="b2b-modal-header">
+              <div>
+                <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>🏦</span>
+                  <span>B2B Partner Bank Accounts Directory</span>
+                </h3>
+                <span style={{ fontSize: '12px', color: 'var(--muted, #8B949E)' }}>
+                  Manage multiple bank accounts per B2B company so you can select which account to pay in ERP and Excel.
+                </span>
+              </div>
+              <button
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: 'var(--muted, #8B949E)' }}
+                onClick={() => setShowAccountsManagerModal(false)}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="b2b-modal-body">
+              <div className="manager-layout">
+                {/* Left: Companies List */}
+                <div className="manager-companies-list">
+                  <div style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--muted, #8B949E)', textTransform: 'uppercase', marginBottom: '4px' }}>
+                    B2B Companies ({Object.keys(partnerAccounts).length})
+                  </div>
+                  {Object.keys(partnerAccounts).map((compName) => {
+                    const accCount = (partnerAccounts[compName] || []).length;
+                    const isActive = selectedManagerCompany.toLowerCase() === compName.toLowerCase();
+                    return (
+                      <button
+                        key={compName}
+                        type="button"
+                        className={`manager-company-btn ${isActive ? 'active' : ''}`}
+                        onClick={() => {
+                          setSelectedManagerCompany(compName);
+                          setIsAddingNewCompany(false);
+                        }}
+                      >
+                        <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{compName}</span>
+                        <span className="acc-count-tag">{accCount}</span>
+                      </button>
+                    );
+                  })}
+
+                  {/* Add New Company Button */}
+                  {!isAddingNewCompany ? (
+                    <button
+                      type="button"
+                      className="manager-company-btn"
+                      style={{ color: '#4F46E5', border: '1px dashed #4F46E5', marginTop: '6px' }}
+                      onClick={() => setIsAddingNewCompany(true)}
+                    >
+                      + Add New Company
+                    </button>
+                  ) : (
+                    <form onSubmit={handleManagerAddCompany} style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <input
+                        type="text"
+                        autoFocus
+                        placeholder="Company Name"
+                        value={newCompanyNameInput}
+                        onChange={(e) => setNewCompanyNameInput(e.target.value)}
+                        style={{ padding: '6px 8px', fontSize: '12px', borderRadius: '4px', border: '1px solid #4F46E5' }}
+                      />
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        <button type="submit" className="btn-simple-primary" style={{ padding: '3px 8px', fontSize: '11px', flex: 1 }}>
+                          Create
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-cancel"
+                          style={{ padding: '3px 8px', fontSize: '11px' }}
+                          onClick={() => setIsAddingNewCompany(false)}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
+                  )}
+                </div>
+
+                {/* Right: Accounts for Selected Company */}
+                <div className="manager-accounts-area">
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border, rgba(148, 163, 225, 0.2))', paddingBottom: '8px' }}>
+                    <div>
+                      <h4 style={{ margin: 0, fontSize: '15px', color: 'var(--text, #EDEFFA)' }}>
+                        Accounts for: <strong>{selectedManagerCompany}</strong>
+                      </h4>
+                      <span style={{ fontSize: '11.5px', color: 'var(--muted, #8B949E)' }}>
+                        {(partnerAccounts[selectedManagerCompany] || []).length} registered bank account(s)
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* List of existing accounts for this company */}
+                  {(partnerAccounts[selectedManagerCompany] || []).length === 0 ? (
+                    <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--muted, #8B949E)', fontSize: '13px' }}>
+                      No bank accounts added for <strong>{selectedManagerCompany}</strong> yet. Use the form below to add one.
+                    </div>
+                  ) : (
+                    (partnerAccounts[selectedManagerCompany] || []).map((acc) => (
+                      <div key={acc.id} className="account-card-box">
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <strong style={{ fontSize: '13.5px', color: 'var(--text, #EDEFFA)' }}>{acc.label}</strong>
+                            {acc.is_default && (
+                              <span style={{ fontSize: '10.5px', background: '#10B981', color: '#fff', padding: '1px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                                Primary / Default
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: '12px', color: 'var(--text, #EDEFFA)', opacity: 0.85 }}>
+                            🏦 {acc.bank_name || 'Bank'} &bull; A/C: <strong>{acc.account_number || 'N/A'}</strong> {acc.ifsc && `(IFSC: ${acc.ifsc})`}
+                          </div>
+                          {acc.beneficiary_name && (
+                            <div style={{ fontSize: '11.5px', color: 'var(--muted, #8B949E)' }}>
+                              Beneficiary: {acc.beneficiary_name} {acc.branch && `• Branch: ${acc.branch}`}
+                            </div>
+                          )}
+                          {acc.upi_id && (
+                            <div style={{ fontSize: '11.5px', color: '#4F46E5' }}>
+                              UPI: <strong>{acc.upi_id}</strong>
+                            </div>
+                          )}
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-end' }}>
+                          {!acc.is_default && (
+                            <button
+                              type="button"
+                              className="btn-cancel"
+                              style={{ padding: '3px 8px', fontSize: '11px', whiteSpace: 'nowrap' }}
+                              onClick={() => handleManagerSetDefault(selectedManagerCompany, acc.id)}
+                            >
+                              Set as Default
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            className="btn-table-action"
+                            style={{ color: '#EF4444', fontSize: '12px' }}
+                            onClick={() => handleManagerDeleteAccount(selectedManagerCompany, acc.id)}
+                            title="Delete this account"
+                          >
+                            🗑️ Delete
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+
+                  {/* Add New Account Form for this Selected Company */}
+                  <div style={{ marginTop: '10px', padding: '14px', background: 'var(--bg2, #ffffff)', border: '1px solid var(--border, rgba(148, 163, 225, 0.25))', borderRadius: '8px' }}>
+                    <div style={{ fontSize: '13px', fontWeight: 700, color: '#4F46E5', marginBottom: '10px' }}>
+                      + Add New Bank Account for {selectedManagerCompany}
+                    </div>
+
+                    <form onSubmit={handleManagerAddAccount} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <div className="form-row">
+                        <div className="form-field">
+                          <label>Account Label *</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="e.g. HDFC Current A/C, ICICI Secondary, Foreign Wire"
+                            value={managerAccountForm.label}
+                            onChange={(e) => setManagerAccountForm({ ...managerAccountForm, label: e.target.value })}
+                          />
+                        </div>
+                        <div className="form-field">
+                          <label>Bank Name *</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="e.g. HDFC Bank, SBI, Citibank"
+                            value={managerAccountForm.bank_name}
+                            onChange={(e) => setManagerAccountForm({ ...managerAccountForm, bank_name: e.target.value })}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="form-row">
+                        <div className="form-field">
+                          <label>Account Number / IBAN *</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="e.g. 50200038291048 or IBAN"
+                            value={managerAccountForm.account_number}
+                            onChange={(e) => setManagerAccountForm({ ...managerAccountForm, account_number: e.target.value })}
+                          />
+                        </div>
+                        <div className="form-field">
+                          <label>IFSC / Swift BIC Code *</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="e.g. HDFC0000240 or Swift Code"
+                            value={managerAccountForm.ifsc}
+                            onChange={(e) => setManagerAccountForm({ ...managerAccountForm, ifsc: e.target.value })}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="form-row">
+                        <div className="form-field">
+                          <label>Beneficiary Name (Account Holder Name)</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Consult Fox Edutech Pvt Ltd"
+                            value={managerAccountForm.beneficiary_name}
+                            onChange={(e) => setManagerAccountForm({ ...managerAccountForm, beneficiary_name: e.target.value })}
+                          />
+                        </div>
+                        <div className="form-field">
+                          <label>UPI ID (Optional)</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. partner@okhdfcbank"
+                            value={managerAccountForm.upi_id}
+                            onChange={(e) => setManagerAccountForm({ ...managerAccountForm, upi_id: e.target.value })}
+                          />
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
+                        <button type="submit" className="btn-simple-primary" style={{ padding: '7px 18px' }}>
+                          ✓ Save Bank Account
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="b2b-modal-footer">
+              <button type="button" className="btn-simple-primary" onClick={() => setShowAccountsManagerModal(false)}>
+                Done / Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 10. DOWNLOAD EXCEL CUSTOMIZATION MODAL (Select what to include in Excel) */}
       {showExportModal && (
         <div className="b2b-modal-overlay" onClick={() => setShowExportModal(false)}>
           <div className="b2b-modal-card" style={{ maxWidth: '640px' }} onClick={(e) => e.stopPropagation()}>
