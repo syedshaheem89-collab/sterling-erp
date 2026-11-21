@@ -191,11 +191,12 @@ export default function DocumentGeneratorModal({
     remarks: 'Payment voucher submitted for Accounts verification & bank payout.',
   });
 
-  // --- 3. UNIVERSITY COMMISSION CLAIM INVOICE STATE ---
+  // --- 3. UNIVERSITY / B2B COMMISSION CLAIM INVOICE STATE ---
   const [universityInvoice, setUniversityInvoice] = useState({
     invoiceNumber: 'INV-UNI-2026-042',
     invoiceDate: new Date().toLocaleDateString('en-GB').replace(/\//g, '.'),
     dueDate: 'Due on Receipt',
+    recipientType: 'Partner University', // 'Partner University' | 'University Representative' | 'B2B Partner Agency'
     universityName: 'MCAST - Malta College of Arts, Science and Technology',
     universityCampus: 'Main Campus, Corradino Hill, Paola, Malta',
     financeEmail: 'finance.admissions@mcast.edu.mt',
@@ -207,14 +208,33 @@ export default function DocumentGeneratorModal({
     commissionPercent: 15,
     commissionAmount: 810,
     currency: 'EUR',
+    applyGst: false,
+    gstRate: 18,
+    students: [
+      {
+        id: 'stu-1',
+        studentName: 'JOICE SAMUEL',
+        studentId: 'MCAST-2026-8910',
+        country: 'Malta',
+        university: 'MCAST - Malta College of Arts, Science and Technology',
+        courseDetails: 'Introductory Certificate in Applied Science',
+        intake: 'February 2027',
+        tuitionFeePaid: 5400,
+        commissionPercent: 15,
+        commissionAmount: 810,
+      },
+    ],
+    selectedBankId: 'comp-bank-wio-1',
+    companyAddress: 'Etihad Airways Centre 5th Floor, Abu Dhabi, United Arab Emirates',
     bankDetails: {
       accountHolder: 'Sterling Overseas Consultancy LLC',
       businessId: 'WIOBAEADXXX',
-      bankName: 'WIO BANK',
+      bankName: 'WIO BANK PJSC',
       address: 'Etihad Airways Centre 5th Floor, Abu Dhabi, UAE',
-      accountNumber: 'AE620860000009569370024',
+      accountNumber: '0860000009569370024',
       iban: 'AE620860000009569370024',
       swiftCode: 'WIOBAEADXXX',
+      isDomestic: false,
     },
     remarks: 'Official Agency Commission claim for student recruitment and enrollment.',
   });
@@ -536,18 +556,32 @@ export default function DocumentGeneratorModal({
     const uniName = stu.university || stu.college || (stu.country === 'Malta' ? 'MCAST - Malta College of Arts, Science & Technology' : 'Partner European University');
     const isAlreadyReceived = Number(meta.uni_commission_received || 0) >= commAmt && commAmt > 0;
 
+    const newStuRow = {
+      id: `stu-${Date.now()}`,
+      studentName: (stu.name || 'STUDENT NAME').toUpperCase(),
+      studentId: stu.student_id || stu.passport_number || `STU-${cleanSuffix.toUpperCase()}`,
+      country: destinationCountry,
+      university: uniName,
+      courseDetails: courseName,
+      intake: stu.intake || 'Upcoming Intake',
+      tuitionFeePaid: uniFee,
+      commissionPercent: commRate,
+      commissionAmount: commAmt,
+    };
+
     setUniversityInvoice((prev) => ({
       ...prev,
       invoiceNumber: cleanUniInvNumber,
-      studentName: (stu.name || 'STUDENT NAME').toUpperCase(),
-      studentId: stu.student_id || stu.passport_number || `STU-${cleanSuffix.toUpperCase()}`,
+      studentName: newStuRow.studentName,
+      studentId: newStuRow.studentId,
       courseDetails: courseName,
-      intake: stu.intake || 'Upcoming Intake',
+      intake: newStuRow.intake,
       universityName: uniName,
       tuitionFeePaid: uniFee,
       commissionPercent: commRate,
       commissionAmount: commAmt,
       currency: feeCurr,
+      students: [newStuRow],
       isReceived: isAlreadyReceived,
       receivedAmount: Number(meta.uni_commission_received || 0),
     }));
@@ -682,10 +716,12 @@ export default function DocumentGeneratorModal({
   // Reset to a 100% Blank University Commission Claim Invoice
   const handleResetToBlankUniversityInvoice = () => {
     const todayStr = new Date().toLocaleDateString('en-GB').replace(/\//g, '.');
+    setSelectedStudentId('');
     setUniversityInvoice({
       invoiceNumber: `INV-UNI-${new Date().getFullYear()}-001`,
       invoiceDate: todayStr,
       dueDate: 'Due on Receipt',
+      recipientType: 'Partner University',
       universityName: '',
       universityCampus: '',
       financeEmail: '',
@@ -697,18 +733,136 @@ export default function DocumentGeneratorModal({
       commissionPercent: 15,
       commissionAmount: 0,
       currency: 'EUR',
+      applyGst: false,
+      gstRate: 18,
+      students: [
+        {
+          id: `stu-${Date.now()}`,
+          studentName: '',
+          studentId: '',
+          country: '',
+          university: '',
+          courseDetails: '',
+          intake: '',
+          tuitionFeePaid: 0,
+          commissionPercent: 15,
+          commissionAmount: 0,
+        },
+      ],
+      selectedBankId: 'comp-bank-wio-1',
+      companyAddress: 'Etihad Airways Centre 5th Floor, Abu Dhabi, United Arab Emirates',
       bankDetails: {
         accountHolder: 'Sterling Overseas Consultancy LLC',
         businessId: 'WIOBAEADXXX',
-        bankName: 'WIO BANK',
+        bankName: 'WIO BANK PJSC',
         address: 'Etihad Airways Centre 5th Floor, Abu Dhabi, UAE',
-        accountNumber: 'AE620860000009569370024',
+        accountNumber: '0860000009569370024',
         iban: 'AE620860000009569370024',
         swiftCode: 'WIOBAEADXXX',
+        isDomestic: false,
       },
       remarks: 'Official Agency Commission claim for student recruitment and enrollment.',
     });
-    toast.success('Reset to Blank University Commission Claim Invoice');
+    toast.success('Reset to Blank Commission Claim Invoice');
+  };
+
+  // Multi-Student Commission Claim Handlers
+  const handleUniStudentChange = (idx, field, value) => {
+    setUniversityInvoice((prev) => {
+      const list = [...(prev.students || [])];
+      const row = { ...list[idx], [field]: value };
+      if (field === 'tuitionFeePaid' || field === 'commissionPercent') {
+        const fee = Number(row.tuitionFeePaid) || 0;
+        const pct = Number(row.commissionPercent) || 0;
+        if (fee > 0 && pct > 0) {
+          row.commissionAmount = Math.round((fee * pct) / 100);
+        }
+      }
+      list[idx] = row;
+      const totalComm = list.reduce((sum, s) => sum + (Number(s.commissionAmount) || 0), 0);
+      return {
+        ...prev,
+        students: list,
+        studentName: list[0]?.studentName || '',
+        studentId: list[0]?.studentId || '',
+        courseDetails: list[0]?.courseDetails || '',
+        intake: list[0]?.intake || '',
+        commissionAmount: totalComm,
+      };
+    });
+  };
+
+  const handleAddUniStudent = () => {
+    setUniversityInvoice((prev) => ({
+      ...prev,
+      students: [
+        ...(prev.students || []),
+        {
+          id: `stu-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          studentName: '',
+          studentId: '',
+          country: '',
+          university: prev.universityName || '',
+          courseDetails: '',
+          intake: '',
+          tuitionFeePaid: 0,
+          commissionPercent: 15,
+          commissionAmount: 0,
+        },
+      ],
+    }));
+  };
+
+  const handleRemoveUniStudent = (idx) => {
+    setUniversityInvoice((prev) => {
+      const list = [...(prev.students || [])];
+      if (list.length <= 1) return prev;
+      list.splice(idx, 1);
+      const totalComm = list.reduce((sum, s) => sum + (Number(s.commissionAmount) || 0), 0);
+      return {
+        ...prev,
+        students: list,
+        commissionAmount: totalComm,
+      };
+    });
+  };
+
+  const handleAddErpStudentToUniClaim = (stu) => {
+    if (!stu) return;
+    const meta = getStudentAgentMeta(stu);
+    const uniFee = Number(stu.tuition_fee || stu.tuition || 0);
+    const commRate = 15;
+    const existingComm = Number(meta.uni_commission_committed || stu.commission || 0);
+    const commAmt = existingComm > 0 ? existingComm : (uniFee > 0 ? Math.round((uniFee * commRate) / 100) : 0);
+    const uniName = stu.university || stu.college || '';
+    const newRow = {
+      id: `stu-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      studentName: (stu.name || 'STUDENT').toUpperCase(),
+      studentId: stu.student_id || stu.passport_number || '',
+      country: stu.country || '',
+      university: uniName,
+      courseDetails: stu.course || '',
+      intake: stu.intake || '',
+      tuitionFeePaid: uniFee,
+      commissionPercent: commRate,
+      commissionAmount: commAmt,
+    };
+
+    setUniversityInvoice((prev) => {
+      const current = prev.students || [];
+      // If only 1 empty or default placeholder row, replace it; otherwise append
+      const isSingleEmpty = current.length === 1 && !current[0].studentName?.trim();
+      const updatedList = isSingleEmpty ? [newRow] : [...current, newRow];
+      const totalComm = updatedList.reduce((sum, s) => sum + (Number(s.commissionAmount) || 0), 0);
+      return {
+        ...prev,
+        universityName: prev.universityName || uniName,
+        students: updatedList,
+        studentName: updatedList[0]?.studentName || '',
+        commissionAmount: totalComm,
+      };
+    });
+    toast.success(`Added ${stu.name} to commission claim`);
   };
 
   // Recalculate Student Invoice totals
@@ -822,11 +976,16 @@ export default function DocumentGeneratorModal({
       const partner = safeSlug(b2bReceipt.partnerName, 'Partner');
       docTitle = `${kind}_${num}_${partner}`;
     } else {
-      const num = safeSlug(uniClaim?.claimNumber, 'CLAIM');
-      const uni = safeSlug(uniClaim?.universityName, 'University');
-      const stu = safeSlug(uniClaim?.studentName, 'Student');
-      docTitle = `UNI_COMMISSION_${num}_${uni}_${stu}`;
+      const num = safeSlug(universityInvoice?.invoiceNumber, 'INV-UNI');
+      const uni = safeSlug(universityInvoice?.universityName, 'Partner');
+      const stuList = universityInvoice?.students || [];
+      const stu = stuList.length > 1
+        ? `${stuList.length}_Students`
+        : safeSlug(stuList[0]?.studentName || universityInvoice?.studentName, 'Student');
+      docTitle = `COMMISSION_CLAIM_${num}_${uni}_${stu}`;
     }
+
+    const isMultiPageClaim = mode === 'university_commission' && (universityInvoice?.students?.length || 1) > 4;
 
     printWindow.document.write(`
       <!DOCTYPE html>
@@ -839,7 +998,7 @@ export default function DocumentGeneratorModal({
           <style>
             @page {
               size: A4 portrait;
-              margin: 0;
+              margin: ${isMultiPageClaim ? '8mm 0' : '0'};
             }
             * {
               box-sizing: border-box;
@@ -858,13 +1017,18 @@ export default function DocumentGeneratorModal({
             }
             .a4-sheet {
               width: 210mm;
-              height: 297mm;
-              max-height: 297mm;
+              ${isMultiPageClaim
+                ? 'min-height: 297mm; height: auto !important; max-height: none !important; overflow: visible !important;'
+                : 'height: 297mm; max-height: 297mm; overflow: hidden; page-break-after: avoid; page-break-inside: avoid;'}
               position: relative;
               background-color: #ffffff !important;
-              overflow: hidden;
-              page-break-after: avoid;
-              page-break-inside: avoid;
+            }
+            thead {
+              display: table-header-group !important;
+            }
+            tr {
+              break-inside: avoid !important;
+              page-break-inside: avoid !important;
             }
             .print-letterhead-bg {
               position: absolute !important;
@@ -1931,29 +2095,31 @@ export default function DocumentGeneratorModal({
                 </div>
               )}
 
-              {/* --- 3. UNIVERSITY COMMISSION CLAIM FORM --- */}
+              {/* --- 3. UNIVERSITY / B2B COMMISSION CLAIM FORM --- */}
               {mode === 'university_commission' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <span style={{ fontSize: '12.5px', fontWeight: 700, color: '#60A5FA' }}>
-                      University Commission Claim
+                      Commission Claim Invoice
                     </span>
-                    <span style={{ fontSize: '11px', color: '#94A3B8' }}>Billed to Partner University</span>
+                    <span style={{ fontSize: '10.5px', color: '#94A3B8' }}>
+                      {(universityInvoice.students || []).length} Student{(universityInvoice.students || []).length > 1 ? 's' : ''}
+                    </span>
                   </div>
 
-                  {/* Pick Existing Student from ERP */}
-                  <div style={{ background: 'rgba(59, 130, 246, 0.08)', border: '1px solid rgba(59, 130, 246, 0.25)', borderRadius: '6px', padding: '10px' }}>
+                  {/* Quick Add Student from ERP */}
+                  <div style={{ background: 'rgba(59, 130, 246, 0.08)', border: '1px solid rgba(59, 130, 246, 0.25)', borderRadius: '6px', padding: '8px 10px' }}>
                     <label style={{ display: 'block', color: '#93C5FD', fontSize: '11px', marginBottom: '4px', fontWeight: 700 }}>
-                      ⚡ Pick Existing Student from ERP:
+                      ⚡ Add Student from ERP (Supports 1, 10, 30+):
                     </label>
                     <select
-                      value={selectedStudentId}
+                      value=""
                       onChange={(e) => {
                         const sId = e.target.value;
-                        setSelectedStudentId(sId);
                         if (sId) {
+                          setSelectedStudentId(sId);
                           const match = erpStudentsList.find((s) => String(s.id) === String(sId));
-                          if (match) applyStudentToInvoice(match);
+                          if (match) handleAddErpStudentToUniClaim(match);
                         }
                       }}
                       style={{
@@ -1966,10 +2132,9 @@ export default function DocumentGeneratorModal({
                         fontWeight: 600,
                         fontSize: '12px',
                         outline: 'none',
-                        marginBottom: '8px',
                       }}
                     >
-                      <option value="">-- Choose Student to Auto-fill &amp; Link --</option>
+                      <option value="">+ Pick Student from ERP to Add to Claim...</option>
                       {erpStudentsList.map((stu) => (
                         <option key={stu.id} value={stu.id}>
                           {stu.name} {stu.country ? `(${stu.country})` : ''} - {stu.university || 'Uni'}
@@ -1979,7 +2144,7 @@ export default function DocumentGeneratorModal({
 
                     {/* Student Commission Link Status & Direct Mark Received Action */}
                     {selectedStudentId && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '6px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px' }}>
                           <span style={{ color: '#94A3B8' }}>Commission Status:</span>
                           {universityInvoice.isReceived ? (
@@ -1990,26 +2155,24 @@ export default function DocumentGeneratorModal({
                             </span>
                           )}
                         </div>
-
                         {!universityInvoice.isReceived ? (
                           <button
                             type="button"
                             onClick={handleMarkCommissionReceived}
                             style={{
                               width: '100%',
-                              padding: '7px 10px',
+                              padding: '6px 10px',
                               borderRadius: '6px',
                               background: 'linear-gradient(135deg, #10B981, #059669)',
                               border: 'none',
                               color: '#fff',
-                              fontSize: '11.5px',
+                              fontSize: '11px',
                               fontWeight: 800,
                               cursor: 'pointer',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
                               gap: '6px',
-                              boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)',
                             }}
                           >
                             <span>💳</span>
@@ -2017,21 +2180,36 @@ export default function DocumentGeneratorModal({
                           </button>
                         ) : (
                           <div style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.3)', color: '#34D399', padding: '5px 8px', borderRadius: '4px', fontSize: '10.5px', textAlign: 'center', fontWeight: 700 }}>
-                            ✓ Connected to Student Application &amp; Settled
+                            ✓ Connected &amp; Settled
                           </div>
                         )}
                       </div>
                     )}
                   </div>
 
-                  <div>
-                    <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Invoice #</label>
-                    <input
-                      type="text"
-                      value={universityInvoice.invoiceNumber}
-                      onChange={(e) => setUniversityInvoice({ ...universityInvoice, invoiceNumber: e.target.value })}
-                      style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff' }}
-                    />
+                  {/* Invoice Meta */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                    <div>
+                      <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Billed To Type</label>
+                      <select
+                        value={universityInvoice.recipientType || 'Partner University'}
+                        onChange={(e) => setUniversityInvoice({ ...universityInvoice, recipientType: e.target.value })}
+                        style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff', fontSize: '11.5px' }}
+                      >
+                        <option value="Partner University">Partner University</option>
+                        <option value="University Representative">University Representative</option>
+                        <option value="B2B Partner Agency">B2B Partner Agency</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Invoice #</label>
+                      <input
+                        type="text"
+                        value={universityInvoice.invoiceNumber}
+                        onChange={(e) => setUniversityInvoice({ ...universityInvoice, invoiceNumber: e.target.value })}
+                        style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff' }}
+                      />
+                    </div>
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
@@ -2056,129 +2234,293 @@ export default function DocumentGeneratorModal({
                   </div>
 
                   <div>
-                    <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>University Name *</label>
+                    <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>
+                      {universityInvoice.recipientType === 'B2B Partner Agency'
+                        ? 'B2B Agency Name *'
+                        : universityInvoice.recipientType === 'University Representative'
+                        ? 'Representative / Company Name *'
+                        : 'University Name *'}
+                    </label>
                     <input
                       type="text"
                       value={universityInvoice.universityName}
                       onChange={(e) => setUniversityInvoice({ ...universityInvoice, universityName: e.target.value })}
+                      placeholder="e.g. MCAST / ApplyBoard / Edvoy"
                       style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff', fontWeight: 600 }}
                     />
                   </div>
 
-                  <div>
-                    <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Campus / Address</label>
-                    <input
-                      type="text"
-                      value={universityInvoice.universityCampus}
-                      onChange={(e) => setUniversityInvoice({ ...universityInvoice, universityCampus: e.target.value })}
-                      style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff' }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Finance / Admissions Email</label>
-                    <input
-                      type="text"
-                      value={universityInvoice.financeEmail}
-                      onChange={(e) => setUniversityInvoice({ ...universityInvoice, financeEmail: e.target.value })}
-                      style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff' }}
-                    />
-                  </div>
-
-                  <div style={{ borderTop: '1px solid #2B3A5A', paddingTop: '10px' }}>
-                    <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#38BDF8', marginBottom: '6px' }}>Student & Commission Details</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
-                      <div>
-                        <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Student Name *</label>
-                        <input
-                          type="text"
-                          value={universityInvoice.studentName}
-                          onChange={(e) => setUniversityInvoice({ ...universityInvoice, studentName: e.target.value })}
-                          style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff' }}
-                        />
-                      </div>
-                      <div>
-                        <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Student / App #</label>
-                        <input
-                          type="text"
-                          value={universityInvoice.studentId}
-                          onChange={(e) => setUniversityInvoice({ ...universityInvoice, studentId: e.target.value })}
-                          style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff' }}
-                        />
-                      </div>
-                    </div>
-
-                    <div style={{ marginBottom: '8px' }}>
-                      <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Degree & Course</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                    <div>
+                      <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Address / Country (Optional)</label>
                       <input
                         type="text"
-                        value={universityInvoice.courseDetails}
-                        onChange={(e) => setUniversityInvoice({ ...universityInvoice, courseDetails: e.target.value })}
+                        value={universityInvoice.universityCampus}
+                        onChange={(e) => setUniversityInvoice({ ...universityInvoice, universityCampus: e.target.value })}
+                        placeholder="Campus or Agency Address"
                         style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff' }}
                       />
                     </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
-                      <div>
-                        <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Intake</label>
-                        <input
-                          type="text"
-                          value={universityInvoice.intake}
-                          onChange={(e) => setUniversityInvoice({ ...universityInvoice, intake: e.target.value })}
-                          style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff' }}
-                        />
-                      </div>
-                      <div>
-                        <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Currency</label>
-                        <select
-                          value={universityInvoice.currency}
-                          onChange={(e) => setUniversityInvoice({ ...universityInvoice, currency: e.target.value })}
-                          style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff' }}
-                        >
-                          <option value="EUR">EUR (€)</option>
-                          <option value="USD">USD ($)</option>
-                          <option value="GBP">GBP (£)</option>
-                          <option value="INR">INR (₹)</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                      <div>
-                        <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Tuition Fee Paid</label>
-                        <input
-                          type="number"
-                          value={universityInvoice.tuitionFeePaid}
-                          onChange={(e) => {
-                            const t = Number(e.target.value) || 0;
-                            const comm = Math.round((t * universityInvoice.commissionPercent) / 100);
-                            setUniversityInvoice({ ...universityInvoice, tuitionFeePaid: t, commissionAmount: comm });
-                          }}
-                          style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff' }}
-                        />
-                      </div>
-                      <div>
-                        <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Commission Rate (%)</label>
-                        <input
-                          type="number"
-                          value={universityInvoice.commissionPercent}
-                          onChange={(e) => {
-                            const p = Number(e.target.value) || 0;
-                            const comm = Math.round((universityInvoice.tuitionFeePaid * p) / 100);
-                            setUniversityInvoice({ ...universityInvoice, commissionPercent: p, commissionAmount: comm });
-                          }}
-                          style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff' }}
-                        />
-                      </div>
-                    </div>
-
-                    <div style={{ marginTop: '8px' }}>
-                      <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Total Commission Claimed</label>
+                    <div>
+                      <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Finance Email (Optional)</label>
                       <input
-                        type="number"
-                        value={universityInvoice.commissionAmount}
-                        onChange={(e) => setUniversityInvoice({ ...universityInvoice, commissionAmount: Number(e.target.value) || 0 })}
-                        style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#0B0F1C', border: '1px solid #2B3A5A', color: '#38BDF8', fontWeight: 700 }}
+                        type="text"
+                        value={universityInvoice.financeEmail}
+                        onChange={(e) => setUniversityInvoice({ ...universityInvoice, financeEmail: e.target.value })}
+                        placeholder="finance@partner.com"
+                        style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff' }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Currency & Optional GST */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '8px', alignItems: 'end' }}>
+                    <div>
+                      <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Currency</label>
+                      <select
+                        value={universityInvoice.currency}
+                        onChange={(e) => setUniversityInvoice({ ...universityInvoice, currency: e.target.value })}
+                        style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff' }}
+                      >
+                        <option value="EUR">EUR (€)</option>
+                        <option value="USD">USD ($)</option>
+                        <option value="GBP">GBP (£)</option>
+                        <option value="AED">AED (د.إ)</option>
+                        <option value="INR">INR (₹)</option>
+                      </select>
+                    </div>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#131B2E', border: '1px solid #2B3A5A', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', color: '#CBD5E1' }}>
+                      <input
+                        type="checkbox"
+                        checked={Boolean(universityInvoice.applyGst)}
+                        onChange={(e) => setUniversityInvoice({ ...universityInvoice, applyGst: e.target.checked })}
+                        style={{ accentColor: '#6366F1' }}
+                      />
+                      <span>Add 18% GST</span>
+                    </label>
+                  </div>
+
+                  {/* Multi-Student Claim List */}
+                  <div style={{ borderTop: '1px solid #2B3A5A', paddingTop: '10px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                      <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#38BDF8' }}>
+                        Students in Claim ({(universityInvoice.students || []).length})
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleAddUniStudent}
+                        style={{
+                          background: '#4F46E5',
+                          color: '#fff',
+                          border: 'none',
+                          borderRadius: '4px',
+                          padding: '3px 9px',
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        + Add Student
+                      </button>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '310px', overflowY: 'auto', paddingRight: '2px' }}>
+                      {(universityInvoice.students || []).map((stu, idx) => (
+                        <div key={stu.id || idx} style={{ background: '#131B2E', border: '1px solid #2B3A5A', borderRadius: '6px', padding: '8px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
+                            <span style={{ fontSize: '10.5px', fontWeight: 800, color: '#93C5FD' }}>Student #{idx + 1}</span>
+                            {(universityInvoice.students || []).length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveUniStudent(idx)}
+                                style={{ background: 'none', border: 'none', color: '#F87171', fontSize: '11px', cursor: 'pointer' }}
+                              >
+                                ✕ Remove
+                              </button>
+                            )}
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: '6px', marginBottom: '5px' }}>
+                            <input
+                              type="text"
+                              placeholder="Student Name *"
+                              value={stu.studentName}
+                              onChange={(e) => handleUniStudentChange(idx, 'studentName', e.target.value)}
+                              style={{ width: '100%', padding: '4px 6px', borderRadius: '4px', background: '#0B0F1C', border: '1px solid #334155', color: '#fff', fontSize: '11.5px', fontWeight: 600 }}
+                            />
+                            <input
+                              type="text"
+                              placeholder="App / Student ID (Opt)"
+                              value={stu.studentId || ''}
+                              onChange={(e) => handleUniStudentChange(idx, 'studentId', e.target.value)}
+                              style={{ width: '100%', padding: '4px 6px', borderRadius: '4px', background: '#0B0F1C', border: '1px solid #334155', color: '#fff', fontSize: '11px' }}
+                            />
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.3fr', gap: '6px', marginBottom: '5px' }}>
+                            <input
+                              type="text"
+                              placeholder="Country (Opt)"
+                              value={stu.country || ''}
+                              onChange={(e) => handleUniStudentChange(idx, 'country', e.target.value)}
+                              style={{ width: '100%', padding: '4px 6px', borderRadius: '4px', background: '#0B0F1C', border: '1px solid #334155', color: '#fff', fontSize: '11px' }}
+                            />
+                            <input
+                              type="text"
+                              placeholder="University (Opt)"
+                              value={stu.university || ''}
+                              onChange={(e) => handleUniStudentChange(idx, 'university', e.target.value)}
+                              style={{ width: '100%', padding: '4px 6px', borderRadius: '4px', background: '#0B0F1C', border: '1px solid #334155', color: '#fff', fontSize: '11px' }}
+                            />
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '6px', marginBottom: '5px' }}>
+                            <input
+                              type="text"
+                              placeholder="Course / Program (Opt)"
+                              value={stu.courseDetails || ''}
+                              onChange={(e) => handleUniStudentChange(idx, 'courseDetails', e.target.value)}
+                              style={{ width: '100%', padding: '4px 6px', borderRadius: '4px', background: '#0B0F1C', border: '1px solid #334155', color: '#fff', fontSize: '11px' }}
+                            />
+                            <input
+                              type="text"
+                              placeholder="Intake (Opt)"
+                              value={stu.intake || ''}
+                              onChange={(e) => handleUniStudentChange(idx, 'intake', e.target.value)}
+                              style={{ width: '100%', padding: '4px 6px', borderRadius: '4px', background: '#0B0F1C', border: '1px solid #334155', color: '#fff', fontSize: '11px' }}
+                            />
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 0.7fr 1fr', gap: '6px' }}>
+                            <input
+                              type="number"
+                              placeholder="Tuition (Opt)"
+                              title="Tuition Fee Paid (Optional)"
+                              value={stu.tuitionFeePaid || ''}
+                              onChange={(e) => handleUniStudentChange(idx, 'tuitionFeePaid', e.target.value)}
+                              style={{ width: '100%', padding: '4px 6px', borderRadius: '4px', background: '#0B0F1C', border: '1px solid #334155', color: '#fff', fontSize: '11px' }}
+                            />
+                            <input
+                              type="number"
+                              placeholder="Rate %"
+                              title="Commission Rate % (Optional)"
+                              value={stu.commissionPercent ?? ''}
+                              onChange={(e) => handleUniStudentChange(idx, 'commissionPercent', e.target.value)}
+                              style={{ width: '100%', padding: '4px 6px', borderRadius: '4px', background: '#0B0F1C', border: '1px solid #334155', color: '#fff', fontSize: '11px' }}
+                            />
+                            <input
+                              type="number"
+                              placeholder="Claim Amt *"
+                              title="Commission Claim Amount"
+                              value={stu.commissionAmount || ''}
+                              onChange={(e) => handleUniStudentChange(idx, 'commissionAmount', e.target.value)}
+                              style={{ width: '100%', padding: '4px 6px', borderRadius: '4px', background: '#0B0F1C', border: '1px solid #3B82F6', color: '#38BDF8', fontSize: '11.5px', fontWeight: 700 }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Receiving Bank Account Selector (Which Sterling Account to Transfer To) */}
+                  <div style={{ borderTop: '1px solid #2B3A5A', paddingTop: '10px' }}>
+                    <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px', fontWeight: 700 }}>
+                      🏦 Receiving Bank Account (Transfer To Sterling)
+                    </label>
+                    <select
+                      value={universityInvoice.selectedBankId || 'comp-bank-wio-1'}
+                      onChange={(e) => {
+                        const bId = e.target.value;
+                        if (bId === 'comp-bank-axis-1') {
+                          setUniversityInvoice((prev) => ({
+                            ...prev,
+                            selectedBankId: bId,
+                            currency: 'INR',
+                            companyAddress: '5th Floor, Hi-lite Business Park, Calicut, Kerala, India - 673014',
+                            bankDetails: {
+                              accountHolder: 'Sterling Study Abroad',
+                              businessId: '',
+                              bankName: 'Axis Bank',
+                              address: 'Tirur / Malappuram Branch, Kerala, India',
+                              accountNumber: '921020048291039',
+                              iban: 'N/A',
+                              swiftCode: 'UTIB0000829',
+                              isDomestic: true,
+                            },
+                          }));
+                        } else if (bId === 'comp-bank-fed-1') {
+                          setUniversityInvoice((prev) => ({
+                            ...prev,
+                            selectedBankId: bId,
+                            currency: 'INR',
+                            companyAddress: '5th Floor, Hi-lite Business Park, Calicut, Kerala, India - 673014',
+                            bankDetails: {
+                              accountHolder: 'Sterling Study Abroad',
+                              businessId: '',
+                              bankName: 'Federal Bank',
+                              address: 'Valanchery Main Branch, Kerala, India',
+                              accountNumber: '14200200039281',
+                              iban: 'N/A',
+                              swiftCode: 'FDRL0001420',
+                              isDomestic: true,
+                            },
+                          }));
+                        } else {
+                          setUniversityInvoice((prev) => ({
+                            ...prev,
+                            selectedBankId: 'comp-bank-wio-1',
+                            companyAddress: 'Etihad Airways Centre 5th Floor, Abu Dhabi, United Arab Emirates',
+                            bankDetails: {
+                              accountHolder: 'Sterling Overseas Consultancy LLC',
+                              businessId: 'WIOBAEADXXX',
+                              bankName: 'WIO BANK PJSC',
+                              address: 'Etihad Airways Centre 5th Floor, Abu Dhabi, UAE',
+                              accountNumber: '0860000009569370024',
+                              iban: 'AE620860000009569370024',
+                              swiftCode: 'WIOBAEADXXX',
+                              isDomestic: false,
+                            },
+                          }));
+                        }
+                      }}
+                      style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#131B2E', border: '1px solid #3B82F6', color: '#fff', fontSize: '11.5px', marginBottom: '6px' }}
+                    >
+                      <option value="comp-bank-wio-1">WIO Bank UAE (EUR/USD/GBP/AED)</option>
+                      <option value="comp-bank-axis-1">Axis Bank (India - INR)</option>
+                      <option value="comp-bank-fed-1">Federal Bank (India - INR)</option>
+                    </select>
+
+                    <input
+                      type="text"
+                      placeholder="Account Holder"
+                      value={universityInvoice.bankDetails?.accountHolder || ''}
+                      onChange={(e) => setUniversityInvoice({ ...universityInvoice, bankDetails: { ...universityInvoice.bankDetails, accountHolder: e.target.value } })}
+                      style={{ width: '100%', padding: '4px 6px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff', fontSize: '11px', marginBottom: '4px' }}
+                    />
+                    <input
+                      type="text"
+                      placeholder="Beneficiary Address (Foreign / India)"
+                      value={universityInvoice.companyAddress || ''}
+                      onChange={(e) => setUniversityInvoice({ ...universityInvoice, companyAddress: e.target.value })}
+                      style={{ width: '100%', padding: '4px 6px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff', fontSize: '11px', marginBottom: '4px' }}
+                    />
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                      <input
+                        type="text"
+                        placeholder="Account No / IBAN"
+                        value={universityInvoice.bankDetails?.isDomestic ? (universityInvoice.bankDetails?.accountNumber || '') : (universityInvoice.bankDetails?.iban || '')}
+                        onChange={(e) => setUniversityInvoice({
+                          ...universityInvoice,
+                          bankDetails: {
+                            ...universityInvoice.bankDetails,
+                            accountNumber: e.target.value,
+                            iban: e.target.value,
+                          },
+                        })}
+                        style={{ width: '100%', padding: '4px 6px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff', fontSize: '11px' }}
+                      />
+                      <input
+                        type="text"
+                        placeholder="SWIFT / IFSC Code"
+                        value={universityInvoice.bankDetails?.swiftCode || ''}
+                        onChange={(e) => setUniversityInvoice({ ...universityInvoice, bankDetails: { ...universityInvoice.bankDetails, swiftCode: e.target.value } })}
+                        style={{ width: '100%', padding: '4px 6px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff', fontSize: '11px' }}
                       />
                     </div>
                   </div>
@@ -3135,137 +3477,195 @@ export default function DocumentGeneratorModal({
                       </div>
 
                       {/* Header Meta Table */}
-                      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '16px' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '14px' }}>
                         <tbody>
                           <tr>
                             <td style={{ border: '1.5px solid #000000', padding: '8px 12px', width: '55%', verticalAlign: 'top', background: '#ffffff', color: '#000000' }}>
-                              <div style={{ fontSize: '11px', color: '#000000', fontWeight: 800 }}>BILLED TO (PARTNER UNIVERSITY):</div>
-                              <div style={{ fontSize: '14.5px', fontWeight: 900, color: '#000000' }}>
-                                {universityInvoice.universityName || 'PARTNER UNIVERSITY'}
+                              <div style={{ fontSize: '10.5px', color: '#475569', fontWeight: 800, textTransform: 'uppercase' }}>
+                                BILLED TO ({(universityInvoice.recipientType || 'Partner University').toUpperCase()}):
                               </div>
-                              <div style={{ fontSize: '11px', color: '#000000', fontWeight: 600 }}>
-                                {universityInvoice.universityCampus}
+                              <div style={{ fontSize: '14.5px', fontWeight: 900, color: '#000000', marginTop: '2px' }}>
+                                {universityInvoice.universityName || 'PARTNER UNIVERSITY / AGENCY'}
                               </div>
+                              {universityInvoice.universityCampus && (
+                                <div style={{ fontSize: '11px', color: '#000000', fontWeight: 600 }}>
+                                  {universityInvoice.universityCampus}
+                                </div>
+                              )}
                               {universityInvoice.financeEmail && (
                                 <div style={{ fontSize: '10.5px', color: '#000000', marginTop: '2px' }}>
-                                  Attn: Finance Department ({universityInvoice.financeEmail})
+                                  Attn: Finance / Accounts ({universityInvoice.financeEmail})
                                 </div>
                               )}
                             </td>
                             <td style={{ border: '1.5px solid #000000', padding: '8px 12px', width: '45%', verticalAlign: 'top', background: '#ffffff', color: '#000000' }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
                                 <span style={{ fontWeight: 800, color: '#000000' }}>Invoice No:</span>
-                                <span style={{ fontWeight: 900, color: '#000000' }}>{universityInvoice.invoiceNumber}</span>
+                                <span style={{ fontWeight: 900, color: '#000000', fontFamily: 'monospace' }}>{universityInvoice.invoiceNumber}</span>
                               </div>
                               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
                                 <span style={{ fontWeight: 800, color: '#000000' }}>Invoice Date:</span>
                                 <span style={{ fontWeight: 700, color: '#000000' }}>{universityInvoice.invoiceDate}</span>
                               </div>
-                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
                                 <span style={{ fontWeight: 800, color: '#000000' }}>Payment Terms:</span>
                                 <span style={{ fontWeight: 700, color: '#2563EB' }}>{universityInvoice.dueDate}</span>
                               </div>
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-
-                      {/* Candidate Enrolment Reference Table */}
-                      <div style={{ border: '1.5px solid #000000', background: '#F8FAFC', padding: '10px 12px', borderRadius: '4px', marginBottom: '16px' }}>
-                        <div style={{ fontWeight: 900, fontSize: '11.5px', color: '#000000', marginBottom: '6px', textTransform: 'uppercase' }}>
-                          🎓 Enrolled Candidate &amp; Program Verification
-                        </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px', fontSize: '11.5px' }}>
-                          <div>
-                            <span style={{ fontWeight: 800, color: '#000000' }}>Student Name: </span>
-                            <strong style={{ color: '#000000' }}>{universityInvoice.studentName}</strong>
-                          </div>
-                          <div>
-                            <span style={{ fontWeight: 800, color: '#000000' }}>Student / Application ID: </span>
-                            <strong style={{ color: '#000000' }}>{universityInvoice.studentId || 'N/A'}</strong>
-                          </div>
-                          <div>
-                            <span style={{ fontWeight: 800, color: '#000000' }}>Program / Degree: </span>
-                            <strong style={{ color: '#000000' }}>{universityInvoice.courseDetails}</strong>
-                          </div>
-                          <div>
-                            <span style={{ fontWeight: 800, color: '#000000' }}>Intake Session: </span>
-                            <strong style={{ color: '#000000' }}>{universityInvoice.intake}</strong>
-                          </div>
-                          <div style={{ gridColumn: 'span 2' }}>
-                            <span style={{ fontWeight: 800, color: '#000000' }}>Tuition Fee Paid to University: </span>
-                            <strong style={{ color: '#047857' }}>
-                              {Number(universityInvoice.tuitionFeePaid).toLocaleString()} {universityInvoice.currency}
-                            </strong>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Financial Commission Calculation Table */}
-                      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '16px' }}>
-                        <thead>
-                          <tr style={{ background: '#E2E8F0' }}>
-                            <th style={{ border: '1.5px solid #000000', padding: '8px 10px', textAlign: 'center', width: '45px', fontWeight: 900, color: '#000000' }}>#</th>
-                            <th style={{ border: '1.5px solid #000000', padding: '8px 10px', textAlign: 'left', fontWeight: 900, color: '#000000' }}>Service &amp; Commission Description</th>
-                            <th style={{ border: '1.5px solid #000000', padding: '8px 10px', textAlign: 'center', width: '120px', fontWeight: 900, color: '#000000' }}>Agreed Rate</th>
-                            <th style={{ border: '1.5px solid #000000', padding: '8px 10px', textAlign: 'right', width: '130px', fontWeight: 900, color: '#000000' }}>Claim Amount</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr>
-                            <td style={{ border: '1.5px solid #000000', padding: '10px', textAlign: 'center', fontWeight: 800, color: '#000000' }}>1</td>
-                            <td style={{ border: '1.5px solid #000000', padding: '10px', color: '#000000' }}>
-                              <div style={{ fontWeight: 800 }}>Student Recruitment &amp; Enrolment Agency Commission</div>
-                              <div style={{ fontSize: '11px', color: '#000000', marginTop: '2px' }}>
-                                Candidate: {universityInvoice.studentName} ({universityInvoice.courseDetails})
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ fontWeight: 800, color: '#000000' }}>Total Candidates:</span>
+                                <span style={{ fontWeight: 800, color: '#000000' }}>{(universityInvoice.students || []).length} Student{(universityInvoice.students || []).length > 1 ? 's' : ''}</span>
                               </div>
                             </td>
-                            <td style={{ border: '1.5px solid #000000', padding: '10px', textAlign: 'center', fontWeight: 800, color: '#000000' }}>
-                              {universityInvoice.commissionPercent}% of Tuition
-                            </td>
-                            <td style={{ border: '1.5px solid #000000', padding: '10px', textAlign: 'right', fontWeight: 900, color: '#000000' }}>
-                              {Number(universityInvoice.commissionAmount).toLocaleString()} {universityInvoice.currency}
-                            </td>
-                          </tr>
-
-                          {/* Grand Total */}
-                          <tr style={{ background: '#F1F5F9' }}>
-                            <td colSpan={3} style={{ border: '1.5px solid #000000', padding: '10px', fontWeight: 900, textAlign: 'right', color: '#000000' }}>
-                              TOTAL AGENCY COMMISSION PAYABLE:
-                            </td>
-                            <td style={{ border: '1.5px solid #000000', padding: '10px', textAlign: 'right', fontWeight: 900, fontSize: '15px', color: '#2563EB' }}>
-                              {Number(universityInvoice.commissionAmount).toLocaleString()} {universityInvoice.currency}
-                            </td>
                           </tr>
                         </tbody>
                       </table>
 
-                      {/* Remittance Bank Information (Sterling WIO Bank Abu Dhabi) */}
-                      <div style={{ border: '1.5px solid #000000', padding: '10px 12px', background: '#ffffff', borderRadius: '4px', marginBottom: '14px' }}>
-                        <div style={{ fontSize: '11px', fontWeight: 900, color: '#000000', textTransform: 'uppercase', marginBottom: '4px' }}>
-                          🏦 Remittance Bank Details (Wire Payment to Sterling):
+                      {/* Multi-Student Commission Schedule Table */}
+                      {(() => {
+                        const stuRows = universityInvoice.students && universityInvoice.students.length > 0
+                          ? universityInvoice.students
+                          : [{
+                              studentName: universityInvoice.studentName,
+                              studentId: universityInvoice.studentId,
+                              country: '',
+                              university: universityInvoice.universityName,
+                              courseDetails: universityInvoice.courseDetails,
+                              intake: universityInvoice.intake,
+                              tuitionFeePaid: universityInvoice.tuitionFeePaid,
+                              commissionPercent: universityInvoice.commissionPercent,
+                              commissionAmount: universityInvoice.commissionAmount,
+                            }];
+                        const subTotal = stuRows.reduce((s, r) => s + (Number(r.commissionAmount) || 0), 0);
+                        const gstAmt = universityInvoice.applyGst ? Math.round(subTotal * ((Number(universityInvoice.gstRate) || 18) / 100)) : 0;
+                        const grandTotal = subTotal + gstAmt;
+
+                        return (
+                          <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '14px', fontSize: '11px' }}>
+                            <thead>
+                              <tr style={{ background: '#E2E8F0' }}>
+                                <th style={{ border: '1.5px solid #000000', padding: '7px 6px', textAlign: 'center', width: '36px', fontWeight: 900, color: '#000000' }}>#</th>
+                                <th style={{ border: '1.5px solid #000000', padding: '7px 8px', textAlign: 'left', width: '26%', fontWeight: 900, color: '#000000' }}>Student &amp; ID</th>
+                                <th style={{ border: '1.5px solid #000000', padding: '7px 8px', textAlign: 'left', fontWeight: 900, color: '#000000' }}>Country / University / Course</th>
+                                <th style={{ border: '1.5px solid #000000', padding: '7px 8px', textAlign: 'center', width: '105px', fontWeight: 900, color: '#000000' }}>Tuition / Rate</th>
+                                <th style={{ border: '1.5px solid #000000', padding: '7px 8px', textAlign: 'right', width: '115px', fontWeight: 900, color: '#000000' }}>Claim Amount</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {stuRows.map((row, idx) => (
+                                <tr key={row.id || idx}>
+                                  <td style={{ border: '1.5px solid #000000', padding: '7px 6px', textAlign: 'center', fontWeight: 800, color: '#000000' }}>{idx + 1}</td>
+                                  <td style={{ border: '1.5px solid #000000', padding: '7px 8px', color: '#000000', verticalAlign: 'top' }}>
+                                    <div style={{ fontWeight: 900, fontSize: '11.5px' }}>{row.studentName || 'STUDENT NAME'}</div>
+                                    {row.studentId && (
+                                      <div style={{ fontSize: '10px', color: '#334155', fontFamily: 'monospace' }}>ID: {row.studentId}</div>
+                                    )}
+                                  </td>
+                                  <td style={{ border: '1.5px solid #000000', padding: '7px 8px', color: '#000000', verticalAlign: 'top', lineHeight: 1.35 }}>
+                                    {row.country && (
+                                      <div><strong>Country:</strong> {row.country}</div>
+                                    )}
+                                    {row.university && (
+                                      <div><strong>University:</strong> {row.university}</div>
+                                    )}
+                                    {row.courseDetails && (
+                                      <div><strong>Course:</strong> {row.courseDetails}{row.intake ? ` (${row.intake})` : ''}</div>
+                                    )}
+                                    {!row.country && !row.university && !row.courseDetails && (
+                                      <span style={{ color: '#475569' }}>Student Recruitment &amp; Enrolment Commission{row.intake ? ` (${row.intake})` : ''}</span>
+                                    )}
+                                  </td>
+                                  <td style={{ border: '1.5px solid #000000', padding: '7px 8px', textAlign: 'center', fontWeight: 700, color: '#000000', verticalAlign: 'top' }}>
+                                    {Number(row.tuitionFeePaid) > 0 ? (
+                                      <>
+                                        <div>{Number(row.tuitionFeePaid).toLocaleString()} {universityInvoice.currency}</div>
+                                        {Number(row.commissionPercent) > 0 && (
+                                          <div style={{ fontSize: '10px', color: '#334155' }}>@ {row.commissionPercent}%</div>
+                                        )}
+                                      </>
+                                    ) : (
+                                      <span>Agreed Fee</span>
+                                    )}
+                                  </td>
+                                  <td style={{ border: '1.5px solid #000000', padding: '7px 8px', textAlign: 'right', fontWeight: 900, color: '#000000', verticalAlign: 'top' }}>
+                                    {Number(row.commissionAmount || 0).toLocaleString()} {universityInvoice.currency}
+                                  </td>
+                                </tr>
+                              ))}
+
+                              {universityInvoice.applyGst && (
+                                <>
+                                  <tr>
+                                    <td colSpan={4} style={{ border: '1.5px solid #000000', padding: '7px 10px', fontWeight: 800, textAlign: 'right', color: '#000000' }}>
+                                      Sub Total:
+                                    </td>
+                                    <td style={{ border: '1.5px solid #000000', padding: '7px 8px', textAlign: 'right', fontWeight: 800, color: '#000000' }}>
+                                      {subTotal.toLocaleString()} {universityInvoice.currency}
+                                    </td>
+                                  </tr>
+                                  <tr>
+                                    <td colSpan={4} style={{ border: '1.5px solid #000000', padding: '7px 10px', fontWeight: 800, textAlign: 'right', color: '#000000' }}>
+                                      GST ({universityInvoice.gstRate || 18}%):
+                                    </td>
+                                    <td style={{ border: '1.5px solid #000000', padding: '7px 8px', textAlign: 'right', fontWeight: 800, color: '#000000' }}>
+                                      +{gstAmt.toLocaleString()} {universityInvoice.currency}
+                                    </td>
+                                  </tr>
+                                </>
+                              )}
+
+                              {/* Grand Total */}
+                              <tr style={{ background: '#F1F5F9' }}>
+                                <td colSpan={4} style={{ border: '1.5px solid #000000', padding: '9px 10px', fontWeight: 900, textAlign: 'right', color: '#000000' }}>
+                                  TOTAL AGENCY COMMISSION PAYABLE ({stuRows.length} Candidate{stuRows.length > 1 ? 's' : ''}):
+                                </td>
+                                <td style={{ border: '1.5px solid #000000', padding: '9px 8px', textAlign: 'right', fontWeight: 900, fontSize: '14px', color: '#2563EB' }}>
+                                  {grandTotal.toLocaleString()} {universityInvoice.currency}
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        );
+                      })()}
+
+                      {/* Remittance Bank Information (Receiving Account) */}
+                      <div style={{ border: '1.5px solid #000000', padding: '10px 12px', background: '#ffffff', borderRadius: '4px', marginBottom: '12px', breakInside: 'avoid', pageBreakInside: 'avoid' }}>
+                        <div style={{ fontSize: '11px', fontWeight: 900, color: '#000000', textTransform: 'uppercase', marginBottom: '5px' }}>
+                          🏦 Remittance Bank Details ({universityInvoice.bankDetails?.isDomestic ? 'Domestic Transfer to Sterling' : 'International Wire Payment to Sterling'}):
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3px 12px', fontSize: '11px', color: '#000000' }}>
-                          <div>Account Holder: <strong>{universityInvoice.bankDetails.accountHolder}</strong></div>
-                          <div>Bank Name: <strong style={{ color: '#047857' }}>{universityInvoice.bankDetails.bankName}</strong></div>
-                          <div>IBAN: <strong>{universityInvoice.bankDetails.iban}</strong></div>
-                          <div>SWIFT Code: <strong>{universityInvoice.bankDetails.swiftCode}</strong></div>
-                          <div style={{ gridColumn: 'span 2' }}>Bank Address: {universityInvoice.bankDetails.address}</div>
+                          <div>Account Holder: <strong>{universityInvoice.bankDetails?.accountHolder}</strong></div>
+                          <div>Bank Name: <strong style={{ color: '#047857' }}>{universityInvoice.bankDetails?.bankName}</strong></div>
+                          <div>
+                            {universityInvoice.bankDetails?.isDomestic ? 'Account No: ' : 'IBAN / A/C No: '}
+                            <strong style={{ fontFamily: 'monospace' }}>
+                              {universityInvoice.bankDetails?.isDomestic ? universityInvoice.bankDetails?.accountNumber : universityInvoice.bankDetails?.iban}
+                            </strong>
+                          </div>
+                          <div>
+                            {universityInvoice.bankDetails?.isDomestic ? 'IFSC Code: ' : 'SWIFT / BIC Code: '}
+                            <strong style={{ fontFamily: 'monospace' }}>{universityInvoice.bankDetails?.swiftCode}</strong>
+                          </div>
+                          {universityInvoice.companyAddress && (
+                            <div style={{ gridColumn: 'span 2' }}>Beneficiary Address: <strong>{universityInvoice.companyAddress}</strong></div>
+                          )}
+                          <div style={{ gridColumn: 'span 2' }}>Bank Branch Address: {universityInvoice.bankDetails?.address}</div>
                         </div>
                         <div style={{ fontSize: '10px', fontStyle: 'italic', color: '#000000', marginTop: '4px', borderTop: '1px dashed #000000', paddingTop: '3px' }}>
-                          Note: Please quote Invoice #{universityInvoice.invoiceNumber} and Candidate Name on SWIFT transfer description.
+                          Note: Please quote Invoice #{universityInvoice.invoiceNumber} on your bank transfer description.
                         </div>
                       </div>
                     </div>
 
                     {/* Authorized Signatory Block */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '20px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '18px', breakInside: 'avoid', pageBreakInside: 'avoid' }}>
                       <div style={{ fontSize: '10px', color: '#000000', fontWeight: 600 }}>
-                        Official tax invoice for international education consultancy &amp; student recruitment services.
+                        Official agency commission invoice for international education consultancy &amp; student recruitment services.
                       </div>
                       <div style={{ textAlign: 'center', width: '220px' }}>
                         <div style={{ height: '36px', borderBottom: '1.5px solid #000000', marginBottom: '6px' }}></div>
-                        <div style={{ fontWeight: 900, fontSize: '11px', color: '#000000' }}>Sterling Overseas Consultancy LLC</div>
+                        <div style={{ fontWeight: 900, fontSize: '11px', color: '#000000' }}>
+                          {universityInvoice.bankDetails?.accountHolder || 'Sterling Overseas Consultancy LLC'}
+                        </div>
                         <div style={{ fontSize: '10px', color: '#000000', fontWeight: 600 }}>Accounts Department / Authorised Signatory</div>
                       </div>
                     </div>
