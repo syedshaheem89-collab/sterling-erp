@@ -108,6 +108,7 @@ export default function StudentPopupModal({
 
       const agentMeta = {
         b2b_agent_name: editStudentData.b2b_agent_name || '',
+        b2b_category: editStudentData.b2b_category || 'B2B Partner Fee',
         b2b_committed: Number(editStudentData.b2b_committed || 0),
         b2b_paid: Number(editStudentData.b2b_paid || 0),
         b2b_currency: editStudentData.b2b_currency || 'INR',
@@ -1006,6 +1007,19 @@ export default function StudentPopupModal({
                               ))}
                             </select>
                           </div>
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Payment Category (Shown on Invoice / Sheet)</label>
+                          <select
+                            value={editStudentData.b2b_category || 'B2B Partner Fee'}
+                            onChange={(e) => setEditStudentData({ ...editStudentData, b2b_category: e.target.value })}
+                            style={{ width: '100%', padding: '5px 7px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
+                          >
+                            <option value="B2B Partner Fee">B2B Partner Fee (Processing / Partner Fund)</option>
+                            <option value="Sub-Agent Commission">Sub-Agent Commission (Referral Payout)</option>
+                            <option value="University Processing Fee">University Processing Fee</option>
+                            <option value="B2B Sub-Agent">B2B Sub-Agent</option>
+                          </select>
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
                           <div>

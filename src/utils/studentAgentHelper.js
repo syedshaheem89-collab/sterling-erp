@@ -56,6 +56,7 @@ export function formatPartnerMoney(amount, currency = 'INR') {
 
 const DEFAULT_META = {
   b2b_agent_name: '',
+  b2b_category: 'B2B Partner Fee',
   b2b_committed: 0,
   b2b_paid: 0,
   b2b_currency: 'INR',
@@ -144,6 +145,7 @@ export function getStudentAgentMeta(student) {
 export function saveStudentAgentMeta(studentId, studentName, meta, existingNotes = '') {
   const cleanMeta = {
     b2b_agent_name: meta.b2b_agent_name?.trim() || '',
+    b2b_category: meta.b2b_category || 'B2B Partner Fee',
     b2b_committed: Number(meta.b2b_committed || 0),
     b2b_paid: Number(meta.b2b_paid || 0),
     b2b_currency: meta.b2b_currency || 'INR',
@@ -250,7 +252,7 @@ export function syncStudentPartnerToB2BPayments(studentId, studentName, meta) {
         paid: Number(meta.b2b_paid || 0),
         currency: meta.b2b_currency || 'INR',
         has_gst: meta.b2b_currency === 'INR' ? (meta.b2b_has_gst !== undefined ? Boolean(meta.b2b_has_gst) : true) : false,
-        category: 'Sub-Agent Commission',
+        category: meta.b2b_category || 'B2B Partner Fee',
       },
       {
         type: 'apostille',

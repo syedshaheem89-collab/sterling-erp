@@ -410,7 +410,9 @@ export const INITIAL_B2B_PAYMENTS = [
 ];
 
 const CATEGORIES = [
+  'B2B Partner Fee',
   'Sub-Agent Commission',
+  'University Processing Fee',
   'B2B Sub-Agent',
   'VFS & Embassy Fee',
   'Local Consultancy / Partner Processing Fee',
