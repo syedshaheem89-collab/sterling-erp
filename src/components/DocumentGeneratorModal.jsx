@@ -2039,13 +2039,15 @@ export default function DocumentGeneratorModal({
                   <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between', position: 'relative' }}>
                     <div>
                       {/* Top Entity & Title */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
                         <div>
-                          <div style={{ fontWeight: 900, fontSize: '16px', color: '#000000' }}>
-                            Sterling Study Abroad &amp; Overseas Consultancy
-                          </div>
-                          <div style={{ fontSize: '11.5px', color: '#000000', fontWeight: 700 }}>
-                            Central Accounts &amp; Disbursements Division
+                          {!includeLetterheadBg && (
+                            <div style={{ fontWeight: 900, fontSize: '16px', color: '#000000', marginBottom: '2px' }}>
+                              Sterling Study Abroad &amp; Overseas Consultancy
+                            </div>
+                          )}
+                          <div style={{ fontSize: '11px', color: '#475569', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                            Central Accounts &amp; Finance Division
                           </div>
                         </div>
 
@@ -2053,7 +2055,7 @@ export default function DocumentGeneratorModal({
                           <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 900, color: '#000000', letterSpacing: '0.5px' }}>
                             {b2bReceipt.status === 'PAID' ? 'PAYMENT REMITTANCE RECEIPT' : 'PAYMENT REQUISITION & APPROVAL SLIP'}
                           </h2>
-                          <div style={{ fontSize: '11.5px', color: b2bReceipt.status === 'PAID' ? '#047857' : '#D97706', fontWeight: 800, marginTop: '2px' }}>
+                          <div style={{ fontSize: '11px', color: b2bReceipt.status === 'PAID' ? '#047857' : '#D97706', fontWeight: 800, marginTop: '2px' }}>
                             {b2bReceipt.status === 'PAID' ? 'DISBURSEMENT VOUCHER & PAYMENT ADVICE' : 'ACCOUNTS DISBURSEMENT ORDER • STERLING ACCOUNTS CLEARANCE'}
                           </div>
                         </div>

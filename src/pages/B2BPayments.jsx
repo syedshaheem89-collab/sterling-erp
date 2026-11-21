@@ -497,8 +497,9 @@ export default function B2BPayments({ setCurrentPage }) {
   const [selectedIds, setSelectedIds] = useState(new Set());
 
   // Filter & Search states
-  const [statusFilter, setStatusFilter] = useState('pending'); // 'pending', 'urgent', 'completed', 'all'
+  const [statusFilter, setStatusFilter] = useState('pending'); // 'pending', 'urgent', 'completed', 'all', 'partner_ledger'
   const [currencyFilter, setCurrencyFilter] = useState('All');
+  const [partnerFilter, setPartnerFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [completedOpen, setCompletedOpen] = useState(false);
 
@@ -785,6 +786,76 @@ export default function B2BPayments({ setCurrentPage }) {
       pendingCount,
     };
   }, [payments]);
+
+  // Partner Ledger Summary (Paid vs Remaining per B2B Partner)
+  const partnerLedgerList = useMemo(() => {
+    const map = {};
+    payments.forEach((p) => {
+      const partner = (p.partner_name || 'Unspecified Partner').trim();
+      const fin = calculateFinancials(p);
+      const curr = p.currency || 'INR';
+
+      if (!map[partner]) {
+        map[partner] = {
+          partnerName: partner,
+          currency: curr,
+          totalCommitted: 0,
+          totalBase: 0,
+          totalGst: 0,
+          totalPaid: 0,
+          remainingDue: 0,
+          pendingCount: 0,
+          completedCount: 0,
+          categories: new Set(),
+          candidates: new Set(),
+          transferAccounts: new Set(),
+        };
+      }
+
+      map[partner].totalCommitted += fin.totalAmount;
+      map[partner].totalBase += fin.baseAmount;
+      map[partner].totalGst += fin.gstAmount;
+
+      if (p.status === 'completed') {
+        map[partner].totalPaid += fin.totalAmount;
+        map[partner].completedCount += 1;
+      } else {
+        map[partner].remainingDue += fin.totalAmount;
+        map[partner].pendingCount += 1;
+      }
+
+      if (p.category) map[partner].categories.add(p.category);
+      if (p.student_names) map[partner].candidates.add(p.student_names);
+      if (p.transfer_account) map[partner].transferAccounts.add(p.transfer_account);
+    });
+
+    return Object.values(map)
+      .map((entry) => ({
+        ...entry,
+        categories: Array.from(entry.categories).join(', '),
+        candidates: Array.from(entry.candidates).join(', '),
+        transferAccount: Array.from(entry.transferAccounts)[0] || 'No account on file',
+      }))
+      .sort((a, b) => b.remainingDue - a.remainingDue);
+  }, [payments]);
+
+  // Unique partner names for filter
+  const uniquePartnerNames = useMemo(() => {
+    const names = new Set();
+    payments.forEach((p) => {
+      if (p.partner_name?.trim()) names.add(p.partner_name.trim());
+    });
+    return Array.from(names).sort();
+  }, [payments]);
+
+  const selectedPartnerLedger = useMemo(() => {
+    if (partnerFilter === 'All') return null;
+    return (
+      partnerLedgerList.find(
+        (p) => p.partnerName.toLowerCase() === partnerFilter.trim().toLowerCase()
+      ) || null
+    );
+  }, [partnerFilter, partnerLedgerList]);
 
   // Selection Checkbox Logic
   const handleToggleSelect = (id) => {
@@ -1721,6 +1792,13 @@ export default function B2BPayments({ setCurrentPage }) {
       list = list.filter((p) => p.currency === currencyFilter);
     }
 
+    // Partner filter
+    if (partnerFilter !== 'All') {
+      list = list.filter(
+        (p) => (p.partner_name || '').trim().toLowerCase() === partnerFilter.trim().toLowerCase()
+      );
+    }
+
     // Paying bank filter (Our company bank account)
     if (payingBankFilter !== 'All') {
       list = list.filter((p) => p.paying_bank_id === payingBankFilter || (p.paying_bank_name || '').toLowerCase() === payingBankFilter.toLowerCase());
@@ -2462,10 +2540,40 @@ export default function B2BPayments({ setCurrentPage }) {
           >
             All Records ({payments.length})
           </button>
+          <button
+            className={`simple-tab-btn ${statusFilter === 'partner_ledger' ? 'active' : ''}`}
+            onClick={() => setStatusFilter('partner_ledger')}
+            style={{ fontWeight: 800 }}
+          >
+            👥 Partner Balances &amp; Ledger ({partnerLedgerList.length})
+          </button>
         </div>
 
-        {/* Currency, Paying Bank & Search */}
+        {/* Currency, Partner Filter, Paying Bank & Search */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          {/* Partner Dropdown Filter */}
+          <select
+            value={partnerFilter}
+            onChange={(e) => setPartnerFilter(e.target.value)}
+            title="Filter records by B2B Partner"
+            style={{
+              padding: '6px 10px',
+              borderRadius: '6px',
+              border: '1px solid var(--border, rgba(148, 163, 225, 0.25))',
+              background: 'var(--bg2, #ffffff)',
+              color: 'var(--text, #EDEFFA)',
+              fontSize: '12.5px',
+              fontWeight: 600,
+            }}
+          >
+            <option value="All">All Partners ({uniquePartnerNames.length})</option>
+            {uniquePartnerNames.map((name) => (
+              <option key={name} value={name}>
+                🤝 {name}
+              </option>
+            ))}
+          </select>
+
           <select
             value={currencyFilter}
             onChange={(e) => setCurrencyFilter(e.target.value)}
@@ -2544,7 +2652,185 @@ export default function B2BPayments({ setCurrentPage }) {
         </div>
       )}
 
-      {/* 6. CLEAN, UNCLUTTERED FINANCIAL TABLE */}
+      {/* PARTNER LEDGER SUMMARY BANNER (WHEN FILTERED BY SPECIFIC PARTNER) */}
+      {selectedPartnerLedger && statusFilter !== 'partner_ledger' && (
+        <div
+          style={{
+            background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.98) 100%)',
+            border: '1.5px solid rgba(59, 130, 246, 0.45)',
+            borderRadius: '10px',
+            padding: '14px 18px',
+            marginBottom: '16px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '12px',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+          }}
+        >
+          <div>
+            <div style={{ fontSize: '11px', color: '#94A3B8', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.5px' }}>
+              B2B Partner Ledger Account
+            </div>
+            <div style={{ fontSize: '19px', fontWeight: 900, color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span>🤝 {selectedPartnerLedger.partnerName}</span>
+              <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '12px', background: 'rgba(59, 130, 246, 0.2)', color: '#60A5FA', fontWeight: 700 }}>
+                {selectedPartnerLedger.categories || 'B2B Partner'}
+              </span>
+            </div>
+            <div style={{ fontSize: '11.5px', color: '#CBD5E1', marginTop: '3px' }}>
+              🏦 <strong>Account:</strong> {selectedPartnerLedger.transferAccount}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+            <div style={{ background: 'rgba(255,255,255,0.06)', padding: '8px 14px', borderRadius: '8px', textAlign: 'right' }}>
+              <div style={{ fontSize: '11px', color: '#94A3B8', fontWeight: 700 }}>Total Committed</div>
+              <div style={{ fontSize: '16px', fontWeight: 900, color: '#fff' }}>
+                {formatMoney(selectedPartnerLedger.totalCommitted, selectedPartnerLedger.currency)}
+              </div>
+            </div>
+
+            <div style={{ background: 'rgba(16, 185, 129, 0.12)', border: '1px solid rgba(16, 185, 129, 0.35)', padding: '8px 14px', borderRadius: '8px', textAlign: 'right' }}>
+              <div style={{ fontSize: '11px', color: '#34D399', fontWeight: 700 }}>✓ Total Paid (Done)</div>
+              <div style={{ fontSize: '16px', fontWeight: 900, color: '#10B981' }}>
+                {formatMoney(selectedPartnerLedger.totalPaid, selectedPartnerLedger.currency)}
+              </div>
+            </div>
+
+            <div style={{ background: 'rgba(245, 158, 11, 0.12)', border: '1px solid rgba(245, 158, 11, 0.35)', padding: '8px 14px', borderRadius: '8px', textAlign: 'right' }}>
+              <div style={{ fontSize: '11px', color: '#FBBF24', fontWeight: 700 }}>⏳ Remaining Due</div>
+              <div style={{ fontSize: '17px', fontWeight: 900, color: '#F59E0B' }}>
+                {formatMoney(selectedPartnerLedger.remainingDue, selectedPartnerLedger.currency)}
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setPartnerFilter('All')}
+              style={{
+                background: 'rgba(255,255,255,0.08)',
+                border: '1px solid rgba(255,255,255,0.15)',
+                color: '#CBD5E1',
+                padding: '7px 12px',
+                borderRadius: '6px',
+                fontSize: '11.5px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              ✕ Show All Partners
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 6. PARTNER BALANCES VIEW (WHEN PARTNER LEDGER TAB IS ACTIVE) */}
+      {statusFilter === 'partner_ledger' ? (
+        <div className="simple-table-wrapper">
+          <table className="simple-table">
+            <thead>
+              <tr>
+                <th style={{ width: '40px', textAlign: 'center' }}>#</th>
+                <th>B2B Partner &amp; Category</th>
+                <th>Linked Candidate(s)</th>
+                <th>Transfer Account on File</th>
+                <th style={{ textAlign: 'right' }}>Total Committed</th>
+                <th style={{ textAlign: 'right' }}>Total Paid (Done)</th>
+                <th style={{ textAlign: 'right' }}>Remaining Due</th>
+                <th style={{ textAlign: 'center', width: '130px' }}>Settlement Rate</th>
+                <th style={{ textAlign: 'center', width: '150px' }}>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {partnerLedgerList.length === 0 ? (
+                <tr>
+                  <td colSpan="9" style={{ textAlign: 'center', padding: '36px', color: 'var(--muted, #8B949E)' }}>
+                    No B2B partner records found.
+                  </td>
+                </tr>
+              ) : (
+                partnerLedgerList.map((partner, idx) => {
+                  const percentPaid = partner.totalCommitted > 0
+                    ? Math.round((partner.totalPaid / partner.totalCommitted) * 100)
+                    : 100;
+                  const isSettled = partner.remainingDue <= 0;
+
+                  return (
+                    <tr key={partner.partnerName}>
+                      <td style={{ textAlign: 'center', fontWeight: 800 }}>{idx + 1}</td>
+                      <td>
+                        <div style={{ fontWeight: 800, fontSize: '14px', color: 'var(--text, #EDEFFA)' }}>
+                          🤝 {partner.partnerName}
+                        </div>
+                        <div style={{ fontSize: '11px', color: 'var(--muted, #8B949E)', marginTop: '2px' }}>
+                          {partner.categories || 'Sub-Agent / Referral'}
+                        </div>
+                      </td>
+                      <td style={{ fontSize: '12px', color: 'var(--text, #EDEFFA)', wordBreak: 'break-word', maxWidth: '200px' }}>
+                        {partner.candidates || 'General'}
+                      </td>
+                      <td>
+                        <span className="account-transfer-pill" title={partner.transferAccount}>
+                          🏦 {partner.transferAccount}
+                        </span>
+                      </td>
+                      <td style={{ textAlign: 'right', fontWeight: 800, fontSize: '13.5px' }}>
+                        {formatMoney(partner.totalCommitted, partner.currency)}
+                      </td>
+                      <td style={{ textAlign: 'right', fontWeight: 800, fontSize: '13.5px', color: '#10B981' }}>
+                        {formatMoney(partner.totalPaid, partner.currency)}
+                        <div style={{ fontSize: '10px', color: '#6EE7B7' }}>
+                          ({partner.completedCount} paid)
+                        </div>
+                      </td>
+                      <td style={{ textAlign: 'right', fontWeight: 900, fontSize: '14px', color: isSettled ? '#10B981' : '#F59E0B' }}>
+                        {isSettled ? '✓ Cleared' : formatMoney(partner.remainingDue, partner.currency)}
+                        {!isSettled && (
+                          <div style={{ fontSize: '10px', color: '#FCD34D' }}>
+                            ({partner.pendingCount} pending)
+                          </div>
+                        )}
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        <div style={{ fontSize: '11px', fontWeight: 800, color: isSettled ? '#10B981' : '#60A5FA', marginBottom: '3px' }}>
+                          {percentPaid}% Paid
+                        </div>
+                        <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
+                          <div
+                            style={{
+                              width: `${percentPaid}%`,
+                              height: '100%',
+                              background: isSettled ? '#10B981' : 'linear-gradient(90deg, #3B82F6 0%, #10B981 100%)',
+                              borderRadius: '3px',
+                            }}
+                          />
+                        </div>
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        <button
+                          type="button"
+                          className="btn-simple-primary"
+                          style={{ padding: '5px 12px', fontSize: '11px', background: '#3B82F6' }}
+                          onClick={() => {
+                            setPartnerFilter(partner.partnerName);
+                            setStatusFilter('all');
+                          }}
+                          title={`Filter transactions for ${partner.partnerName}`}
+                        >
+                          📋 View Transactions
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+      /* 7. CLEAN, UNCLUTTERED FINANCIAL TABLE (FOR TRANSACTIONS) */
       <div className="simple-table-wrapper">
         <table className="simple-table">
           <thead>
@@ -2822,6 +3108,7 @@ export default function B2BPayments({ setCurrentPage }) {
           </tbody>
         </table>
       </div>
+    )}
 
       {/* 7. SETTLEMENT MODAL */}
       {settlingPayment && (
@@ -4496,36 +4783,36 @@ export default function B2BPayments({ setCurrentPage }) {
               <div
                 id="accounts-disbursement-printable"
                 style={{
-                  maxWidth: '860px',
+                  maxWidth: '920px',
                   margin: '0 auto',
                   background: '#ffffff',
+                  backgroundImage: "url('/sterling-letterhead.jpg')",
+                  backgroundSize: '100% auto',
+                  backgroundRepeat: 'no-repeat',
                   color: '#000000',
-                  padding: '24px 28px',
+                  padding: '165px 28px 30px 28px',
                   borderRadius: '6px',
                   boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
                   fontFamily: "'Inter', sans-serif",
-                  fontSize: '11.5px',
+                  fontSize: '11px',
                   lineHeight: '1.4',
                 }}
               >
-                {/* Header */}
+                {/* Header (Company name removed as it is already on the letterhead banner) */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #000000', paddingBottom: '10px', marginBottom: '14px' }}>
                   <div>
-                    <h2 style={{ margin: 0, fontSize: '17px', fontWeight: 900, color: '#000000' }}>
-                      STERLING STUDY ABROAD &amp; OVERSEAS CONSULTANCY
-                    </h2>
-                    <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#000000', marginTop: '2px' }}>
-                      Accounts &amp; Finance Department &bull; B2B Payment Disbursement Order
+                    <div style={{ fontSize: '12px', fontWeight: 900, color: '#1E293B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      Central Accounts &amp; Finance Division
                     </div>
-                    <div style={{ fontSize: '10px', color: '#475569', marginTop: '1px' }}>
-                      Calicut Hi-Lite Business Park &bull; Valanchery Main &bull; Abu Dhabi WIO Bank
+                    <div style={{ fontSize: '10px', color: '#64748B', marginTop: '2px' }}>
+                      B2B Partner Disbursements &bull; Bank Net Banking Clearance Batch
                     </div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '13.5px', fontWeight: 900, color: '#047857', letterSpacing: '0.4px' }}>
+                    <div style={{ fontSize: '14px', fontWeight: 900, color: '#047857', letterSpacing: '0.4px' }}>
                       ACCOUNTS DISBURSEMENT SHEET
                     </div>
-                    <div style={{ fontSize: '11px', color: '#000000', fontWeight: 600 }}>
+                    <div style={{ fontSize: '11px', color: '#000000', fontWeight: 700 }}>
                       Date: {new Date().toLocaleDateString('en-GB').replace(/\//g, '.')}
                     </div>
                     <div style={{ fontSize: '10px', color: '#64748B' }}>
@@ -4554,24 +4841,28 @@ export default function B2BPayments({ setCurrentPage }) {
                   </div>
                 </div>
 
-                {/* Pending Payments Table with 100% fixed widths and zero horizontal scroll */}
+                {/* Pending Payments Table with separate B2B Partner, Category, Purpose, Account, Base, GST, Total Amount */}
                 <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '18px', tableLayout: 'fixed' }}>
                   <colgroup>
-                    <col style={{ width: '4%' }} />
-                    <col style={{ width: '20%' }} />
-                    <col style={{ width: '17%' }} />
-                    <col style={{ width: '31%' }} />
-                    <col style={{ width: '14%' }} />
-                    <col style={{ width: '14%' }} />
+                    <col style={{ width: '3.5%' }} />
+                    <col style={{ width: '15%' }} />
+                    <col style={{ width: '13%' }} />
+                    <col style={{ width: '15%' }} />
+                    <col style={{ width: '22%' }} />
+                    <col style={{ width: '11%' }} />
+                    <col style={{ width: '8.5%' }} />
+                    <col style={{ width: '12%' }} />
                   </colgroup>
                   <thead>
                     <tr style={{ background: '#E2E8F0' }}>
-                      <th style={{ border: '1.5px solid #000000', padding: '6px 4px', textAlign: 'center', fontWeight: 900, color: '#000000', fontSize: '10px', whiteSpace: 'normal', letterSpacing: '0px' }}>#</th>
-                      <th style={{ border: '1.5px solid #000000', padding: '6px 6px', textAlign: 'left', fontWeight: 900, color: '#000000', fontSize: '10px', whiteSpace: 'normal', letterSpacing: '0px', wordBreak: 'break-word' }}>B2B Partner &amp; Category</th>
-                      <th style={{ border: '1.5px solid #000000', padding: '6px 6px', textAlign: 'left', fontWeight: 900, color: '#000000', fontSize: '10px', whiteSpace: 'normal', letterSpacing: '0px', wordBreak: 'break-word' }}>Candidate(s)</th>
-                      <th style={{ border: '1.5px solid #000000', padding: '6px 6px', textAlign: 'left', fontWeight: 900, color: '#000000', fontSize: '10px', whiteSpace: 'normal', letterSpacing: '0px', wordBreak: 'break-word' }}>Transfer Account (Beneficiary)</th>
-                      <th style={{ border: '1.5px solid #000000', padding: '6px 6px', textAlign: 'right', fontWeight: 900, color: '#000000', fontSize: '10px', whiteSpace: 'normal', letterSpacing: '0px', wordBreak: 'break-word' }}>Amount to Pay</th>
-                      <th style={{ border: '1.5px solid #000000', padding: '6px 6px', textAlign: 'center', fontWeight: 900, color: '#000000', fontSize: '10px', whiteSpace: 'normal', letterSpacing: '0px', wordBreak: 'break-word' }}>Due &amp; Clearance</th>
+                      <th style={{ border: '1.5px solid #000000', padding: '6px 4px', textAlign: 'center', fontWeight: 900, color: '#000000', fontSize: '9.5px' }}>#</th>
+                      <th style={{ border: '1.5px solid #000000', padding: '6px 6px', textAlign: 'left', fontWeight: 900, color: '#000000', fontSize: '9.5px' }}>B2B Partner</th>
+                      <th style={{ border: '1.5px solid #000000', padding: '6px 6px', textAlign: 'left', fontWeight: 900, color: '#000000', fontSize: '9.5px' }}>Category</th>
+                      <th style={{ border: '1.5px solid #000000', padding: '6px 6px', textAlign: 'left', fontWeight: 900, color: '#000000', fontSize: '9.5px' }}>Purpose / Candidate(s)</th>
+                      <th style={{ border: '1.5px solid #000000', padding: '6px 6px', textAlign: 'left', fontWeight: 900, color: '#000000', fontSize: '9.5px' }}>Transfer Account (Credit To)</th>
+                      <th style={{ border: '1.5px solid #000000', padding: '6px 6px', textAlign: 'right', fontWeight: 900, color: '#000000', fontSize: '9.5px' }}>Base Amount</th>
+                      <th style={{ border: '1.5px solid #000000', padding: '6px 6px', textAlign: 'center', fontWeight: 900, color: '#000000', fontSize: '9.5px' }}>GST Section</th>
+                      <th style={{ border: '1.5px solid #000000', padding: '6px 6px', textAlign: 'right', fontWeight: 900, color: '#000000', fontSize: '9.5px' }}>Net Payable</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -4579,51 +4870,56 @@ export default function B2BPayments({ setCurrentPage }) {
                       const fin = calculateFinancials(p);
                       return (
                         <tr key={p.id}>
-                          <td style={{ border: '1.5px solid #000000', padding: '6px 4px', textAlign: 'center', fontWeight: 800, color: '#000000', fontSize: '11px' }}>
+                          <td style={{ border: '1.5px solid #000000', padding: '6px 4px', textAlign: 'center', fontWeight: 800, color: '#000000', fontSize: '10px' }}>
                             {idx + 1}
                           </td>
                           <td style={{ border: '1.5px solid #000000', padding: '6px 8px', color: '#000000', wordBreak: 'break-word' }}>
-                            <strong style={{ fontSize: '11.5px' }}>{p.partner_name}</strong>
-                            <div style={{ fontSize: '10px', color: '#475569' }}>{p.category || 'Commission'}</div>
+                            <strong style={{ fontSize: '11px' }}>{p.partner_name}</strong>
                           </td>
-                          <td style={{ border: '1.5px solid #000000', padding: '6px 8px', color: '#000000', fontWeight: 600, fontSize: '11px', wordBreak: 'break-word' }}>
-                            {(() => {
-                              const isBatch = p.batch_count || p.student_names?.includes('30') || p.student_names?.toLowerCase().includes('batch');
-                              const count = p.batch_count || (p.student_names?.match(/\b(\d+)\s*students?\b/i)?.[1] ? parseInt(p.student_names.match(/\b(\d+)\s*students?\b/i)[1]) : (isBatch ? 30 : null));
-                              const perCost = count && p.amount ? Math.round(p.amount / count) : null;
-                              return (
-                                <div>
-                                  <div>{p.student_names || 'General'}</div>
-                                  {count && perCost && (
-                                    <div style={{ fontSize: '9.5px', color: '#334155', fontWeight: 700, marginTop: '2px' }}>
-                                      👥 Cost/stu: {p.currency || 'INR'} {perCost.toLocaleString('en-IN')} ({count} students)
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })()}
+                          <td style={{ border: '1.5px solid #000000', padding: '6px 8px', color: '#000000', fontSize: '10px', wordBreak: 'break-word' }}>
+                            <span style={{ fontWeight: 700, color: '#1E293B' }}>{p.category || 'Commission'}</span>
                           </td>
-                          <td style={{ border: '1.5px solid #000000', padding: '6px 8px', color: '#000000', fontSize: '10px', lineHeight: '1.35', wordBreak: 'break-word' }}>
+                          <td style={{ border: '1.5px solid #000000', padding: '6px 8px', color: '#000000', fontSize: '10px', wordBreak: 'break-word' }}>
+                            <div style={{ fontWeight: 600 }}>{p.student_names || 'General Referrals'}</div>
+                          </td>
+                          <td style={{ border: '1.5px solid #000000', padding: '6px 8px', color: '#000000', fontSize: '9.5px', lineHeight: '1.35', wordBreak: 'break-word', fontFamily: 'monospace' }}>
                             {p.transfer_account || 'Account details pending'}
                           </td>
-                          <td style={{ border: '1.5px solid #000000', padding: '6px 8px', textAlign: 'right', fontWeight: 900, color: '#000000', fontSize: '11.5px', wordBreak: 'break-word' }}>
-                            {formatMoney(fin.totalAmount, p.currency)}
-                            {fin.gstAmount > 0 && (
-                              <div style={{ fontSize: '9px', color: '#64748B', fontWeight: 500 }}>(incl. 18% GST)</div>
+                          <td style={{ border: '1.5px solid #000000', padding: '6px 8px', textAlign: 'right', fontWeight: 700, color: '#000000', fontSize: '10.5px' }}>
+                            {formatMoney(fin.baseAmount, p.currency)}
+                          </td>
+                          <td style={{ border: '1.5px solid #000000', padding: '6px 6px', textAlign: 'center', color: '#000000', fontSize: '9.5px' }}>
+                            {fin.gstAmount > 0 ? (
+                              <div>
+                                <span style={{ fontWeight: 800, color: '#D97706' }}>+18% GST</span>
+                                <div style={{ fontSize: '9px', color: '#475569' }}>+{formatMoney(fin.gstAmount, p.currency)}</div>
+                              </div>
+                            ) : (
+                              <span style={{ color: '#64748B' }}>0% (Exempt)</span>
                             )}
                           </td>
-                          <td style={{ border: '1.5px solid #000000', padding: '6px 6px', textAlign: 'center', color: '#000000', fontSize: '10px' }}>
-                            <div style={{ fontWeight: 700, color: '#1E293B', marginBottom: '3px' }}>
-                              Due: {p.due_date || 'Immediate'}
-                            </div>
-                            <div style={{ borderTop: '1px dashed #CBD5E1', paddingTop: '2px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
-                              <span style={{ fontSize: '9px', color: '#64748B' }}>[ ] Paid</span>
-                              <span style={{ fontSize: '8.5px', color: '#94A3B8' }}>UTR: ________</span>
-                            </div>
+                          <td style={{ border: '1.5px solid #000000', padding: '6px 8px', textAlign: 'right', fontWeight: 900, color: '#0F172A', fontSize: '11.5px' }}>
+                            {formatMoney(fin.totalAmount, p.currency)}
                           </td>
                         </tr>
                       );
                     })}
+
+                    {/* Grand Total Row */}
+                    <tr style={{ background: '#F8FAFC' }}>
+                      <td colSpan={5} style={{ border: '1.5px solid #000000', padding: '8px 10px', fontWeight: 900, fontSize: '10.5px', color: '#000000', textAlign: 'right' }}>
+                        TOTAL DISBURSEMENT LIABILITY (NET PAYABLE):
+                      </td>
+                      <td style={{ border: '1.5px solid #000000', padding: '8px', textAlign: 'right', fontWeight: 900, fontSize: '10.5px', color: '#000000' }}>
+                        {formatMoney(metrics.pendingWithoutGstINR, 'INR')}
+                      </td>
+                      <td style={{ border: '1.5px solid #000000', padding: '8px', textAlign: 'center', fontWeight: 900, fontSize: '10px', color: '#D97706' }}>
+                        +{formatMoney(metrics.pendingGstAmountINR, 'INR')}
+                      </td>
+                      <td style={{ border: '1.5px solid #000000', padding: '8px', textAlign: 'right', fontWeight: 900, fontSize: '12px', color: '#047857' }}>
+                        {formatMoney(metrics.pendingWithGstINR, 'INR')}
+                      </td>
+                    </tr>
                   </tbody>
                 </table>
 
