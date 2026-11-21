@@ -836,205 +836,266 @@ export default function StudentPopupModal({
                 </button>
               </div>
 
-              {/* EDIT APPLICATION MODE IN DRAWER */}
-              {isEditingStudent && (
+              {/* EDIT APPLICATION MODE OR NORMAL VIEW MODE */}
+              {isEditingStudent ? (
                 <div
                   style={{
-                    background: 'rgba(20, 26, 48, 0.95)',
+                    background: 'rgba(20, 26, 48, 0.98)',
                     border: '1px solid rgba(124, 111, 255, 0.45)',
                     borderRadius: '12px',
-                    padding: '14px',
+                    padding: '16px',
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: '12px',
+                    gap: '14px',
                     boxShadow: '0 8px 30px rgba(0,0,0,0.5)',
                   }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(148, 163, 225, 0.15)', paddingBottom: '8px' }}>
-                    <span style={{ fontSize: '13px', fontWeight: 800, color: '#fff' }}>✏️ Edit Application &amp; Partners</span>
-                    <span style={{ fontSize: '10.5px', color: '#8E9BB5' }}>Accounts managed in B2B</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(148, 163, 225, 0.15)', paddingBottom: '10px' }}>
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: 800, color: '#fff' }}>✏️ Edit Application &amp; Partners</div>
+                      <div style={{ fontSize: '10.5px', color: '#8E9BB5', marginTop: '2px' }}>
+                        Update candidate details &amp; partner expense liabilities
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingStudent(false)}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#8E9BB5',
+                        fontSize: '18px',
+                        cursor: 'pointer',
+                        padding: '2px 6px',
+                      }}
+                      title="Cancel"
+                    >
+                      ✕
+                    </button>
                   </div>
 
                   {/* Candidate Fields */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                    <div>
-                      <label style={{ fontSize: '10.5px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Full Name *</label>
-                      <input
-                        type="text"
-                        value={editStudentData.name || ''}
-                        onChange={(e) => setEditStudentData({ ...editStudentData, name: e.target.value })}
-                        style={{ width: '100%', padding: '6px 8px', fontSize: '12px', borderRadius: '6px', border: '1px solid rgba(148, 163, 225, 0.25)', background: '#0F172A', color: '#fff' }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: '10.5px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Country</label>
-                      <input
-                        type="text"
-                        value={editStudentData.country || ''}
-                        onChange={(e) => setEditStudentData({ ...editStudentData, country: e.target.value })}
-                        style={{ width: '100%', padding: '6px 8px', fontSize: '12px', borderRadius: '6px', border: '1px solid rgba(148, 163, 225, 0.25)', background: '#0F172A', color: '#fff' }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: '10.5px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Target Intake</label>
-                      <input
-                        type="text"
-                        value={editStudentData.intake || ''}
-                        onChange={(e) => setEditStudentData({ ...editStudentData, intake: e.target.value })}
-                        style={{ width: '100%', padding: '6px 8px', fontSize: '12px', borderRadius: '6px', border: '1px solid rgba(148, 163, 225, 0.25)', background: '#0F172A', color: '#fff' }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: '10.5px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>University</label>
-                      <input
-                        type="text"
-                        value={editStudentData.university || ''}
-                        onChange={(e) => setEditStudentData({ ...editStudentData, university: e.target.value })}
-                        style={{ width: '100%', padding: '6px 8px', fontSize: '12px', borderRadius: '6px', border: '1px solid rgba(148, 163, 225, 0.25)', background: '#0F172A', color: '#fff' }}
-                      />
-                    </div>
-                  </div>
-
                   <div>
-                    <label style={{ fontSize: '10.5px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Committed from Student (₹)</label>
-                    <input
-                      type="number"
-                      value={editStudentData.committed || ''}
-                      onChange={(e) => setEditStudentData({ ...editStudentData, committed: e.target.value })}
-                      style={{ width: '100%', padding: '6px 8px', fontSize: '12px', borderRadius: '6px', border: '1px solid rgba(148, 163, 225, 0.25)', background: '#0F172A', color: '#fff' }}
-                    />
+                    <div style={{ fontSize: '11px', fontWeight: 800, color: '#818CF8', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+                      📋 Application Basics
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                      <div style={{ gridColumn: 'span 2' }}>
+                        <label style={{ fontSize: '10.5px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Full Name *</label>
+                        <input
+                          type="text"
+                          value={editStudentData.name || ''}
+                          onChange={(e) => setEditStudentData({ ...editStudentData, name: e.target.value })}
+                          placeholder="Candidate Name"
+                          style={{ width: '100%', padding: '7px 9px', fontSize: '12px', borderRadius: '6px', border: '1px solid rgba(148, 163, 225, 0.25)', background: '#0F172A', color: '#fff' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '10.5px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Country</label>
+                        <input
+                          type="text"
+                          value={editStudentData.country || ''}
+                          onChange={(e) => setEditStudentData({ ...editStudentData, country: e.target.value })}
+                          placeholder="e.g. Lithuania"
+                          style={{ width: '100%', padding: '7px 9px', fontSize: '12px', borderRadius: '6px', border: '1px solid rgba(148, 163, 225, 0.25)', background: '#0F172A', color: '#fff' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '10.5px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Target Intake</label>
+                        <input
+                          type="text"
+                          value={editStudentData.intake || ''}
+                          onChange={(e) => setEditStudentData({ ...editStudentData, intake: e.target.value })}
+                          placeholder="e.g. Sept 2027"
+                          style={{ width: '100%', padding: '7px 9px', fontSize: '12px', borderRadius: '6px', border: '1px solid rgba(148, 163, 225, 0.25)', background: '#0F172A', color: '#fff' }}
+                        />
+                      </div>
+                      <div style={{ gridColumn: 'span 2' }}>
+                        <label style={{ fontSize: '10.5px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>University</label>
+                        <input
+                          type="text"
+                          value={editStudentData.university || ''}
+                          onChange={(e) => setEditStudentData({ ...editStudentData, university: e.target.value })}
+                          placeholder="e.g. LSMU"
+                          style={{ width: '100%', padding: '7px 9px', fontSize: '12px', borderRadius: '6px', border: '1px solid rgba(148, 163, 225, 0.25)', background: '#0F172A', color: '#fff' }}
+                        />
+                      </div>
+                      <div style={{ gridColumn: 'span 2' }}>
+                        <label style={{ fontSize: '10.5px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Committed from Student (₹)</label>
+                        <input
+                          type="number"
+                          value={editStudentData.committed || ''}
+                          onChange={(e) => setEditStudentData({ ...editStudentData, committed: e.target.value })}
+                          placeholder="e.g. 150000"
+                          style={{ width: '100%', padding: '7px 9px', fontSize: '12px', borderRadius: '6px', border: '1px solid rgba(148, 163, 225, 0.25)', background: '#0F172A', color: '#fff' }}
+                        />
+                      </div>
+                    </div>
                   </div>
 
                   {/* 3 Dedicated Partner Cards */}
-                  {/* 1. B2B Sub-Agent */}
-                  <div style={{ background: 'rgba(99, 102, 241, 0.1)', border: '1px solid rgba(99, 102, 241, 0.3)', borderRadius: '8px', padding: '10px' }}>
-                    <div style={{ fontSize: '11px', fontWeight: 700, color: '#C7D2FE', marginBottom: '6px' }}>🤝 B2B Sub-Agent / Referral Partner</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: '6px' }}>
-                      <div>
-                        <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Agent Name</label>
-                        <input
-                          type="text"
-                          list="popup-b2b-list"
-                          value={editStudentData.b2b_agent_name || ''}
-                          onChange={(e) => setEditStudentData({ ...editStudentData, b2b_agent_name: e.target.value })}
-                          placeholder="e.g. Consult Fox"
-                          style={{ width: '100%', padding: '5px 6px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
-                        />
-                        <datalist id="popup-b2b-list">
-                          {KNOWN_B2B_PARTNERS.map((a) => (
-                            <option key={a} value={a} />
-                          ))}
-                        </datalist>
+                  <div>
+                    <div style={{ fontSize: '11px', fontWeight: 800, color: '#10B981', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+                      🤝 External Partner Costs
+                    </div>
+
+                    {/* 1. B2B Sub-Agent */}
+                    <div style={{ background: 'rgba(99, 102, 241, 0.08)', border: '1px solid rgba(99, 102, 241, 0.28)', borderRadius: '8px', padding: '10px', marginBottom: '8px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <span style={{ fontSize: '11px', fontWeight: 700, color: '#C7D2FE' }}>🤝 B2B Sub-Agent / Partner</span>
+                        {Number(editStudentData.b2b_committed) > 0 && (
+                          <span style={{ fontSize: '10.5px', color: '#FCD34D', fontWeight: 700 }}>
+                            Due: ₹{Math.max(0, Number(editStudentData.b2b_committed) - (Number(editStudentData.b2b_paid) || 0)).toLocaleString('en-IN')}
+                          </span>
+                        )}
                       </div>
-                      <div>
-                        <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Committed (₹)</label>
-                        <input
-                          type="number"
-                          value={editStudentData.b2b_committed || ''}
-                          onChange={(e) => setEditStudentData({ ...editStudentData, b2b_committed: e.target.value })}
-                          style={{ width: '100%', padding: '5px 6px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
-                        />
-                      </div>
-                      <div>
-                        <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Paid (₹)</label>
-                        <input
-                          type="number"
-                          value={editStudentData.b2b_paid || ''}
-                          onChange={(e) => setEditStudentData({ ...editStudentData, b2b_paid: e.target.value })}
-                          style={{ width: '100%', padding: '5px 6px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
-                        />
+                      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: '6px' }}>
+                        <div>
+                          <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Agent Name</label>
+                          <input
+                            type="text"
+                            list="popup-b2b-list"
+                            value={editStudentData.b2b_agent_name || ''}
+                            onChange={(e) => setEditStudentData({ ...editStudentData, b2b_agent_name: e.target.value })}
+                            placeholder="e.g. Consult Fox"
+                            style={{ width: '100%', padding: '5px 7px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
+                          />
+                          <datalist id="popup-b2b-list">
+                            {KNOWN_B2B_PARTNERS.map((a) => (
+                              <option key={a} value={a} />
+                            ))}
+                          </datalist>
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Committed (₹)</label>
+                          <input
+                            type="number"
+                            value={editStudentData.b2b_committed || ''}
+                            onChange={(e) => setEditStudentData({ ...editStudentData, b2b_committed: e.target.value })}
+                            placeholder="0"
+                            style={{ width: '100%', padding: '5px 7px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Paid (₹)</label>
+                          <input
+                            type="number"
+                            value={editStudentData.b2b_paid || ''}
+                            onChange={(e) => setEditStudentData({ ...editStudentData, b2b_paid: e.target.value })}
+                            placeholder="0"
+                            style={{ width: '100%', padding: '5px 7px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
+                          />
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* 2. Apostille Partner */}
-                  <div style={{ background: 'rgba(139, 92, 246, 0.1)', border: '1px solid rgba(139, 92, 246, 0.3)', borderRadius: '8px', padding: '10px' }}>
-                    <div style={{ fontSize: '11px', fontWeight: 700, color: '#DDD6FE', marginBottom: '6px' }}>📑 Apostille (General Expense)</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: '6px' }}>
-                      <div>
-                        <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Apostille Agent</label>
-                        <input
-                          type="text"
-                          list="popup-apostille-list"
-                          value={editStudentData.apostille_agent || ''}
-                          onChange={(e) => setEditStudentData({ ...editStudentData, apostille_agent: e.target.value })}
-                          placeholder="e.g. Comfort Travel"
-                          style={{ width: '100%', padding: '5px 6px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
-                        />
-                        <datalist id="popup-apostille-list">
-                          {KNOWN_APOSTILLE_AGENTS.map((a) => (
-                            <option key={a} value={a} />
-                          ))}
-                        </datalist>
+                    {/* 2. Apostille Partner */}
+                    <div style={{ background: 'rgba(139, 92, 246, 0.08)', border: '1px solid rgba(139, 92, 246, 0.28)', borderRadius: '8px', padding: '10px', marginBottom: '8px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <span style={{ fontSize: '11px', fontWeight: 700, color: '#DDD6FE' }}>📑 Apostille (General Expense)</span>
+                        {Number(editStudentData.apostille_committed) > 0 && (
+                          <span style={{ fontSize: '10.5px', color: '#FCD34D', fontWeight: 700 }}>
+                            Due: ₹{Math.max(0, Number(editStudentData.apostille_committed) - (Number(editStudentData.apostille_paid) || 0)).toLocaleString('en-IN')}
+                          </span>
+                        )}
                       </div>
-                      <div>
-                        <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Committed (₹)</label>
-                        <input
-                          type="number"
-                          value={editStudentData.apostille_committed || ''}
-                          onChange={(e) => setEditStudentData({ ...editStudentData, apostille_committed: e.target.value })}
-                          style={{ width: '100%', padding: '5px 6px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
-                        />
-                      </div>
-                      <div>
-                        <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Paid (₹)</label>
-                        <input
-                          type="number"
-                          value={editStudentData.apostille_paid || ''}
-                          onChange={(e) => setEditStudentData({ ...editStudentData, apostille_paid: e.target.value })}
-                          style={{ width: '100%', padding: '5px 6px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
-                        />
+                      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: '6px' }}>
+                        <div>
+                          <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Apostille Agent</label>
+                          <input
+                            type="text"
+                            list="popup-apostille-list"
+                            value={editStudentData.apostille_agent || ''}
+                            onChange={(e) => setEditStudentData({ ...editStudentData, apostille_agent: e.target.value })}
+                            placeholder="e.g. Comfort Travel"
+                            style={{ width: '100%', padding: '5px 7px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
+                          />
+                          <datalist id="popup-apostille-list">
+                            {KNOWN_APOSTILLE_AGENTS.map((a) => (
+                              <option key={a} value={a} />
+                            ))}
+                          </datalist>
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Committed (₹)</label>
+                          <input
+                            type="number"
+                            value={editStudentData.apostille_committed || ''}
+                            onChange={(e) => setEditStudentData({ ...editStudentData, apostille_committed: e.target.value })}
+                            placeholder="0"
+                            style={{ width: '100%', padding: '5px 7px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Paid (₹)</label>
+                          <input
+                            type="number"
+                            value={editStudentData.apostille_paid || ''}
+                            onChange={(e) => setEditStudentData({ ...editStudentData, apostille_paid: e.target.value })}
+                            placeholder="0"
+                            style={{ width: '100%', padding: '5px 7px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
+                          />
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* 3. Insurance Partner */}
-                  <div style={{ background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '8px', padding: '10px' }}>
-                    <div style={{ fontSize: '11px', fontWeight: 700, color: '#A7F3D0', marginBottom: '6px' }}>🛡️ Insurance / VFS Partner</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: '6px' }}>
-                      <div>
-                        <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Insurance Partner</label>
-                        <input
-                          type="text"
-                          list="popup-insurance-list"
-                          value={editStudentData.insurance_agent || ''}
-                          onChange={(e) => setEditStudentData({ ...editStudentData, insurance_agent: e.target.value })}
-                          placeholder="e.g. VFS & Insurance"
-                          style={{ width: '100%', padding: '5px 6px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
-                        />
-                        <datalist id="popup-insurance-list">
-                          {KNOWN_INSURANCE_AGENTS.map((a) => (
-                            <option key={a} value={a} />
-                          ))}
-                        </datalist>
+                    {/* 3. Insurance Partner */}
+                    <div style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.28)', borderRadius: '8px', padding: '10px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <span style={{ fontSize: '11px', fontWeight: 700, color: '#A7F3D0' }}>🛡️ Insurance / VFS Partner</span>
+                        {Number(editStudentData.insurance_committed) > 0 && (
+                          <span style={{ fontSize: '10.5px', color: '#FCD34D', fontWeight: 700 }}>
+                            Due: ₹{Math.max(0, Number(editStudentData.insurance_committed) - (Number(editStudentData.insurance_paid) || 0)).toLocaleString('en-IN')}
+                          </span>
+                        )}
                       </div>
-                      <div>
-                        <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Committed (₹)</label>
-                        <input
-                          type="number"
-                          value={editStudentData.insurance_committed || ''}
-                          onChange={(e) => setEditStudentData({ ...editStudentData, insurance_committed: e.target.value })}
-                          style={{ width: '100%', padding: '5px 6px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
-                        />
-                      </div>
-                      <div>
-                        <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Paid (₹)</label>
-                        <input
-                          type="number"
-                          value={editStudentData.insurance_paid || ''}
-                          onChange={(e) => setEditStudentData({ ...editStudentData, insurance_paid: e.target.value })}
-                          style={{ width: '100%', padding: '5px 6px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
-                        />
+                      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: '6px' }}>
+                        <div>
+                          <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Insurance Partner</label>
+                          <input
+                            type="text"
+                            list="popup-insurance-list"
+                            value={editStudentData.insurance_agent || ''}
+                            onChange={(e) => setEditStudentData({ ...editStudentData, insurance_agent: e.target.value })}
+                            placeholder="e.g. VFS & Insurance"
+                            style={{ width: '100%', padding: '5px 7px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
+                          />
+                          <datalist id="popup-insurance-list">
+                            {KNOWN_INSURANCE_AGENTS.map((a) => (
+                              <option key={a} value={a} />
+                            ))}
+                          </datalist>
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Committed (₹)</label>
+                          <input
+                            type="number"
+                            value={editStudentData.insurance_committed || ''}
+                            onChange={(e) => setEditStudentData({ ...editStudentData, insurance_committed: e.target.value })}
+                            placeholder="0"
+                            style={{ width: '100%', padding: '5px 7px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Paid (₹)</label>
+                          <input
+                            type="number"
+                            value={editStudentData.insurance_paid || ''}
+                            onChange={(e) => setEditStudentData({ ...editStudentData, insurance_paid: e.target.value })}
+                            placeholder="0"
+                            style={{ width: '100%', padding: '5px 7px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>
 
                   {/* Buttons */}
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '6px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '6px', paddingTop: '10px', borderTop: '1px solid rgba(148, 163, 225, 0.15)' }}>
                     <button
                       type="button"
                       onClick={() => setIsEditingStudent(false)}
-                      style={{ padding: '7px 14px', borderRadius: '8px', background: 'transparent', border: '1px solid #475569', color: '#8E9BB5', fontSize: '12px', cursor: 'pointer' }}
+                      style={{ padding: '8px 16px', borderRadius: '8px', background: 'transparent', border: '1px solid #475569', color: '#8E9BB5', fontSize: '12px', cursor: 'pointer' }}
                     >
                       Cancel
                     </button>
@@ -1042,15 +1103,15 @@ export default function StudentPopupModal({
                       type="button"
                       onClick={handleSaveEdit}
                       disabled={isSavingStudent}
-                      style={{ padding: '7px 18px', borderRadius: '8px', background: 'linear-gradient(135deg, #10B981, #059669)', border: 'none', color: '#fff', fontSize: '12px', fontWeight: 700, cursor: isSavingStudent ? 'wait' : 'pointer' }}
+                      style={{ padding: '8px 20px', borderRadius: '8px', background: 'linear-gradient(135deg, #10B981, #059669)', border: 'none', color: '#fff', fontSize: '12px', fontWeight: 700, cursor: isSavingStudent ? 'wait' : 'pointer' }}
                     >
                       {isSavingStudent ? 'Saving...' : '✓ Save Changes'}
                     </button>
                   </div>
                 </div>
-              )}
-
-              {/* General Info Card */}
+              ) : (
+                <>
+                  {/* General Info Card */}
               <div
                 style={{
                   background: 'rgba(20, 26, 48, 0.55)',
@@ -1670,6 +1731,8 @@ export default function StudentPopupModal({
                   )}
                 </div>
               </div>
+            </>
+          )}
 
                 </div>
               );

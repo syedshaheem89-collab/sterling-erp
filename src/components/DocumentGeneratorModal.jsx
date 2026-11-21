@@ -727,10 +727,15 @@ export default function DocumentGeneratorModal({
               min-height: 297mm;
               height: 297mm;
               position: relative;
-              padding: ${includeLetterheadBg ? '48mm 18mm 25mm 18mm' : '45mm 18mm 25mm 18mm'};
+              padding: ${includeLetterheadBg ? '8mm 14mm 14mm 14mm' : '16mm 14mm 14mm 14mm'};
               background-color: #ffffff !important;
-              ${includeLetterheadBg ? "background-image: url('/sterling-letterhead.jpg'); background-size: 100% 100%; background-repeat: no-repeat;" : 'background-image: none !important;'}
               overflow: hidden;
+            }
+            .a4-sheet img {
+              max-width: 100% !important;
+              height: auto !important;
+              display: block !important;
+              margin-bottom: 14px !important;
             }
             table {
               border-collapse: collapse !important;
@@ -779,11 +784,29 @@ export default function DocumentGeneratorModal({
           </div>
           <script>
             window.onload = function() {
-              setTimeout(function() {
+              var imgs = document.images;
+              var len = imgs.length;
+              var counter = 0;
+              function doPrint() {
                 window.focus();
                 window.print();
                 window.close();
-              }, 400);
+              }
+              if (len === 0) {
+                setTimeout(doPrint, 250);
+              } else {
+                for (var i = 0; i < len; i++) {
+                  if (imgs[i].complete) {
+                    counter++;
+                    if (counter === len) setTimeout(doPrint, 250);
+                  } else {
+                    imgs[i].onload = imgs[i].onerror = function() {
+                      counter++;
+                      if (counter === len) setTimeout(doPrint, 250);
+                    };
+                  }
+                }
+              }
             };
           </script>
         </body>
@@ -1755,14 +1778,24 @@ export default function DocumentGeneratorModal({
                 fontFamily: "'Inter', sans-serif",
                 fontSize: '12px',
                 lineHeight: 1.45,
-                backgroundImage: includeLetterheadBg ? "url('/sterling-letterhead.jpg')" : 'none',
-                backgroundSize: '100% 100%',
-                backgroundRepeat: 'no-repeat',
-                padding: '175px 50px 75px 50px', // Exact space for letterhead top header & bottom footer
+                padding: includeLetterheadBg ? '22px 42px 45px 42px' : '36px 42px 45px 42px',
               }}
             >
               {/* PRINT CONTENT REF */}
               <div ref={printContainerRef} style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
+                {/* Physical in-flow letterhead image: 100% PDF/print reliability and zero text collisions */}
+                {includeLetterheadBg && (
+                  <img
+                    src="/sterling-letterhead.jpg"
+                    alt="Sterling Study Abroad"
+                    style={{
+                      width: '100%',
+                      height: 'auto',
+                      display: 'block',
+                      marginBottom: '16px',
+                    }}
+                  />
+                )}
                 
                 {/* ======================================================== */}
                 {/* 1. DUBAI STUDENT INVOICE & OFFICIAL RECEIPT */}

@@ -4771,9 +4771,18 @@ export default function B2BPayments({ setCurrentPage }) {
                   top: 0 !important;
                   width: 100% !important;
                   margin: 0 !important;
-                  padding: 10px 15px !important;
+                  padding: 8mm 10mm !important;
                   box-shadow: none !important;
                   border: none !important;
+                  -webkit-print-color-adjust: exact !important;
+                  print-color-adjust: exact !important;
+                }
+                #accounts-disbursement-printable img.print-letterhead {
+                  width: 100% !important;
+                  height: auto !important;
+                  display: block !important;
+                  margin-bottom: 12px !important;
+                  visibility: visible !important;
                 }
               }
             `}</style>
@@ -4786,11 +4795,8 @@ export default function B2BPayments({ setCurrentPage }) {
                   maxWidth: '920px',
                   margin: '0 auto',
                   background: '#ffffff',
-                  backgroundImage: "url('/sterling-letterhead.jpg')",
-                  backgroundSize: '100% auto',
-                  backgroundRepeat: 'no-repeat',
                   color: '#000000',
-                  padding: '165px 28px 30px 28px',
+                  padding: '20px 26px 30px 26px',
                   borderRadius: '6px',
                   boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
                   fontFamily: "'Inter', sans-serif",
@@ -4798,6 +4804,20 @@ export default function B2BPayments({ setCurrentPage }) {
                   lineHeight: '1.4',
                 }}
               >
+                {/* Physical in-flow letterhead image: guarantees 100% PDF/print capture and zero text collisions */}
+                <img
+                  src="/sterling-letterhead.jpg"
+                  alt="Sterling Study Abroad"
+                  className="print-letterhead"
+                  style={{
+                    width: '100%',
+                    height: 'auto',
+                    display: 'block',
+                    marginBottom: '16px',
+                    borderRadius: '4px',
+                  }}
+                />
+
                 {/* Header (Company name removed as it is already on the letterhead banner) */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #000000', paddingBottom: '10px', marginBottom: '14px' }}>
                   <div>
