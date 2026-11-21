@@ -2086,6 +2086,10 @@ export default function Students({ setCurrentPage, initialFilter } = {}) {
           onOpenAddPayment={(slot) => handleOpenAddPayment(currentStudent, slot)}
           onOpenEditPayment={(pmt) => handleOpenEditPayment(currentStudent, pmt)}
           onDeletePayment={handleDeletePayment}
+          onOpenDubaiInvoice={() => {
+            setDocStudentData(currentStudent);
+            setShowDocModal(true);
+          }}
           onClose={() => setShowStudentModal(false)}
         />
       )}
@@ -2132,6 +2136,17 @@ export default function Students({ setCurrentPage, initialFilter } = {}) {
         isOpen={showMasterImporterModal}
         onClose={() => setShowMasterImporterModal(false)}
         onImportSuccess={() => fetchStudents()}
+      />
+
+      {/* Official Dubai Student Invoice & B2B Receipt Generator */}
+      <DocumentGeneratorModal
+        isOpen={showDocModal}
+        onClose={() => {
+          setShowDocModal(false);
+          setDocStudentData(null);
+        }}
+        initialMode="dubai_invoice"
+        studentData={docStudentData}
       />
 
       {/* Responsive CSS styling */}
@@ -3312,6 +3327,7 @@ function StudentDetailModal({
   onOpenAddPayment,
   onOpenEditPayment,
   onDeletePayment,
+  onOpenDubaiInvoice,
   onClose,
 }) {
   const [viewerReceipt, setViewerReceipt] = useState(null);
@@ -3416,6 +3432,19 @@ function StudentDetailModal({
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {onOpenDubaiInvoice && (
+              <button
+                type="button"
+                className="btn-glass"
+                onClick={onOpenDubaiInvoice}
+                style={{ padding: '6px 12px', fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                title="Generate Dubai Service Fee Invoice on Sterling Letterhead"
+              >
+                <span>📄</span>
+                <span>Dubai Invoice</span>
+              </button>
+            )}
+
             {activeTab === 'details' && (
               <button
                 type="button"
@@ -4180,17 +4209,6 @@ function StudentDetailModal({
         amount={viewerReceipt?.amount || 0}
         date={viewerReceipt?.date}
         bank={viewerReceipt?.bank || ''}
-      />
-
-      {/* Official Dubai Student Invoice & B2B Receipt Generator */}
-      <DocumentGeneratorModal
-        isOpen={showDocModal}
-        onClose={() => {
-          setShowDocModal(false);
-          setDocStudentData(null);
-        }}
-        initialMode="dubai_invoice"
-        studentData={docStudentData}
       />
     </div>
   );
