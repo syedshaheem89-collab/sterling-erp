@@ -245,7 +245,7 @@ export default function DocumentGeneratorModal({
       try {
         const { data, error } = await supabase
           .from('students')
-          .select('id, name, country, intake, course, service_fee, total_fee, passport_number, address, city, state, currency')
+          .select('*')
           .order('name');
         if (!error && data && data.length > 0) {
           setErpStudentsList(data);
@@ -589,39 +589,67 @@ export default function DocumentGeneratorModal({
     toast.success(`Loaded details for ${stu.name}`);
   };
 
-  // Mark university commission as received and connect directly to student application
+  // Mark university commission as received and connect directly to ALL linked student applications (updates Profit)
   const handleMarkCommissionReceived = async () => {
-    if (!selectedStudentId) {
-      toast.error('Please pick a student to link this commission claim to');
+    const claimRows = universityInvoice.students && universityInvoice.students.length > 0
+      ? universityInvoice.students
+      : [];
+
+    const linkedTargets = [];
+    claimRows.forEach((row) => {
+      const matched = row.erpStudentId
+        ? erpStudentsList.find((s) => String(s.id) === String(row.erpStudentId))
+        : erpStudentsList.find((s) => s.name?.trim().toLowerCase() === row.studentName?.trim().toLowerCase());
+      if (matched) {
+        linkedTargets.push({ matched, row });
+      }
+    });
+
+    if (linkedTargets.length === 0 && selectedStudentId) {
+      const matched = erpStudentsList.find((s) => String(s.id) === String(selectedStudentId));
+      if (matched) {
+        linkedTargets.push({ matched, row: { commissionAmount: universityInvoice.commissionAmount } });
+      }
+    }
+
+    if (linkedTargets.length === 0) {
+      toast.error('Please pick at least one existing ERP student to link and update profit');
       return;
     }
-    const matched = erpStudentsList.find((s) => String(s.id) === String(selectedStudentId));
-    const sName = matched?.name || universityInvoice.studentName || 'Student';
-    const amountToReceive = Number(universityInvoice.commissionAmount || 0);
 
     try {
-      const meta = getStudentAgentMeta(matched || { id: selectedStudentId, name: sName });
-      meta.uni_commission_committed = Math.max(Number(meta.uni_commission_committed || 0), amountToReceive);
-      meta.uni_commission_received = amountToReceive;
-      meta.uni_commission_remaining = Math.max(0, meta.uni_commission_committed - meta.uni_commission_received);
+      let totalReceived = 0;
+      for (const { matched, row } of linkedTargets) {
+        const sId = matched.id;
+        const sName = matched.name || row.studentName || 'Student';
+        const rowComm = Number(row.commissionAmount || 0);
+        totalReceived += rowComm;
 
-      const finalNotes = saveStudentAgentMeta(selectedStudentId, sName, meta, matched?.notes || '');
+        const meta = getStudentAgentMeta(matched);
+        meta.uni_commission_committed = Math.max(Number(meta.uni_commission_committed || 0), rowComm);
+        meta.uni_commission_received = rowComm;
+        meta.uni_commission_remaining = Math.max(0, meta.uni_commission_committed - meta.uni_commission_received);
 
-      await supabase
-        .from('students')
-        .update({
-          commission: amountToReceive,
-          notes: finalNotes,
-        })
-        .eq('id', selectedStudentId);
+        const finalNotes = saveStudentAgentMeta(sId, sName, meta, matched.notes || '');
+
+        await supabase
+          .from('students')
+          .update({
+            commission: rowComm,
+            notes: finalNotes,
+          })
+          .eq('id', sId);
+      }
 
       setUniversityInvoice((prev) => ({
         ...prev,
         isReceived: true,
-        receivedAmount: amountToReceive,
+        receivedAmount: totalReceived,
       }));
 
-      toast.success(`✓ Commission of ${universityInvoice.currency} ${amountToReceive.toLocaleString('en-IN')} marked as received for ${sName}!`);
+      toast.success(
+        `✓ Commission of ${universityInvoice.currency} ${totalReceived.toLocaleString('en-IN')} marked received & synced to ${linkedTargets.length} student profit(s)!`
+      );
       if (onPaymentSettled) onPaymentSettled();
     } catch (e) {
       console.error('Error marking university commission received', e);
@@ -827,16 +855,16 @@ export default function DocumentGeneratorModal({
     });
   };
 
-  const handleAddErpStudentToUniClaim = (stu) => {
-    if (!stu) return;
+  const buildUniRowFromStudent = (stu) => {
     const meta = getStudentAgentMeta(stu);
     const uniFee = Number(stu.tuition_fee || stu.tuition || 0);
     const commRate = 15;
     const existingComm = Number(meta.uni_commission_committed || stu.commission || 0);
     const commAmt = existingComm > 0 ? existingComm : (uniFee > 0 ? Math.round((uniFee * commRate) / 100) : 0);
     const uniName = stu.university || stu.college || '';
-    const newRow = {
+    return {
       id: `stu-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      erpStudentId: stu.id,
       studentName: (stu.name || 'STUDENT').toUpperCase(),
       studentId: stu.student_id || stu.passport_number || '',
       country: stu.country || '',
@@ -847,22 +875,56 @@ export default function DocumentGeneratorModal({
       commissionPercent: commRate,
       commissionAmount: commAmt,
     };
+  };
+
+  const handleAddErpStudentToUniClaim = (stu) => {
+    if (!stu) return;
+    const newRow = buildUniRowFromStudent(stu);
+    setSelectedStudentId(stu.id);
 
     setUniversityInvoice((prev) => {
       const current = prev.students || [];
-      // If only 1 empty or default placeholder row, replace it; otherwise append
-      const isSingleEmpty = current.length === 1 && !current[0].studentName?.trim();
-      const updatedList = isSingleEmpty ? [newRow] : [...current, newRow];
+      const isDefaultSample =
+        current.length === 1 &&
+        (!current[0].studentName?.trim() || current[0].id === 'stu-1');
+      const updatedList = isDefaultSample ? [newRow] : [...current, newRow];
       const totalComm = updatedList.reduce((sum, s) => sum + (Number(s.commissionAmount) || 0), 0);
+      const isDefaultUni = prev.universityName === 'MCAST - Malta College of Arts, Science and Technology';
       return {
         ...prev,
-        universityName: prev.universityName || uniName,
+        universityName: (!prev.universityName || isDefaultUni) ? (newRow.university || prev.universityName) : prev.universityName,
+        universityCampus: isDefaultUni ? (newRow.country || '') : prev.universityCampus,
+        financeEmail: isDefaultUni ? '' : prev.financeEmail,
         students: updatedList,
         studentName: updatedList[0]?.studentName || '',
         commissionAmount: totalComm,
       };
     });
-    toast.success(`Added ${stu.name} to commission claim`);
+    toast.success(`Loaded ${stu.name} from ERP`);
+  };
+
+  const handleSelectErpStudentForRow = (idx, studentId) => {
+    const stu = erpStudentsList.find((s) => String(s.id) === String(studentId));
+    if (!stu) return;
+    const newRow = buildUniRowFromStudent(stu);
+    setSelectedStudentId(stu.id);
+
+    setUniversityInvoice((prev) => {
+      const list = [...(prev.students || [])];
+      list[idx] = { ...newRow, id: list[idx]?.id || newRow.id };
+      const totalComm = list.reduce((sum, s) => sum + (Number(s.commissionAmount) || 0), 0);
+      const isDefaultUni = prev.universityName === 'MCAST - Malta College of Arts, Science and Technology';
+      return {
+        ...prev,
+        universityName: (!prev.universityName || isDefaultUni) ? (newRow.university || prev.universityName) : prev.universityName,
+        universityCampus: isDefaultUni ? (newRow.country || '') : prev.universityCampus,
+        financeEmail: isDefaultUni ? '' : prev.financeEmail,
+        students: list,
+        studentName: list[0]?.studentName || '',
+        commissionAmount: totalComm,
+      };
+    });
+    toast.success(`Auto-filled ${stu.name} (${stu.country || 'ERP'})`);
   };
 
   // Recalculate Student Invoice totals
@@ -2143,7 +2205,7 @@ export default function DocumentGeneratorModal({
                     </select>
 
                     {/* Student Commission Link Status & Direct Mark Received Action */}
-                    {selectedStudentId && (
+                    {(selectedStudentId || (universityInvoice.students || []).some((s) => s.erpStudentId)) && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '6px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px' }}>
                           <span style={{ color: '#94A3B8' }}>Commission Status:</span>
@@ -2176,7 +2238,7 @@ export default function DocumentGeneratorModal({
                             }}
                           >
                             <span>💳</span>
-                            <span>Mark Commission as Received</span>
+                            <span>Mark Commission Received &amp; Sync Profit</span>
                           </button>
                         ) : (
                           <div style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.3)', color: '#34D399', padding: '5px 8px', borderRadius: '4px', fontSize: '10.5px', textAlign: 'center', fontWeight: 700 }}>
@@ -2339,6 +2401,20 @@ export default function DocumentGeneratorModal({
                               </button>
                             )}
                           </div>
+                          <select
+                            value={stu.erpStudentId || ''}
+                            onChange={(e) => {
+                              if (e.target.value) handleSelectErpStudentForRow(idx, e.target.value);
+                            }}
+                            style={{ width: '100%', padding: '4px 6px', borderRadius: '4px', background: '#0B1120', border: '1px solid #3B82F6', color: '#93C5FD', fontSize: '11px', fontWeight: 600, marginBottom: '5px' }}
+                          >
+                            <option value="">-- Pick Existing Student from ERP (Auto-fill) --</option>
+                            {erpStudentsList.map((s) => (
+                              <option key={s.id} value={s.id}>
+                                {s.name} {s.country ? `(${s.country})` : ''} - {s.university || 'Uni'}
+                              </option>
+                            ))}
+                          </select>
                           <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: '6px', marginBottom: '5px' }}>
                             <input
                               type="text"
