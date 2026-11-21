@@ -625,6 +625,107 @@ export default function B2BPayments({ setCurrentPage }) {
   const [accountsSheetFilter, setAccountsSheetFilter] = useState('all'); // 'all' | 'inr' | 'forex'
   const [accountsSheetPartner, setAccountsSheetPartner] = useState('All'); // 'All' | partner_name
 
+  // Dedicated Multi-Page Print Handler for Accounts Disbursement Sheet (supports 10, 50, 100+ rows cleanly)
+  const handlePrintAccountsSheet = () => {
+    const el = document.getElementById('accounts-disbursement-printable');
+    if (!el) {
+      window.print();
+      return;
+    }
+    const printWin = window.open('', '_blank', 'width=1020,height=850');
+    if (!printWin) {
+      window.print();
+      return;
+    }
+    // Replace relative letterhead path with absolute origin URL so it loads in print window
+    const htmlContent = el.outerHTML.replace(
+      /src="\/sterling-letterhead\.jpg"/g,
+      `src="${window.location.origin}/sterling-letterhead.jpg"`
+    );
+    printWin.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Sterling Accounts Disbursement Sheet</title>
+          <style>
+            @page { size: A4 portrait; margin: 8mm 10mm; }
+            * { box-sizing: border-box; }
+            body {
+              margin: 0;
+              padding: 0;
+              background: #ffffff;
+              color: #000000;
+              font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            #accounts-disbursement-printable {
+              width: 100% !important;
+              max-width: none !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              box-shadow: none !important;
+              border-radius: 0 !important;
+            }
+            .print-letterhead-wrapper {
+              width: 100% !important;
+              height: 33mm !important;
+              overflow: hidden !important;
+              margin-bottom: 4mm !important;
+            }
+            img.print-letterhead {
+              width: 100% !important;
+              height: auto !important;
+              display: block !important;
+            }
+            table {
+              width: 100% !important;
+              table-layout: fixed !important;
+              border-collapse: collapse !important;
+            }
+            thead {
+              display: table-header-group !important;
+            }
+            tr {
+              break-inside: avoid !important;
+              page-break-inside: avoid !important;
+            }
+            th {
+              white-space: normal !important;
+              word-wrap: break-word !important;
+              overflow-wrap: break-word !important;
+              font-size: 9.5px !important;
+              line-height: 1.25 !important;
+              padding: 6px 5px !important;
+            }
+            td {
+              white-space: normal !important;
+              word-wrap: break-word !important;
+              overflow-wrap: break-word !important;
+              padding: 6px 6px !important;
+            }
+            .accounts-verification-box {
+              break-inside: avoid !important;
+              page-break-inside: avoid !important;
+            }
+          </style>
+        </head>
+        <body>
+          ${htmlContent}
+          <script>
+            window.onload = function() {
+              setTimeout(function() {
+                window.focus();
+                window.print();
+              }, 350);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWin.document.close();
+  };
+
   // Download / Export Customization Modal State
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportScope, setExportScope] = useState('all'); // 'selected' | 'filtered' | 'all'
@@ -4797,7 +4898,7 @@ export default function B2BPayments({ setCurrentPage }) {
                   type="button"
                   className="btn-simple-primary"
                   style={{ background: '#10B981', padding: '6px 14px', fontSize: '12px' }}
-                  onClick={() => window.print()}
+                  onClick={handlePrintAccountsSheet}
                 >
                   🖨️ Print / Save as PDF
                 </button>
@@ -5118,7 +5219,7 @@ export default function B2BPayments({ setCurrentPage }) {
                     </div>
 
                     {/* Sign-off & Audit Trail (For Sterling Accounts Team) */}
-                    <div style={{ border: '1.5px solid #000000', padding: '12px 14px', borderRadius: '4px', background: '#F8FAFC' }}>
+                    <div className="accounts-verification-box" style={{ border: '1.5px solid #000000', padding: '12px 14px', borderRadius: '4px', background: '#F8FAFC' }}>
                       <div style={{ fontSize: '10px', fontWeight: 800, color: '#000000', textTransform: 'uppercase', marginBottom: '8px' }}>
                         Sterling Accounts Team Verification &amp; Bank Clearance Workflow:
                       </div>
