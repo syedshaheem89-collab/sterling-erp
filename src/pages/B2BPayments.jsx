@@ -642,11 +642,18 @@ export default function B2BPayments({ setCurrentPage }) {
       /src="\/sterling-letterhead\.jpg"/g,
       `src="${window.location.origin}/sterling-letterhead.jpg"`
     );
+    const sheetScope = accountsSheetPartner !== 'All'
+      ? accountsSheetPartner.replace(/[^a-zA-Z0-9_-]+/g, '_').replace(/^_+|_+$/g, '')
+      : (accountsSheetFilter === 'inr' ? 'Domestic_INR' : accountsSheetFilter === 'forex' ? 'Forex_SWIFT' : 'All_Pending');
+    const nowStamp = new Date();
+    const dStr = nowStamp.toLocaleDateString('en-GB').replace(/\//g, '-');
+    const tStr = nowStamp.toTimeString().slice(0, 5).replace(':', '');
+    const sheetTitle = `Accounts_Disbursement_${sheetScope}_${dStr}_${tStr}`;
     printWin.document.write(`
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Sterling Accounts Disbursement Sheet</title>
+          <title>${sheetTitle}</title>
           <style>
             @page { size: A4 portrait; margin: 8mm 10mm; }
             * { box-sizing: border-box; }
@@ -1877,7 +1884,9 @@ export default function B2BPayments({ setCurrentPage }) {
     XLSX.utils.book_append_sheet(workbook, worksheet, 'B2B Payables');
 
     const dateStr = new Date().toISOString().split('T')[0];
-    const fileBase = `Sterling_B2B_Payables_${exportScope}_${dateStr}`;
+    const timeStr = new Date().toTimeString().slice(0, 5).replace(':', '');
+    const partnerSlug = partnerFilter !== 'All' ? `_${partnerFilter.replace(/[^a-zA-Z0-9_-]+/g, '_')}` : '';
+    const fileBase = `Sterling_Billing${partnerSlug}_${exportScope}_${dateStr}_${timeStr}`;
 
     if (exportFormat === 'csv') {
       XLSX.writeFile(workbook, `${fileBase}.csv`, { bookType: 'csv' });

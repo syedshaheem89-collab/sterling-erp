@@ -802,9 +802,31 @@ export default function DocumentGeneratorModal({
       return;
     }
 
-    const docTitle = mode === 'dubai_invoice'
-      ? `Sterling_${studentDocType.toUpperCase()}_${studentInvoice.invoiceNumber}_${studentInvoice.studentName.replace(/\s+/g, '_') || 'Customer'}`
-      : `Sterling_Receipt_${b2bReceipt.receiptNumber}_${b2bReceipt.partnerName.replace(/\s+/g, '_') || 'Partner'}`;
+    const safeSlug = (str, fallback = 'Doc') =>
+      String(str || fallback)
+        .trim()
+        .replace(/[^a-zA-Z0-9_-]+/g, '_')
+        .replace(/^_+|_+$/g, '') || fallback;
+
+    let docTitle = '';
+    if (mode === 'dubai_invoice') {
+      const kind = studentDocType === 'receipt'
+        ? 'OFFICIAL_RECEIPT'
+        : safeSlug(studentInvoice.docHeading || 'INVOICE', 'INVOICE');
+      const num = safeSlug(studentInvoice.invoiceNumber, 'INV');
+      const stu = safeSlug(studentInvoice.studentName, 'Student');
+      docTitle = `${kind}_${num}_${stu}`;
+    } else if (mode === 'b2b_receipt') {
+      const kind = b2bReceipt.status === 'PAID' ? 'B2B_RECEIPT' : 'B2B_VOUCHER';
+      const num = safeSlug(b2bReceipt.receiptNumber, 'REQ');
+      const partner = safeSlug(b2bReceipt.partnerName, 'Partner');
+      docTitle = `${kind}_${num}_${partner}`;
+    } else {
+      const num = safeSlug(uniClaim?.claimNumber, 'CLAIM');
+      const uni = safeSlug(uniClaim?.universityName, 'University');
+      const stu = safeSlug(uniClaim?.studentName, 'Student');
+      docTitle = `UNI_COMMISSION_${num}_${uni}_${stu}`;
+    }
 
     printWindow.document.write(`
       <!DOCTYPE html>
