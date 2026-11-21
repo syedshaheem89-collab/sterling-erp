@@ -83,6 +83,7 @@ export default function DocumentGeneratorModal({
   const [showEditDrawer, setShowEditDrawer] = useState(false);
   const [erpStudentsList, setErpStudentsList] = useState([]);
   const [selectedStudentId, setSelectedStudentId] = useState('');
+  const [activeUniSearchIdx, setActiveUniSearchIdx] = useState(null);
   const [studentSearchQuery, setStudentSearchQuery] = useState('');
   const [showSettleInlineModal, setShowSettleInlineModal] = useState(false);
   const [inlineSettlementData, setInlineSettlementData] = useState({
@@ -2145,44 +2146,10 @@ export default function DocumentGeneratorModal({
                     </span>
                   </div>
 
-                  {/* Quick Add Student from ERP */}
-                  <div style={{ background: 'rgba(59, 130, 246, 0.08)', border: '1px solid rgba(59, 130, 246, 0.25)', borderRadius: '6px', padding: '8px 10px' }}>
-                    <label style={{ display: 'block', color: '#93C5FD', fontSize: '11px', marginBottom: '4px', fontWeight: 700 }}>
-                      ⚡ Add Student from ERP (Supports 1, 10, 30+):
-                    </label>
-                    <select
-                      value=""
-                      onChange={(e) => {
-                        const sId = e.target.value;
-                        if (sId) {
-                          setSelectedStudentId(sId);
-                          const match = erpStudentsList.find((s) => String(s.id) === String(sId));
-                          if (match) handleAddErpStudentToUniClaim(match);
-                        }
-                      }}
-                      style={{
-                        width: '100%',
-                        padding: '7px 10px',
-                        borderRadius: '4px',
-                        background: '#0B1120',
-                        border: '1px solid #3B82F6',
-                        color: '#60A5FA',
-                        fontWeight: 600,
-                        fontSize: '12px',
-                        outline: 'none',
-                      }}
-                    >
-                      <option value="">+ Pick Student from ERP to Add to Claim...</option>
-                      {erpStudentsList.map((stu) => (
-                        <option key={stu.id} value={stu.id}>
-                          {stu.name} {stu.country ? `(${stu.country})` : ''} - {stu.university || 'Uni'}
-                        </option>
-                      ))}
-                    </select>
-
-                    {/* Student Commission Link Status & Direct Mark Received Action */}
-                    {(selectedStudentId || (universityInvoice.students || []).some((s) => s.erpStudentId)) && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '6px' }}>
+                  {/* Student Commission Link Status & Direct Mark Received Action */}
+                  {(selectedStudentId || (universityInvoice.students || []).some((s) => s.erpStudentId)) && (
+                    <div style={{ background: 'rgba(59, 130, 246, 0.08)', border: '1px solid rgba(59, 130, 246, 0.25)', borderRadius: '6px', padding: '8px 10px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px' }}>
                           <span style={{ color: '#94A3B8' }}>Commission Status:</span>
                           {universityInvoice.isReceived ? (
@@ -2222,8 +2189,8 @@ export default function DocumentGeneratorModal({
                           </div>
                         )}
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
 
                   {/* Invoice Meta */}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
@@ -2377,34 +2344,121 @@ export default function DocumentGeneratorModal({
                               </button>
                             )}
                           </div>
-                          <select
-                            value={stu.erpStudentId || ''}
-                            onChange={(e) => {
-                              if (e.target.value) handleSelectErpStudentForRow(idx, e.target.value);
-                            }}
-                            style={{ width: '100%', padding: '4px 6px', borderRadius: '4px', background: '#0B1120', border: '1px solid #3B82F6', color: '#93C5FD', fontSize: '11px', fontWeight: 600, marginBottom: '5px' }}
-                          >
-                            <option value="">-- Pick Existing Student from ERP (Auto-fill) --</option>
-                            {erpStudentsList.map((s) => (
-                              <option key={s.id} value={s.id}>
-                                {s.name} {s.country ? `(${s.country})` : ''} - {s.university || 'Uni'}
-                              </option>
-                            ))}
-                          </select>
-                          <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: '6px', marginBottom: '5px' }}>
-                            <input
-                              type="text"
-                              placeholder="Student Name *"
-                              value={stu.studentName}
-                              onChange={(e) => handleUniStudentChange(idx, 'studentName', e.target.value)}
-                              style={{ width: '100%', padding: '4px 6px', borderRadius: '4px', background: '#0B0F1C', border: '1px solid #334155', color: '#fff', fontSize: '11.5px', fontWeight: 600 }}
-                            />
+                          <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: '6px', marginBottom: '5px', position: 'relative' }}>
+                            <div style={{ position: 'relative' }}>
+                              <input
+                                type="text"
+                                placeholder="Type existing student name..."
+                                value={stu.studentName}
+                                onFocus={() => setActiveUniSearchIdx(idx)}
+                                onBlur={() => setTimeout(() => setActiveUniSearchIdx((cur) => (cur === idx ? null : cur)), 180)}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setActiveUniSearchIdx(idx);
+                                  setUniversityInvoice((prev) => {
+                                    const list = [...(prev.students || [])];
+                                    list[idx] = { ...list[idx], studentName: val, erpStudentId: '' };
+                                    return { ...prev, students: list, studentName: list[0]?.studentName || '' };
+                                  });
+                                }}
+                                style={{
+                                  width: '100%',
+                                  padding: '5px 7px',
+                                  borderRadius: '4px',
+                                  background: '#0B0F1C',
+                                  border: stu.erpStudentId ? '1px solid #10B981' : '1px solid #3B82F6',
+                                  color: '#fff',
+                                  fontSize: '11.5px',
+                                  fontWeight: 600,
+                                }}
+                              />
+                              {activeUniSearchIdx === idx && (
+                                (() => {
+                                  const q = (stu.studentName || '').trim().toLowerCase();
+                                  const matches = (q
+                                    ? erpStudentsList.filter(
+                                        (s) =>
+                                          s.name?.toLowerCase().includes(q) ||
+                                          s.country?.toLowerCase().includes(q) ||
+                                          s.university?.toLowerCase().includes(q)
+                                      )
+                                    : erpStudentsList
+                                  ).slice(0, 8);
+                                  if (matches.length === 0) {
+                                    return (
+                                      <div
+                                        style={{
+                                          position: 'absolute',
+                                          top: '100%',
+                                          left: 0,
+                                          right: 0,
+                                          zIndex: 50,
+                                          background: '#0B1120',
+                                          border: '1px solid #334155',
+                                          borderRadius: '6px',
+                                          padding: '6px 8px',
+                                          fontSize: '10.5px',
+                                          color: '#F59E0B',
+                                          marginTop: '2px',
+                                          boxShadow: '0 8px 20px rgba(0,0,0,0.5)',
+                                        }}
+                                      >
+                                        No matching student found in ERP
+                                      </div>
+                                    );
+                                  }
+                                  return (
+                                    <div
+                                      style={{
+                                        position: 'absolute',
+                                        top: '100%',
+                                        left: 0,
+                                        minWidth: '240px',
+                                        maxHeight: '170px',
+                                        overflowY: 'auto',
+                                        zIndex: 50,
+                                        background: '#0B1120',
+                                        border: '1px solid #3B82F6',
+                                        borderRadius: '6px',
+                                        marginTop: '2px',
+                                        boxShadow: '0 10px 24px rgba(0,0,0,0.65)',
+                                      }}
+                                    >
+                                      {matches.map((s) => (
+                                        <div
+                                          key={s.id}
+                                          onMouseDown={(ev) => {
+                                            ev.preventDefault();
+                                            handleSelectErpStudentForRow(idx, s.id);
+                                            setActiveUniSearchIdx(null);
+                                          }}
+                                          style={{
+                                            padding: '6px 9px',
+                                            cursor: 'pointer',
+                                            borderBottom: '1px solid rgba(148,163,225,0.1)',
+                                            fontSize: '11px',
+                                            color: '#EDEFFA',
+                                          }}
+                                          onMouseEnter={(ev) => { ev.currentTarget.style.background = '#1E293B'; }}
+                                          onMouseLeave={(ev) => { ev.currentTarget.style.background = 'transparent'; }}
+                                        >
+                                          <div style={{ fontWeight: 700, color: '#60A5FA' }}>{s.name}</div>
+                                          <div style={{ fontSize: '9.5px', color: '#94A3B8' }}>
+                                            {s.country || 'Country N/A'} &bull; {s.university || 'Uni N/A'}
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  );
+                                })()
+                              )}
+                            </div>
                             <input
                               type="text"
                               placeholder="App / Student ID (Opt)"
                               value={stu.studentId || ''}
                               onChange={(e) => handleUniStudentChange(idx, 'studentId', e.target.value)}
-                              style={{ width: '100%', padding: '4px 6px', borderRadius: '4px', background: '#0B0F1C', border: '1px solid #334155', color: '#fff', fontSize: '11px' }}
+                              style={{ width: '100%', padding: '5px 7px', borderRadius: '4px', background: '#0B0F1C', border: '1px solid #334155', color: '#fff', fontSize: '11px' }}
                             />
                           </div>
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.3fr', gap: '6px', marginBottom: '5px' }}>
