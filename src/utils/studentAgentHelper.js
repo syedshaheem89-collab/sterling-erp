@@ -45,6 +45,20 @@ export function getCurrencySymbol(currency = 'INR') {
   return '₹';
 }
 
+export const FX_RATES_TO_INR = {
+  INR: 1,
+  USD: 85,
+  EUR: 92,
+  GBP: 108,
+  AED: 23,
+};
+
+export function convertToINR(amount, currency = 'INR') {
+  const num = Number(amount) || 0;
+  const rate = FX_RATES_TO_INR[currency] || 1;
+  return Math.round(num * rate);
+}
+
 export function formatPartnerMoney(amount, currency = 'INR') {
   const num = Number(amount) || 0;
   if (currency === 'INR') return '₹' + num.toLocaleString('en-IN');
@@ -71,6 +85,7 @@ const DEFAULT_META = {
   insurance_paid: 0,
   insurance_currency: 'INR',
   insurance_has_gst: false,
+  uni_commission_source: '',
   uni_commission_committed: 0,
   uni_commission_received: 0,
   uni_commission_currency: 'EUR',
@@ -160,6 +175,7 @@ export function saveStudentAgentMeta(studentId, studentName, meta, existingNotes
     insurance_paid: Number(meta.insurance_paid || 0),
     insurance_currency: meta.insurance_currency || 'INR',
     insurance_has_gst: meta.insurance_currency === 'INR' ? Boolean(meta.insurance_has_gst) : false,
+    uni_commission_source: meta.uni_commission_source?.trim() || '',
     uni_commission_committed: Number(meta.uni_commission_committed || 0),
     uni_commission_received: Number(meta.uni_commission_received || 0),
     uni_commission_currency: meta.uni_commission_currency || 'EUR',

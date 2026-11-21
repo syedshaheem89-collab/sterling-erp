@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
 import { supabase } from '../supabase';
-import { parseTransferAccountDetails, numberToWordsINR, getStudentAgentMeta, saveStudentAgentMeta, updateStudentFromB2BSettlement } from '../utils/studentAgentHelper';
+import { parseTransferAccountDetails, numberToWordsINR, getStudentAgentMeta, saveStudentAgentMeta, updateStudentFromB2BSettlement, convertToINR } from '../utils/studentAgentHelper';
 
 /**
  * DocumentGeneratorModal
@@ -619,13 +619,17 @@ export default function DocumentGeneratorModal({
 
     try {
       let totalReceived = 0;
+      const claimCurrency = universityInvoice.currency || 'EUR';
       for (const { matched, row } of linkedTargets) {
         const sId = matched.id;
         const sName = matched.name || row.studentName || 'Student';
         const rowComm = Number(row.commissionAmount || 0);
+        const rowCommINR = convertToINR(rowComm, claimCurrency);
         totalReceived += rowComm;
 
         const meta = getStudentAgentMeta(matched);
+        meta.uni_commission_source = universityInvoice.universityName || meta.uni_commission_source || '';
+        meta.uni_commission_currency = claimCurrency;
         meta.uni_commission_committed = Math.max(Number(meta.uni_commission_committed || 0), rowComm);
         meta.uni_commission_received = rowComm;
         meta.uni_commission_remaining = Math.max(0, meta.uni_commission_committed - meta.uni_commission_received);
@@ -635,7 +639,7 @@ export default function DocumentGeneratorModal({
         await supabase
           .from('students')
           .update({
-            commission: rowComm,
+            commission: rowCommINR,
             notes: finalNotes,
           })
           .eq('id', sId);
