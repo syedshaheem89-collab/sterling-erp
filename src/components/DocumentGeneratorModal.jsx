@@ -219,21 +219,27 @@ export default function DocumentGeneratorModal({
         : (isCompleted ? todayStr : 'Pending Clearance');
 
       const curr = b2bPaymentData.currency || 'INR';
-      const tot = Number(b2bPaymentData.amount || 0);
       const isDomestic = curr === 'INR';
-      const gstRate = isDomestic && b2bPaymentData.is_gst_applicable !== false ? 18 : 0;
-      let base = tot;
-      let gst = 0;
+      const hasGst = isDomestic && (b2bPaymentData.has_gst === true || b2bPaymentData.is_gst_applicable === true);
+      const gstRate = hasGst ? 18 : 0;
+      const base = Number(b2bPaymentData.amount || 0);
+      const gst = gstRate > 0 ? Math.round(base * (gstRate / 100)) : 0;
+      const total = base + gst;
 
-      if (gstRate > 0) {
-        if (b2bPaymentData.gst_type === 'exclusive') {
-          base = tot;
-          gst = Math.round(tot * 0.18);
-        } else {
-          base = Math.round(tot / 1.18);
-          gst = tot - base;
-        }
+      // Clean short reference code (e.g. REQ-2026-089 or REQ-2026-QDTX)
+      let rawId = String(b2bPaymentData.id || '');
+      let shortCode = '';
+      if (rawId.includes('-')) {
+        const parts = rawId.split('-').filter(Boolean);
+        shortCode = parts[parts.length - 1];
+      } else {
+        shortCode = rawId.slice(-4);
       }
+      if (!shortCode || shortCode.length < 3) {
+        shortCode = String(Date.now()).slice(-4);
+      }
+      const cleanRef = shortCode.toUpperCase();
+      const prefix = isCompleted ? 'REC' : 'REQ';
 
       // Check which of Sterling's 4+ banks was used
       const matchedPayingBank = companyBanks.find(
@@ -241,9 +247,7 @@ export default function DocumentGeneratorModal({
       ) || companyBanks[0];
 
       setB2BReceipt({
-        receiptNumber: isCompleted
-          ? `REC-B2B-${new Date().getFullYear()}-${String(b2bPaymentData.id || 101).padStart(4, '0')}`
-          : `REQ-B2B-${new Date().getFullYear()}-${String(b2bPaymentData.id || 101).padStart(4, '0')}`,
+        receiptNumber: `${prefix}-${new Date().getFullYear()}-${cleanRef}`,
         voucherDate: todayStr,
         settledDate: settledStr,
         partnerName: b2bPaymentData.partner_name || 'B2B Partner Company',
@@ -253,7 +257,7 @@ export default function DocumentGeneratorModal({
         baseAmount: base,
         gstRate: gstRate,
         gstAmount: gst,
-        totalDisbursed: base + gst,
+        totalDisbursed: total,
         paymentMode: isCompleted ? (b2bPaymentData.payment_mode || 'Bank Transfer (IMPS / NEFT)') : 'Bank Transfer (Awaiting Release)',
         utrNumber: isCompleted ? (b2bPaymentData.utr_number || 'UTR-NOT-SPECIFIED') : 'Pending Bank Transfer',
         transferAccount: b2bPaymentData.transfer_account || 'Partner Bank Account',
@@ -1857,7 +1861,7 @@ export default function DocumentGeneratorModal({
                             {b2bReceipt.status === 'PAID' ? 'PAYMENT REMITTANCE RECEIPT' : 'PAYMENT REQUISITION & APPROVAL SLIP'}
                           </h2>
                           <div style={{ fontSize: '11.5px', color: b2bReceipt.status === 'PAID' ? '#047857' : '#D97706', fontWeight: 800, marginTop: '2px' }}>
-                            {b2bReceipt.status === 'PAID' ? 'DISBURSEMENT VOUCHER & PAYMENT ADVICE' : 'ACCOUNTS PAYABLE ORDER • AWAITING DIRECTOR APPROVAL'}
+                            {b2bReceipt.status === 'PAID' ? 'DISBURSEMENT VOUCHER & PAYMENT ADVICE' : 'ACCOUNTS DISBURSEMENT ORDER • STERLING ACCOUNTS CLEARANCE'}
                           </div>
                         </div>
                       </div>
@@ -2295,7 +2299,7 @@ export default function DocumentGeneratorModal({
                       <div style={{ textAlign: 'center', width: '220px' }}>
                         <div style={{ height: '36px', borderBottom: '1.5px solid #000000', marginBottom: '6px' }}></div>
                         <div style={{ fontWeight: 900, fontSize: '11px', color: '#000000' }}>Sterling Overseas Consultancy LLC</div>
-                        <div style={{ fontSize: '10px', color: '#000000', fontWeight: 600 }}>Director / Authorised Signatory</div>
+                        <div style={{ fontSize: '10px', color: '#000000', fontWeight: 600 }}>Accounts Department / Authorised Signatory</div>
                       </div>
                     </div>
                   </div>
