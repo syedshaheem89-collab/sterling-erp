@@ -94,6 +94,30 @@ export default function DocumentGeneratorModal({
   });
   const printContainerRef = useRef(null);
 
+  // Unified Document Type calculation and handler
+  const currentDocType =
+    mode === 'dubai_invoice'
+      ? studentDocType === 'receipt'
+        ? 'student_receipt'
+        : 'student_invoice'
+      : mode === 'b2b_receipt'
+      ? 'b2b_voucher'
+      : 'university_claim';
+
+  const handleDocTypeChange = (newType) => {
+    if (newType === 'student_invoice') {
+      setMode('dubai_invoice');
+      setStudentDocType('invoice');
+    } else if (newType === 'student_receipt') {
+      setMode('dubai_invoice');
+      setStudentDocType('receipt');
+    } else if (newType === 'b2b_voucher') {
+      setMode('b2b_receipt');
+    } else if (newType === 'university_claim') {
+      setMode('university_commission');
+    }
+  };
+
   // --- 1. STUDENT DUBAI INVOICE / RECEIPT STATE (WIO Bank Abu Dhabi Template) ---
   const [studentInvoice, setStudentInvoice] = useState({
     invoiceNumber: 'INV-2026-081',
@@ -861,92 +885,70 @@ export default function DocumentGeneratorModal({
             gap: '12px',
           }}
         >
-          {/* Left: Mode Switcher or Clean B2B Header */}
-          {b2bPaymentData || mode === 'b2b_receipt' ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <span style={{ fontSize: '22px' }}>🤝</span>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontWeight: 800, fontSize: '15px', color: '#fff' }}>
-                    {b2bReceipt.status === 'PAID' ? 'B2B Remittance Receipt' : 'B2B Payment Requisition'}
-                  </span>
-                  <span
-                    style={{
-                      fontSize: '11px',
-                      fontWeight: 800,
-                      padding: '2px 8px',
-                      borderRadius: '12px',
-                      background: b2bReceipt.status === 'PAID' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(245, 158, 11, 0.2)',
-                      color: b2bReceipt.status === 'PAID' ? '#34D399' : '#FBBF24',
-                      border: b2bReceipt.status === 'PAID' ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(245, 158, 11, 0.4)',
-                    }}
-                  >
-                    {b2bReceipt.status === 'PAID' ? '✓ SETTLED & PAID' : '⏳ PENDING CLEARANCE'}
-                  </span>
-                </div>
-                <div style={{ fontSize: '11px', color: '#94A3B8' }}>
-                  {b2bReceipt.partnerName} &bull; {b2bReceipt.receiptNumber}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {/* Left: Unified Document Type Selector */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
               <span style={{ fontSize: '20px' }}>📄</span>
-              <div style={{ display: 'inline-flex', background: 'rgba(255,255,255,0.06)', borderRadius: '8px', padding: '3px' }}>
-                <button
-                  type="button"
-                  onClick={() => setMode('dubai_invoice')}
-                  style={{
-                    padding: '6px 14px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    fontSize: '12.5px',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    background: mode === 'dubai_invoice' ? '#4F46E5' : 'transparent',
-                    color: mode === 'dubai_invoice' ? '#fff' : '#94A3B8',
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  🎓 Student Invoice &amp; Receipt
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMode('b2b_receipt')}
-                  style={{
-                    padding: '6px 14px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    fontSize: '12.5px',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    background: mode === 'b2b_receipt' ? (b2bReceipt.status === 'PAID' ? '#059669' : '#D97706') : 'transparent',
-                    color: mode === 'b2b_receipt' ? '#fff' : '#94A3B8',
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  🤝 {b2bReceipt.status === 'PAID' ? 'B2B Remittance Receipt (PAID)' : 'B2B Payment Requisition (Pending)'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMode('university_commission')}
-                  style={{
-                    padding: '6px 14px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    fontSize: '12.5px',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    background: mode === 'university_commission' ? '#2563EB' : 'transparent',
-                    color: mode === 'university_commission' ? '#fff' : '#94A3B8',
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  🏛️ University Commission Claim
-                </button>
-              </div>
+              <span style={{ fontWeight: 800, fontSize: '15px', color: '#fff', whiteSpace: 'nowrap' }}>
+                Create Invoice / Document
+              </span>
             </div>
-          )}
+
+            {/* Document Type Dropdown */}
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: 'rgba(255,255,255,0.06)',
+                padding: '4px 10px',
+                borderRadius: '8px',
+                border: '1px solid rgba(148,163,225,0.25)',
+              }}
+            >
+              <label style={{ fontSize: '11px', fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.4px', whiteSpace: 'nowrap' }}>
+                Document Type:
+              </label>
+              <select
+                value={currentDocType}
+                onChange={(e) => handleDocTypeChange(e.target.value)}
+                style={{
+                  background: '#0F172A',
+                  border: '1px solid #334155',
+                  color: '#fff',
+                  padding: '5px 12px',
+                  borderRadius: '6px',
+                  fontSize: '12.5px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  outline: 'none',
+                }}
+              >
+                <option value="student_invoice">🎓 Student Invoice (Payment Request)</option>
+                <option value="student_receipt">🧾 Student Receipt (Payment Received)</option>
+                <option value="b2b_voucher">🤝 B2B Payment Voucher &amp; Requisition</option>
+                <option value="university_claim">🏛️ University Commission Claim</option>
+              </select>
+            </div>
+
+            {/* Status badge if B2B */}
+            {mode === 'b2b_receipt' && (
+              <span
+                style={{
+                  fontSize: '11px',
+                  fontWeight: 800,
+                  padding: '3px 9px',
+                  borderRadius: '12px',
+                  background: b2bReceipt.status === 'PAID' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(245, 158, 11, 0.2)',
+                  color: b2bReceipt.status === 'PAID' ? '#34D399' : '#FBBF24',
+                  border: b2bReceipt.status === 'PAID' ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(245, 158, 11, 0.4)',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {b2bReceipt.status === 'PAID' ? '✓ SETTLED & PAID' : '⏳ PENDING CLEARANCE'}
+              </span>
+            )}
+          </div>
 
           {/* Right: Actions */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
@@ -1152,44 +1154,12 @@ export default function DocumentGeneratorModal({
               {/* Header inside drawer */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
                 <h4 style={{ margin: 0, fontSize: '14px', color: '#fff', fontWeight: 700 }}>
-                  {mode === 'dubai_invoice' ? 'Student Document Editor' : 'B2B Remittance Editor'}
+                  {mode === 'dubai_invoice'
+                    ? (studentDocType === 'receipt' ? '🧾 Student Receipt Editor' : '🎓 Student Invoice Editor')
+                    : mode === 'b2b_receipt'
+                    ? '🤝 B2B Voucher Editor'
+                    : '🏛️ University Invoice Editor'}
                 </h4>
-                {mode === 'dubai_invoice' && (
-                  <div style={{ display: 'inline-flex', background: 'rgba(255,255,255,0.06)', borderRadius: '6px', padding: '2px' }}>
-                    <button
-                      type="button"
-                      onClick={() => setStudentDocType('invoice')}
-                      style={{
-                        padding: '3px 8px',
-                        borderRadius: '4px',
-                        border: 'none',
-                        fontSize: '11px',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        background: studentDocType === 'invoice' ? '#4F46E5' : 'transparent',
-                        color: studentDocType === 'invoice' ? '#fff' : '#94A3B8',
-                      }}
-                    >
-                      Invoice
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setStudentDocType('receipt')}
-                      style={{
-                        padding: '3px 8px',
-                        borderRadius: '4px',
-                        border: 'none',
-                        fontSize: '11px',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        background: studentDocType === 'receipt' ? '#059669' : 'transparent',
-                        color: studentDocType === 'receipt' ? '#fff' : '#94A3B8',
-                      }}
-                    >
-                      Receipt
-                    </button>
-                  </div>
-                )}
               </div>
 
               {/* MODE 1: STUDENT DUBAI INVOICE / RECEIPT CONTROLS */}
@@ -1803,11 +1773,13 @@ export default function DocumentGeneratorModal({
                       {/* Top Entity & Title */}
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '22px' }}>
                         <div>
-                          <div style={{ fontWeight: 900, fontSize: '16px', color: '#000000', letterSpacing: '-0.2px' }}>
-                            Sterling Overseas Consultancy LLC
-                          </div>
-                          <div style={{ fontSize: '12px', color: '#000000', fontWeight: 700, letterSpacing: '0.5px' }}>
-                            WIOBAEADXXX
+                          {!includeLetterheadBg && (
+                            <div style={{ fontWeight: 900, fontSize: '16px', color: '#000000', letterSpacing: '-0.2px', marginBottom: '2px' }}>
+                              Sterling Overseas Consultancy LLC
+                            </div>
+                          )}
+                          <div style={{ fontSize: '11px', color: '#475569', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                            International Admissions &bull; License Ref: WIOBAEADXXX
                           </div>
                         </div>
 

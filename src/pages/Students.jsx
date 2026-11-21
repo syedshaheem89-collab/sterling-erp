@@ -1118,7 +1118,7 @@ export default function Students({ setCurrentPage, initialFilter } = {}) {
             }}
           >
             <span>📄</span>
-            <span>Dubai Invoice</span>
+            <span>Create Invoice</span>
           </button>
 
           {canAddStudent && (
@@ -3441,7 +3441,7 @@ function StudentDetailModal({
                 title="Generate Dubai Service Fee Invoice on Sterling Letterhead"
               >
                 <span>📄</span>
-                <span>Dubai Invoice</span>
+                <span>Generate Invoice</span>
               </button>
             )}
 
