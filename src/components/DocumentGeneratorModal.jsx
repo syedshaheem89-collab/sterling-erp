@@ -126,8 +126,9 @@ export default function DocumentGeneratorModal({
     dueDate: new Date().toLocaleDateString('en-GB').replace(/\//g, '.'),
     studentName: 'DELWIN TOMY',
     studentAddress: 'Kerala, India',
-    targetUniversity: 'MCAST - Malta College of Arts, Science & Technology',
-    courseDetails: 'Higher Education & Visa Processing (Malta)',
+    destinationCountry: 'Malta',
+    targetUniversity: '',
+    courseDetails: 'Post Graduate Diploma in Transportation, Logistics & Supply Chain Management',
     intake: 'Jan 2027',
     passportNumber: 'V4819204',
     applicationNumber: '',
@@ -220,7 +221,7 @@ export default function DocumentGeneratorModal({
       try {
         const { data, error } = await supabase
           .from('students')
-          .select('id, name, country, intake, course, service_fee, total_fee, passport_number')
+          .select('id, name, country, intake, course, service_fee, total_fee, passport_number, address, city, state, currency')
           .order('name');
         if (!error && data && data.length > 0) {
           setErpStudentsList(data);
@@ -457,10 +458,12 @@ export default function DocumentGeneratorModal({
   const applyStudentToInvoice = (stu) => {
     if (!stu) return;
     const todayStr = new Date().toLocaleDateString('en-GB').replace(/\//g, '.');
-    const feeAmount = Number(stu.service_fee || stu.total_fee || stu.amount || stu.committed || 1000);
-    const feeCurr = stu.currency || (stu.country === 'Malta' || stu.country === 'Germany' || stu.country === 'France' ? 'EUR' : 'USD');
-    const courseName = stu.course || 'Study Abroad Consultation & Processing';
-    const studentAddress = stu.address || stu.country || 'MALTA';
+    const rawFee = stu.service_fee || stu.total_fee || stu.committed || stu.amount || 1000;
+    const feeAmount = typeof rawFee === 'string' ? Number(rawFee.replace(/[^0-9.-]+/g, '')) || 1000 : Number(rawFee) || 1000;
+    const feeCurr = stu.currency || (stu.country === 'Malta' || stu.country === 'Germany' || stu.country === 'France' || stu.country === 'Ireland' || stu.country === 'Italy' ? 'EUR' : (stu.country === 'UK' || stu.country === 'United Kingdom' ? 'GBP' : 'USD'));
+    const courseName = stu.course || 'Post Graduate Diploma in Transportation, Logistics & Supply Chain Management';
+    const studentAddress = stu.address || (stu.city ? `${stu.city}, ${stu.state || 'Kerala'}, India` : 'Kerala, India');
+    const destinationCountry = stu.country || 'Malta';
     const passportNo = stu.passport_number || stu.passport || '';
 
     // Generate clean short 3-4 char ID instead of raw UUID
@@ -486,6 +489,7 @@ export default function DocumentGeneratorModal({
       dueDate: todayStr,
       studentName: (stu.name || 'STUDENT NAME').toUpperCase(),
       studentAddress: studentAddress,
+      destinationCountry: destinationCountry,
       courseDetails: courseName,
       intake: stu.intake || '',
       passportNumber: passportNo,
@@ -583,6 +587,7 @@ export default function DocumentGeneratorModal({
       dueDate: todayStr,
       studentName: '',
       studentAddress: '',
+      destinationCountry: '',
       targetUniversity: '',
       courseDetails: '',
       intake: '',
@@ -825,7 +830,7 @@ export default function DocumentGeneratorModal({
               z-index: 1 !important;
               width: 100% !important;
               height: 100% !important;
-              padding: ${includeLetterheadBg ? '38mm 12mm 12mm 12mm' : '14mm 12mm 12mm 12mm'} !important;
+              padding: ${includeLetterheadBg ? '53mm 14mm 12mm 14mm' : '15mm 14mm 12mm 14mm'} !important;
               display: flex !important;
               flex-direction: column !important;
               justify-content: space-between !important;
@@ -853,8 +858,8 @@ export default function DocumentGeneratorModal({
             }
             .rubber-stamp {
               position: absolute;
-              top: 10mm;
-              right: 10mm;
+              bottom: 22mm;
+              right: 14mm;
               border: 2.5px dashed #047857 !important;
               color: #047857 !important;
               padding: 6px 12px;
@@ -1378,15 +1383,27 @@ export default function DocumentGeneratorModal({
                     </div>
                   </div>
 
-                  <div>
-                    <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Student Address / Country</label>
-                    <input
-                      type="text"
-                      value={studentInvoice.studentAddress}
-                      onChange={(e) => setStudentInvoice({ ...studentInvoice, studentAddress: e.target.value })}
-                      placeholder="e.g. MALTA or Kerala, India"
-                      style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff' }}
-                    />
+                  <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '8px' }}>
+                    <div>
+                      <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Student Address (India KYC)</label>
+                      <input
+                        type="text"
+                        value={studentInvoice.studentAddress}
+                        onChange={(e) => setStudentInvoice({ ...studentInvoice, studentAddress: e.target.value })}
+                        placeholder="e.g. Thrissur, Kerala, India"
+                        style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Destination Country</label>
+                      <input
+                        type="text"
+                        value={studentInvoice.destinationCountry || ''}
+                        onChange={(e) => setStudentInvoice({ ...studentInvoice, destinationCountry: e.target.value })}
+                        placeholder="e.g. Malta, Germany, UK"
+                        style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff' }}
+                      />
+                    </div>
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
@@ -2102,7 +2119,7 @@ export default function DocumentGeneratorModal({
                   display: 'flex',
                   flexDirection: 'column',
                   justifyContent: 'space-between',
-                  padding: includeLetterheadBg ? '150px 42px 42px 42px' : '36px 42px 42px 42px',
+                  padding: includeLetterheadBg ? '196px 42px 36px 42px' : '36px 42px 36px 42px',
                   boxSizing: 'border-box',
                 }}
               >
@@ -2185,13 +2202,19 @@ export default function DocumentGeneratorModal({
                           </tr>
                           <tr>
                             <td style={{ border: '1.5px solid #000000', padding: '9px 12px', verticalAlign: 'top', background: '#ffffff', color: '#000000' }}>
-                              <div style={{ fontSize: '11px', color: '#000000' }}>
-                                <span style={{ fontWeight: 800 }}>Address: </span>
-                                <span>{studentInvoice.studentAddress || 'MALTA'}</span>
+                              <div style={{ fontSize: '11px', color: '#000000', marginBottom: '3px' }}>
+                                <span style={{ fontWeight: 800 }}>Address (India): </span>
+                                <span>{studentInvoice.studentAddress || 'Kerala, India'}</span>
                               </div>
+                              {studentInvoice.destinationCountry && (
+                                <div style={{ fontSize: '11px', color: '#000000', marginBottom: '3px' }}>
+                                  <span style={{ fontWeight: 800 }}>Destination Country: </span>
+                                  <span style={{ fontWeight: 700 }}>{studentInvoice.destinationCountry}</span>
+                                </div>
+                              )}
                               {studentInvoice.courseDetails && (
-                                <div style={{ fontSize: '11px', color: '#000000', fontWeight: 600, marginTop: '3px' }}>
-                                  <span style={{ fontWeight: 800 }}>Program: </span>
+                                <div style={{ fontSize: '11px', color: '#000000', fontWeight: 600 }}>
+                                  <span style={{ fontWeight: 800 }}>Course / Program: </span>
                                   <span>{studentInvoice.courseDetails} {studentInvoice.intake ? `(${studentInvoice.intake})` : ''}</span>
                                 </div>
                               )}
@@ -2311,14 +2334,28 @@ export default function DocumentGeneratorModal({
                                     {studentInvoice.bankDetails.swiftCode}
                                   </td>
                                 </tr>
+                                <tr>
+                                  <td style={{ border: '1.5px solid #000000', padding: '5px 10px', fontWeight: 800, color: '#000000' }}>Remittance Purpose (RBI LRS):</td>
+                                  <td style={{ border: '1.5px solid #000000', padding: '5px 10px', fontWeight: 700, color: '#000000' }}>
+                                    Education Consultancy &amp; Student Visa Facilitation (RBI Purpose Code: S0305)
+                                  </td>
+                                </tr>
                               </>
                             ) : (
-                              <tr>
-                                <td style={{ border: '1.5px solid #000000', padding: '5px 10px', fontWeight: 800, color: '#000000' }}>IFSC Code:</td>
-                                <td style={{ border: '1.5px solid #000000', padding: '5px 10px', fontWeight: 900, color: '#000000', letterSpacing: '0.5px', fontFamily: 'monospace' }}>
-                                  {studentInvoice.bankDetails.swiftCode}
-                                </td>
-                              </tr>
+                              <>
+                                <tr>
+                                  <td style={{ border: '1.5px solid #000000', padding: '5px 10px', fontWeight: 800, color: '#000000' }}>IFSC Code:</td>
+                                  <td style={{ border: '1.5px solid #000000', padding: '5px 10px', fontWeight: 900, color: '#000000', letterSpacing: '0.5px', fontFamily: 'monospace' }}>
+                                    {studentInvoice.bankDetails.swiftCode}
+                                  </td>
+                                </tr>
+                                <tr>
+                                  <td style={{ border: '1.5px solid #000000', padding: '5px 10px', fontWeight: 800, color: '#000000' }}>Transfer Purpose:</td>
+                                  <td style={{ border: '1.5px solid #000000', padding: '5px 10px', fontWeight: 700, color: '#000000' }}>
+                                    Higher Education Admission &amp; Visa Advisory Services
+                                  </td>
+                                </tr>
+                              </>
                             )}
                           </tbody>
                         </table>
@@ -2374,8 +2411,8 @@ export default function DocumentGeneratorModal({
                     {/* Authorized Signature & Corporate Seal Block */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '22px' }}>
                       <div style={{ fontSize: '9.5px', color: '#475569', lineHeight: '1.4', maxWidth: '380px' }}>
-                        <div>* <strong>Bank &amp; Educational Loan Clearance Note:</strong> This is an authentic {studentDocType === 'receipt' ? 'official fee receipt' : 'statutory tax invoice'} issued for higher education application and student visa processing.</div>
-                        <div style={{ marginTop: '2px' }}>Sterling Study Abroad &amp; Overseas Consultancy &bull; www.sterlingstudyabroad.com</div>
+                        <div>* <strong>Bank &amp; Educational Loan Clearance Note:</strong> This is an authentic {studentDocType === 'receipt' ? 'official fee receipt' : 'official invoice'} issued for higher education consultation, university admission, and international student visa facilitation.</div>
+                        <div style={{ marginTop: '2px' }}>{studentInvoice.bankDetails?.accountHolder || 'Sterling Overseas Consultancy LLC'} &bull; www.sterlingstudyabroad.com</div>
                       </div>
                       <div style={{ textAlign: 'center', width: '220px', position: 'relative' }}>
                         {/* Realistic Stamp Seal for Invoice */}
