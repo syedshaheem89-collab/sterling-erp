@@ -120,6 +120,7 @@ export default function DocumentGeneratorModal({
 
   // --- 1. STUDENT DUBAI INVOICE / RECEIPT STATE (WIO Bank Abu Dhabi Template) ---
   const [studentInvoice, setStudentInvoice] = useState({
+    docHeading: 'INVOICE', // 'INVOICE' | 'PROFORMA INVOICE' | 'TAX INVOICE' | 'FEE PAYMENT ADVICE'
     invoiceNumber: `INV-DXB-${new Date().getFullYear()}-084`,
     invoiceDate: new Date().toLocaleDateString('en-GB').replace(/\//g, '.'),
     dueDate: new Date().toLocaleDateString('en-GB').replace(/\//g, '.'),
@@ -576,6 +577,7 @@ export default function DocumentGeneratorModal({
     const todayStr = new Date().toLocaleDateString('en-GB').replace(/\//g, '.');
     setSelectedStudentId('');
     setStudentInvoice({
+      docHeading: 'INVOICE',
       invoiceNumber: `INV-DXB-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`,
       invoiceDate: todayStr,
       dueDate: todayStr,
@@ -1307,14 +1309,29 @@ export default function DocumentGeneratorModal({
                     </select>
                   </div>
 
-                  <div>
-                    <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Document #</label>
-                    <input
-                      type="text"
-                      value={studentInvoice.invoiceNumber}
-                      onChange={(e) => setStudentInvoice({ ...studentInvoice, invoiceNumber: e.target.value })}
-                      style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff' }}
-                    />
+                  <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '8px' }}>
+                    <div>
+                      <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Document Title</label>
+                      <select
+                        value={studentInvoice.docHeading || 'INVOICE'}
+                        onChange={(e) => setStudentInvoice({ ...studentInvoice, docHeading: e.target.value })}
+                        style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff', fontSize: '12px' }}
+                      >
+                        <option value="INVOICE">INVOICE (Bank Wire / Forex)</option>
+                        <option value="PROFORMA INVOICE">PROFORMA INVOICE</option>
+                        <option value="TAX INVOICE">TAX INVOICE</option>
+                        <option value="FEE PAYMENT ADVICE">FEE PAYMENT ADVICE</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Document #</label>
+                      <input
+                        type="text"
+                        value={studentInvoice.invoiceNumber}
+                        onChange={(e) => setStudentInvoice({ ...studentInvoice, invoiceNumber: e.target.value })}
+                        style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff' }}
+                      />
+                    </div>
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
@@ -2130,7 +2147,7 @@ export default function DocumentGeneratorModal({
 
                         <div style={{ textAlign: 'right' }}>
                           <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 900, color: '#000000', letterSpacing: '1px' }}>
-                            {studentDocType === 'receipt' ? 'OFFICIAL RECEIPT' : 'TAX INVOICE'}
+                            {studentDocType === 'receipt' ? 'OFFICIAL RECEIPT' : (studentInvoice.docHeading || 'INVOICE')}
                           </h1>
                           <div style={{ fontSize: '10.5px', color: studentDocType === 'receipt' ? '#047857' : '#2563EB', fontWeight: 800 }}>
                             {studentDocType === 'receipt' ? 'SERVICE FEE PAYMENT CONFIRMATION' : 'OVERSEAS EDUCATION PROCESSING FEE'}
