@@ -1766,68 +1766,40 @@ export default function DocumentGeneratorModal({
                         value={studentInvoice.selectedBankId || 'comp-bank-wio-1'}
                         onChange={(e) => {
                           const bId = e.target.value;
-                          if (bId === 'comp-bank-axis-1') {
-                            setStudentInvoice((prev) => ({
-                              ...prev,
-                              selectedBankId: bId,
-                              currency: 'INR',
-                              companyName: prev.companyName || 'Sterling Study Abroad',
-                              companyAddress: '5th Floor, Hi-lite Business Park, Calicut, Kerala, India - 673014',
-                              bankDetails: {
-                                accountHolder: 'Sterling Study Abroad',
-                                businessId: '',
-                                licenseNumber: '',
-                                bankName: 'Axis Bank',
-                                address: 'Tirur / Malappuram Branch, Kerala',
-                                accountNumber: '921020048291039',
-                                iban: 'N/A',
-                                swiftCode: 'UTIB0000829',
-                                isDomestic: true,
-                              },
-                            }));
-                          } else if (bId === 'comp-bank-fed-1') {
-                            setStudentInvoice((prev) => ({
-                              ...prev,
-                              selectedBankId: bId,
-                              currency: 'INR',
-                              companyName: prev.companyName || 'Sterling Study Abroad',
-                              companyAddress: '5th Floor, Hi-lite Business Park, Calicut, Kerala, India - 673014',
-                              bankDetails: {
-                                accountHolder: 'Sterling Study Abroad',
-                                businessId: '',
-                                licenseNumber: '',
-                                bankName: 'Federal Bank',
-                                address: 'Valanchery Main Branch, Kerala',
-                                accountNumber: '14200200039281',
-                                iban: 'N/A',
-                                swiftCode: 'FDRL0001420',
-                                isDomestic: true,
-                              },
-                            }));
-                          } else {
-                            setStudentInvoice((prev) => ({
-                              ...prev,
-                              selectedBankId: 'comp-bank-wio-1',
-                              companyAddress: 'Etihad Airways Centre 5th Floor, Abu Dhabi, United Arab Emirates',
-                              bankDetails: {
-                                accountHolder: 'Sterling Overseas Consultancy LLC',
-                                businessId: '',
-                                licenseNumber: '',
-                                bankName: 'WIO BANK PJSC',
-                                address: 'Etihad Airways Centre 5th Floor, Abu Dhabi, UAE',
-                                accountNumber: '0860000009569370024',
-                                iban: 'AE620860000009569370024',
-                                swiftCode: 'WIOBAEADXXX',
-                                isDomestic: false,
-                              },
-                            }));
-                          }
+                          const chosen = companyBanks.find((b) => b.id === bId);
+                          if (!chosen) return;
+                          const isForeign =
+                            (chosen.currency && chosen.currency !== 'INR') ||
+                            (chosen.bank_name || '').toLowerCase().includes('wio') ||
+                            String(chosen.account_number || '').startsWith('AE');
+                          setStudentInvoice((prev) => ({
+                            ...prev,
+                            selectedBankId: chosen.id,
+                            currency: isForeign ? (prev.currency === 'INR' ? (chosen.currency || 'USD') : prev.currency) : 'INR',
+                            companyName: prev.companyName || (isForeign ? 'Sterling Overseas Consultancy LLC' : 'Sterling Study Abroad'),
+                            companyAddress: isForeign
+                              ? (chosen.branch || 'Etihad Airways Centre 5th Floor, Abu Dhabi, United Arab Emirates')
+                              : '5th Floor, Hi-lite Business Park, Calicut, Kerala, India - 673014',
+                            bankDetails: {
+                              accountHolder: chosen.account_holder || (isForeign ? 'Sterling Overseas Consultancy LLC' : 'Sterling Study Abroad'),
+                              businessId: isForeign ? (chosen.ifsc || '') : '',
+                              licenseNumber: '',
+                              bankName: chosen.bank_name || 'Bank',
+                              address: chosen.branch || '',
+                              accountNumber: chosen.account_number || '',
+                              iban: isForeign ? (chosen.account_number || '') : 'N/A',
+                              swiftCode: chosen.ifsc || '',
+                              isDomestic: !isForeign,
+                            },
+                          }));
                         }}
                         style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff', fontSize: '11px' }}
                       >
-                        <option value="comp-bank-wio-1">WIO Bank UAE (USD/EUR/AED)</option>
-                        <option value="comp-bank-axis-1">Axis Bank (India - INR)</option>
-                        <option value="comp-bank-fed-1">Federal Bank (India - INR)</option>
+                        {companyBanks.map((b) => (
+                          <option key={b.id} value={b.id}>
+                            {b.label || `${b.bank_name} (${b.account_number?.slice(-4) || ''})`}
+                          </option>
+                        ))}
                       </select>
                     </div>
                   </div>
@@ -2503,63 +2475,38 @@ export default function DocumentGeneratorModal({
                       value={universityInvoice.selectedBankId || 'comp-bank-wio-1'}
                       onChange={(e) => {
                         const bId = e.target.value;
-                        if (bId === 'comp-bank-axis-1') {
-                          setUniversityInvoice((prev) => ({
-                            ...prev,
-                            selectedBankId: bId,
-                            currency: 'INR',
-                            companyAddress: '5th Floor, Hi-lite Business Park, Calicut, Kerala, India - 673014',
-                            bankDetails: {
-                              accountHolder: 'Sterling Study Abroad',
-                              businessId: '',
-                              bankName: 'Axis Bank',
-                              address: 'Tirur / Malappuram Branch, Kerala, India',
-                              accountNumber: '921020048291039',
-                              iban: 'N/A',
-                              swiftCode: 'UTIB0000829',
-                              isDomestic: true,
-                            },
-                          }));
-                        } else if (bId === 'comp-bank-fed-1') {
-                          setUniversityInvoice((prev) => ({
-                            ...prev,
-                            selectedBankId: bId,
-                            currency: 'INR',
-                            companyAddress: '5th Floor, Hi-lite Business Park, Calicut, Kerala, India - 673014',
-                            bankDetails: {
-                              accountHolder: 'Sterling Study Abroad',
-                              businessId: '',
-                              bankName: 'Federal Bank',
-                              address: 'Valanchery Main Branch, Kerala, India',
-                              accountNumber: '14200200039281',
-                              iban: 'N/A',
-                              swiftCode: 'FDRL0001420',
-                              isDomestic: true,
-                            },
-                          }));
-                        } else {
-                          setUniversityInvoice((prev) => ({
-                            ...prev,
-                            selectedBankId: 'comp-bank-wio-1',
-                            companyAddress: 'Etihad Airways Centre 5th Floor, Abu Dhabi, United Arab Emirates',
-                            bankDetails: {
-                              accountHolder: 'Sterling Overseas Consultancy LLC',
-                              businessId: 'WIOBAEADXXX',
-                              bankName: 'WIO BANK PJSC',
-                              address: 'Etihad Airways Centre 5th Floor, Abu Dhabi, UAE',
-                              accountNumber: '0860000009569370024',
-                              iban: 'AE620860000009569370024',
-                              swiftCode: 'WIOBAEADXXX',
-                              isDomestic: false,
-                            },
-                          }));
-                        }
+                        const chosen = companyBanks.find((b) => b.id === bId);
+                        if (!chosen) return;
+                        const isForeign =
+                          (chosen.currency && chosen.currency !== 'INR') ||
+                          (chosen.bank_name || '').toLowerCase().includes('wio') ||
+                          String(chosen.account_number || '').startsWith('AE');
+                        setUniversityInvoice((prev) => ({
+                          ...prev,
+                          selectedBankId: chosen.id,
+                          currency: isForeign ? (prev.currency === 'INR' ? (chosen.currency || 'EUR') : prev.currency) : 'INR',
+                          companyAddress: isForeign
+                            ? (chosen.branch || 'Etihad Airways Centre 5th Floor, Abu Dhabi, United Arab Emirates')
+                            : '5th Floor, Hi-lite Business Park, Calicut, Kerala, India - 673014',
+                          bankDetails: {
+                            accountHolder: chosen.account_holder || (isForeign ? 'Sterling Overseas Consultancy LLC' : 'Sterling Study Abroad'),
+                            businessId: isForeign ? (chosen.ifsc || '') : '',
+                            bankName: chosen.bank_name || 'Bank',
+                            address: chosen.branch || '',
+                            accountNumber: chosen.account_number || '',
+                            iban: isForeign ? (chosen.account_number || '') : 'N/A',
+                            swiftCode: chosen.ifsc || '',
+                            isDomestic: !isForeign,
+                          },
+                        }));
                       }}
                       style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#131B2E', border: '1px solid #3B82F6', color: '#fff', fontSize: '11.5px', marginBottom: '6px' }}
                     >
-                      <option value="comp-bank-wio-1">WIO Bank UAE (EUR/USD/GBP/AED)</option>
-                      <option value="comp-bank-axis-1">Axis Bank (India - INR)</option>
-                      <option value="comp-bank-fed-1">Federal Bank (India - INR)</option>
+                      {companyBanks.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.label || `${b.bank_name} (${b.account_number?.slice(-4) || ''})`}
+                        </option>
+                      ))}
                     </select>
 
                     <input
