@@ -75,36 +75,6 @@ export function getStudentAgentMeta(student) {
     }
   }
 
-  // 3. Fallback heuristics for known students if not set
-  const lowerName = (student.name || '').toLowerCase();
-  if (!meta.b2b_agent_name) {
-    if (lowerName.includes('thejus') || lowerName.includes('nivil')) {
-      meta.b2b_agent_name = 'Consult Fox';
-      meta.b2b_committed = meta.b2b_committed || 180000;
-    } else if (lowerName.includes('abhijith')) {
-      meta.b2b_agent_name = 'VFS & Insurance';
-      meta.b2b_committed = meta.b2b_committed || 20780;
-    } else if (lowerName.includes('liza')) {
-      meta.b2b_agent_name = 'Rashin Team';
-      meta.b2b_committed = meta.b2b_committed || 20000;
-    } else if (lowerName.includes('vivek') || lowerName.includes('hanock')) {
-      meta.b2b_agent_name = 'Future Factory';
-      meta.b2b_committed = meta.b2b_committed || 42000; // ~500 USD
-    } else if (lowerName.includes('annalise') || lowerName.includes('megha')) {
-      meta.b2b_agent_name = 'Future Factory';
-      meta.b2b_committed = meta.b2b_committed || 42000;
-    } else if (lowerName.includes('annlin')) {
-      meta.b2b_agent_name = 'Empire - Lithuania';
-      meta.b2b_committed = meta.b2b_committed || 90000; // ~1000 EUR
-    } else if (lowerName.includes('gayathri') || lowerName.includes('achsah') || lowerName.includes('anna biju')) {
-      meta.b2b_agent_name = 'Abroad Angel Poland';
-      meta.b2b_committed = meta.b2b_committed || 70800;
-    } else if (lowerName.includes('esabella')) {
-      meta.b2b_agent_name = 'Medwizard';
-      meta.b2b_committed = meta.b2b_committed || 24000;
-    }
-  }
-
   // Ensure numeric fields
   meta.b2b_committed = Number(meta.b2b_committed || 0);
   meta.b2b_paid = Number(meta.b2b_paid || 0);
@@ -145,6 +115,18 @@ export function saveStudentAgentMeta(studentId, studentName, meta, existingNotes
     if (studentId) parsed[studentId] = cleanMeta;
     if (studentName) parsed[studentName.trim().toLowerCase()] = cleanMeta;
     localStorage.setItem('sterling_student_agent_meta', JSON.stringify(parsed));
+
+    // Clear deleted suppression for this student on explicit user save
+    const deletedKeys = JSON.parse(localStorage.getItem('sterling_b2b_deleted_keys') || '[]');
+    const sId = studentId ? String(studentId).toLowerCase() : '';
+    const sName = studentName ? studentName.trim().toLowerCase() : '';
+    const filtered = deletedKeys.filter((k) => {
+      const lower = k.toLowerCase();
+      if (sId && lower.includes(sId)) return false;
+      if (sName && lower.includes(sName)) return false;
+      return true;
+    });
+    localStorage.setItem('sterling_b2b_deleted_keys', JSON.stringify(filtered));
   } catch (e) {
     console.error('Failed to save student agent meta to localStorage', e);
   }
@@ -229,6 +211,23 @@ export function syncStudentPartnerToB2BPayments(studentId, studentName, meta) {
       },
     ];
 
+    // Check if the user previously deleted/dismissed this payment
+    let deletedKeys = [];
+    try {
+      deletedKeys = JSON.parse(localStorage.getItem('sterling_b2b_deleted_keys') || '[]');
+    } catch (e) {}
+
+    const isDeleted = (type, partner) => {
+      const k1 = studentId ? `${studentId}_${type}`.toLowerCase() : null;
+      const k2 = studentName ? `${studentName.trim().toLowerCase()}_${type}` : null;
+      const k3 = studentName && partner ? `${studentName.trim().toLowerCase()}_${partner.toLowerCase()}` : null;
+      return (
+        (k1 && deletedKeys.includes(k1)) ||
+        (k2 && deletedKeys.includes(k2)) ||
+        (k3 && deletedKeys.includes(k3))
+      );
+    };
+
     let hasChanges = false;
 
     partnersToSync.forEach(({ type, partner, committed, paid, category }) => {
@@ -270,7 +269,7 @@ export function syncStudentPartnerToB2BPayments(studentId, studentName, meta) {
           notes: cur.notes || `${category} for student ${studentName}`,
         };
         hasChanges = true;
-      } else if (remainingDue > 0) {
+      } else if (remainingDue > 0 && !isDeleted(type, partner)) {
         // Insert new pending payment voucher
         const newPayment = {
           id: `b2b-auto-${Date.now()}-${type}-${Math.random().toString(36).substring(2, 6)}`,
@@ -308,16 +307,11 @@ export function syncStudentPartnerToB2BPayments(studentId, studentName, meta) {
 }
 
 /**
- * Reconcile and synchronize all students in the database with B2B payments
+ * Reconcile and synchronize all students in the database with B2B payments.
+ * Deliberate no-op to prevent deleted items from being resurrected on mount.
  */
-export function syncAllStudentsToB2BPayments(students) {
-  if (!Array.isArray(students) || students.length === 0) return;
-  students.forEach((s) => {
-    const meta = getStudentAgentMeta(s);
-    if (meta.b2b_agent_name || meta.apostille_agent || meta.insurance_agent) {
-      syncStudentPartnerToB2BPayments(s.id, s.name, meta);
-    }
-  });
+export function syncAllStudentsToB2BPayments() {
+  // Sync occurs on explicit save of a student application
 }
 
 /**

@@ -454,9 +454,12 @@ export default function B2BPayments({ setCurrentPage }) {
   const [payments, setPayments] = useState(() => {
     try {
       const saved = localStorage.getItem('sterling_b2b_payments');
+      const deletedKeys = JSON.parse(localStorage.getItem('sterling_b2b_deleted_keys') || '[]');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.filter((p) => !deletedKeys.includes(p.id));
+        }
       }
     } catch (e) {
       console.warn('Failed to parse saved b2b payments', e);
@@ -632,7 +635,7 @@ export default function B2BPayments({ setCurrentPage }) {
     }
   }, [payments]);
 
-  // Fetch ERP students on mount for autocomplete & auto-sync pending partner dues
+  // Fetch ERP students on mount for autocomplete & calculations
   useEffect(() => {
     async function fetchStudents() {
       try {
@@ -642,17 +645,6 @@ export default function B2BPayments({ setCurrentPage }) {
           .order('name');
         if (!error && data) {
           setErpStudents(data);
-          syncAllStudentsToB2BPayments(data);
-          // Reload payments from localStorage after synchronization
-          const latest = localStorage.getItem('sterling_b2b_payments');
-          if (latest) {
-            try {
-              const parsed = JSON.parse(latest);
-              if (Array.isArray(parsed) && parsed.length > 0) {
-                setPayments(parsed);
-              }
-            } catch (e) {}
-          }
         }
       } catch (err) {
         console.warn('Student lookup not available:', err);
@@ -1399,16 +1391,36 @@ export default function B2BPayments({ setCurrentPage }) {
     setShowModal(false);
   };
 
-  // Delete Payment
+  // Delete Payment permanently
   const handleDelete = (id, partner) => {
     if (window.confirm(`Delete payment reminder for "${partner}"?`)) {
-      setPayments((prev) => prev.filter((p) => p.id !== id));
+      const target = payments.find((p) => p.id === id);
+      if (target) {
+        try {
+          const deletedKeys = JSON.parse(localStorage.getItem('sterling_b2b_deleted_keys') || '[]');
+          const k1 = id;
+          const k2 = target.student_id ? `${target.student_id}_${target.partner_type || target.category}`.toLowerCase() : null;
+          const k3 = target.student_names ? `${target.student_names.trim().toLowerCase()}_${target.partner_type || target.category}`.toLowerCase() : null;
+          const k4 = target.student_names && target.partner_name ? `${target.student_names.trim().toLowerCase()}_${target.partner_name.toLowerCase()}`.toLowerCase() : null;
+          const updated = Array.from(new Set([...deletedKeys, k1, k2, k3, k4].filter(Boolean)));
+          localStorage.setItem('sterling_b2b_deleted_keys', JSON.stringify(updated));
+        } catch (e) {}
+      }
+
+      setPayments((prev) => {
+        const next = prev.filter((p) => p.id !== id);
+        try {
+          localStorage.setItem('sterling_b2b_payments', JSON.stringify(next));
+        } catch (e) {}
+        return next;
+      });
+
       setSelectedIds((prev) => {
         const next = new Set(prev);
         next.delete(id);
         return next;
       });
-      toast.success('Removed');
+      toast.success('Payment deleted permanently');
     }
   };
 
