@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
 import { supabase } from '../supabase';
+import { parseTransferAccountDetails, numberToWordsINR } from '../utils/studentAgentHelper';
 
 /**
  * DocumentGeneratorModal
@@ -1931,95 +1932,249 @@ export default function DocumentGeneratorModal({
                         </tbody>
                       </table>
 
-                      {/* Transaction Audit Execution Box (Both Our Bank & Partner Bank) */}
-                      <div style={{ border: '1.5px solid #000000', background: '#F8FAFC', padding: '12px 14px', borderRadius: '4px', marginBottom: '18px' }}>
-                        <div style={{ fontWeight: 900, fontSize: '12px', color: '#000000', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                          🏦 {b2bReceipt.status === 'PAID' ? 'Electronic Fund Transfer & Bank Clearance Audit' : 'Disbursing Account Recommendation & Payee Bank'}
-                        </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '11.5px' }}>
-                          <div>
-                            <span style={{ color: '#000000', fontWeight: 800 }}>Payment Mode: </span>
-                            <strong style={{ color: '#000000' }}>{b2bReceipt.paymentMode}</strong>
+                      {/* BANKING INSTRUCTIONS: RECEIVER ACCOUNT vs DEBIT ACCOUNT */}
+                      {(() => {
+                        const receiverAcc = parseTransferAccountDetails(b2bReceipt.transferAccount, b2bReceipt.partnerName);
+                        const payingBank = companyBanks.find((b) => b.id === b2bReceipt.selectedPayingBankId) || companyBanks[0];
+
+                        return (
+                          <div style={{ marginBottom: '18px' }}>
+                            <div style={{
+                              display: 'grid',
+                              gridTemplateColumns: '1.15fr 0.85fr',
+                              border: '1.5px solid #000000',
+                              borderRadius: '6px',
+                              overflow: 'hidden',
+                              background: '#ffffff',
+                            }}>
+                              {/* LEFT COLUMN: RECEIVER (BENEFICIARY) BANK ACCOUNT */}
+                              <div style={{
+                                padding: '12px 14px',
+                                borderRight: '1.5px solid #000000',
+                                background: '#FAFAFA',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '5px',
+                                fontSize: '11px',
+                                color: '#000000',
+                              }}>
+                                <div style={{
+                                  fontSize: '11px',
+                                  fontWeight: 900,
+                                  color: '#1E293B',
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.04em',
+                                  borderBottom: '1px solid #CBD5E1',
+                                  paddingBottom: '4px',
+                                  marginBottom: '3px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '5px',
+                                }}>
+                                  <span>🏦</span>
+                                  <span>Receiver / Beneficiary Account (Credit To)</span>
+                                </div>
+
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                                  <span style={{ color: '#64748B', fontWeight: 600 }}>Beneficiary Payee:</span>
+                                  <strong style={{ color: '#0F172A', fontSize: '12px', textAlign: 'right' }}>
+                                    {receiverAcc.beneficiary || b2bReceipt.partnerName}
+                                  </strong>
+                                </div>
+
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                                  <span style={{ color: '#64748B', fontWeight: 600 }}>Bank Name:</span>
+                                  <strong style={{ color: '#0F172A', textAlign: 'right' }}>{receiverAcc.bankName}</strong>
+                                </div>
+
+                                <div style={{
+                                  background: '#F1F5F9',
+                                  border: '1px solid #CBD5E1',
+                                  borderRadius: '4px',
+                                  padding: '6px 10px',
+                                  margin: '2px 0',
+                                }}>
+                                  <div style={{ fontSize: '9.5px', color: '#475569', fontWeight: 800, textTransform: 'uppercase' }}>
+                                    Account Number / IBAN (Transfer To)
+                                  </div>
+                                  <div style={{ fontSize: '15px', fontWeight: 900, color: '#0F172A', letterSpacing: '0.8px', fontFamily: 'monospace' }}>
+                                    {receiverAcc.accountNumber}
+                                  </div>
+                                </div>
+
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <div>
+                                    <span style={{ color: '#64748B', fontWeight: 600 }}>IFSC Code: </span>
+                                    <strong style={{ color: '#0F172A', fontFamily: 'monospace', fontWeight: 900 }}>{receiverAcc.ifsc}</strong>
+                                  </div>
+                                  {receiverAcc.upiId && (
+                                    <div>
+                                      <span style={{ color: '#64748B', fontWeight: 600 }}>UPI ID: </span>
+                                      <strong style={{ color: '#0F172A', fontFamily: 'monospace' }}>{receiverAcc.upiId}</strong>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* RIGHT COLUMN: DISBURSING (STERLING) ACCOUNT */}
+                              <div style={{
+                                padding: '12px 14px',
+                                background: '#ffffff',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '5px',
+                                fontSize: '11px',
+                                color: '#000000',
+                              }}>
+                                <div style={{
+                                  fontSize: '11px',
+                                  fontWeight: 900,
+                                  color: '#1E293B',
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.04em',
+                                  borderBottom: '1px solid #CBD5E1',
+                                  paddingBottom: '4px',
+                                  marginBottom: '3px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '5px',
+                                }}>
+                                  <span>🏢</span>
+                                  <span>Disbursing Account (Debit From)</span>
+                                </div>
+
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                                  <span style={{ color: '#64748B', fontWeight: 600 }}>Sterling Bank:</span>
+                                  <strong style={{ color: '#0F172A', fontSize: '12px', textAlign: 'right' }}>
+                                    {payingBank?.bank_name || 'Sterling Operations Bank'}
+                                  </strong>
+                                </div>
+
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                                  <span style={{ color: '#64748B', fontWeight: 600 }}>Branch / Location:</span>
+                                  <strong style={{ color: '#0F172A', textAlign: 'right' }}>
+                                    {payingBank?.branch || 'Calicut Main / Hi-Lite'}
+                                  </strong>
+                                </div>
+
+                                <div style={{
+                                  background: '#F8FAFC',
+                                  border: '1px solid #E2E8F0',
+                                  borderRadius: '4px',
+                                  padding: '6px 10px',
+                                  margin: '2px 0',
+                                }}>
+                                  <div style={{ fontSize: '9.5px', color: '#475569', fontWeight: 800, textTransform: 'uppercase' }}>
+                                    Debit Account # (Sterling Current)
+                                  </div>
+                                  <div style={{ fontSize: '13px', fontWeight: 900, color: '#0F172A', letterSpacing: '0.5px', fontFamily: 'monospace' }}>
+                                    {payingBank?.account_number || 'Primary Operations Current A/C'}
+                                  </div>
+                                </div>
+
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <div>
+                                    <span style={{ color: '#64748B', fontWeight: 600 }}>Transfer Mode: </span>
+                                    <strong style={{ color: '#0F172A' }}>{b2bReceipt.paymentMode || 'NEFT / RTGS'}</strong>
+                                  </div>
+                                  <div>
+                                    <span style={{ color: '#64748B', fontWeight: 600 }}>Bank UTR: </span>
+                                    <strong style={{ color: b2bReceipt.status === 'PAID' ? '#047857' : '#D97706', fontFamily: 'monospace' }}>
+                                      {b2bReceipt.status === 'PAID' ? b2bReceipt.utrNumber : '[Pending]'}
+                                    </strong>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
                           </div>
-                          <div>
-                            <span style={{ color: '#000000', fontWeight: 800 }}>Bank UTR / Transaction Ref: </span>
-                            <strong style={{ color: b2bReceipt.status === 'PAID' ? '#047857' : '#D97706', letterSpacing: '0.5px' }}>
-                              {b2bReceipt.status === 'PAID' ? b2bReceipt.utrNumber : '[Pending Bank Transfer]'}
-                            </strong>
-                          </div>
-                          <div style={{ gridColumn: 'span 2' }}>
-                            <span style={{ color: '#000000', fontWeight: 800 }}>
-                              {b2bReceipt.status === 'PAID' ? 'Debited From (Our Bank): ' : 'Proposed Disbursing Bank: '}
-                            </span>
-                            <strong style={{ color: '#000000' }}>{b2bReceipt.debitAccount}</strong>
-                          </div>
-                          <div style={{ gridColumn: 'span 2' }}>
-                            <span style={{ color: '#000000', fontWeight: 800 }}>Credited To (Beneficiary Bank): </span>
-                            <strong style={{ color: '#000000' }}>{b2bReceipt.transferAccount}</strong>
-                          </div>
-                        </div>
-                      </div>
+                        );
+                      })()}
 
                       {/* Financial Dissection Table */}
-                      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '18px' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '10px' }}>
                         <thead>
                           <tr style={{ background: '#E2E8F0' }}>
-                            <th style={{ border: '1.5px solid #000000', padding: '8px 10px', textAlign: 'left', fontWeight: 900, color: '#000000' }}>Disbursement Particulars</th>
-                            <th style={{ border: '1.5px solid #000000', padding: '8px 10px', textAlign: 'center', width: '110px', fontWeight: 900, color: '#000000' }}>Tax / GST</th>
-                            <th style={{ border: '1.5px solid #000000', padding: '8px 10px', textAlign: 'right', width: '140px', fontWeight: 900, color: '#000000' }}>
-                              {b2bReceipt.status === 'PAID' ? 'Amount Disbursed' : 'Amount to Disburse'}
+                            <th style={{ border: '1.5px solid #000000', padding: '7px 10px', textAlign: 'center', width: '35px', fontWeight: 900, color: '#000000' }}>#</th>
+                            <th style={{ border: '1.5px solid #000000', padding: '7px 10px', textAlign: 'left', fontWeight: 900, color: '#000000' }}>Particulars / Service Description</th>
+                            <th style={{ border: '1.5px solid #000000', padding: '7px 10px', textAlign: 'center', width: '105px', fontWeight: 900, color: '#000000' }}>Tax / GST</th>
+                            <th style={{ border: '1.5px solid #000000', padding: '7px 10px', textAlign: 'right', width: '135px', fontWeight: 900, color: '#000000' }}>
+                              {b2bReceipt.status === 'PAID' ? 'Amount Settled' : 'Amount to Disburse'}
                             </th>
                           </tr>
                         </thead>
                         <tbody>
                           <tr>
-                            <td style={{ border: '1.5px solid #000000', padding: '10px', fontWeight: 700, color: '#000000' }}>
-                              Base Professional Commission / Sub-Agent Fee
-                              <div style={{ fontSize: '11px', color: '#000000', fontWeight: 500 }}>
-                                Candidate(s): {b2bReceipt.studentNames || 'General'}
+                            <td style={{ border: '1.5px solid #000000', padding: '9px 10px', textAlign: 'center', fontWeight: 800, color: '#000000', verticalAlign: 'top' }}>
+                              1
+                            </td>
+                            <td style={{ border: '1.5px solid #000000', padding: '9px 10px', fontWeight: 700, color: '#000000' }}>
+                              <div style={{ fontSize: '12px', fontWeight: 900, color: '#000000' }}>
+                                {b2bReceipt.purpose || 'Sub-Agent Commission & Candidate Processing'}
+                              </div>
+                              <div style={{ fontSize: '11px', color: '#475569', fontWeight: 600, marginTop: '2px' }}>
+                                Candidate Reference: <strong style={{ color: '#000000' }}>{b2bReceipt.studentNames || 'General'}</strong>
                               </div>
                             </td>
-                            <td style={{ border: '1.5px solid #000000', padding: '10px', textAlign: 'center', fontWeight: 700, color: '#000000' }}>
+                            <td style={{ border: '1.5px solid #000000', padding: '9px 10px', textAlign: 'center', fontWeight: 700, color: '#000000', verticalAlign: 'top' }}>
                               {b2bReceipt.gstRate > 0 ? `${b2bReceipt.gstRate}% GST` : '0% (Exempt)'}
                             </td>
-                            <td style={{ border: '1.5px solid #000000', padding: '10px', textAlign: 'right', fontWeight: 800, color: '#000000' }}>
-                              {Number(b2bReceipt.baseAmount).toLocaleString()} {b2bReceipt.currency}
+                            <td style={{ border: '1.5px solid #000000', padding: '9px 10px', textAlign: 'right', fontWeight: 800, color: '#000000', verticalAlign: 'top', fontSize: '12.5px' }}>
+                              ₹{Number(b2bReceipt.baseAmount).toLocaleString('en-IN')} {b2bReceipt.currency}
                             </td>
                           </tr>
 
                           {b2bReceipt.gstAmount > 0 && (
                             <tr>
+                              <td style={{ border: '1.5px solid #000000', padding: '8px 10px', textAlign: 'center', fontWeight: 800, color: '#000000' }}>
+                                2
+                              </td>
                               <td style={{ border: '1.5px solid #000000', padding: '8px 10px', fontWeight: 700, color: '#000000' }}>
-                                Goods and Services Tax (GST 18%)
+                                Goods and Services Tax (GST @ 18.00%)
                               </td>
                               <td style={{ border: '1.5px solid #000000', padding: '8px 10px', textAlign: 'center', fontWeight: 700, color: '#000000' }}>
                                 18.00%
                               </td>
-                              <td style={{ border: '1.5px solid #000000', padding: '8px 10px', textAlign: 'right', fontWeight: 800, color: '#000000' }}>
-                                +{Number(b2bReceipt.gstAmount).toLocaleString()} {b2bReceipt.currency}
+                              <td style={{ border: '1.5px solid #000000', padding: '8px 10px', textAlign: 'right', fontWeight: 800, color: '#000000', fontSize: '12.5px' }}>
+                                +₹{Number(b2bReceipt.gstAmount).toLocaleString('en-IN')} {b2bReceipt.currency}
                               </td>
                             </tr>
                           )}
 
                           {/* Grand Total Row */}
-                          <tr style={{ background: '#F1F5F9' }}>
-                            <td style={{ border: '1.5px solid #000000', padding: '10px', fontWeight: 900, fontSize: '13px', color: '#000000' }}>
-                              {b2bReceipt.status === 'PAID' ? 'TOTAL REMITTANCE SETTLED (NET PAID)' : 'TOTAL AMOUNT TO DISBURSE'}
+                          <tr style={{ background: '#F8FAFC' }}>
+                            <td colSpan={2} style={{ border: '1.5px solid #000000', padding: '10px 12px', fontWeight: 900, fontSize: '12.5px', color: '#000000' }}>
+                              {b2bReceipt.status === 'PAID' ? 'TOTAL REMITTANCE SETTLED (NET PAID)' : 'TOTAL NET PAYABLE AMOUNT (INCL. GST)'}
                             </td>
-                            <td style={{ border: '1.5px solid #000000', padding: '10px', textAlign: 'center', fontWeight: 800, color: '#000000' }}>
+                            <td style={{ border: '1.5px solid #000000', padding: '10px', textAlign: 'center', fontWeight: 900, color: '#000000' }}>
                               FULL
                             </td>
-                            <td style={{ border: '1.5px solid #000000', padding: '10px', textAlign: 'right', fontWeight: 900, fontSize: '14.5px', color: b2bReceipt.status === 'PAID' ? '#047857' : '#D97706' }}>
-                              {Number(b2bReceipt.totalDisbursed).toLocaleString()} {b2bReceipt.currency}
+                            <td style={{ border: '1.5px solid #000000', padding: '10px 12px', textAlign: 'right', fontWeight: 900, fontSize: '15px', color: b2bReceipt.status === 'PAID' ? '#047857' : '#0F172A' }}>
+                              ₹{Number(b2bReceipt.totalDisbursed).toLocaleString('en-IN')} {b2bReceipt.currency}
                             </td>
                           </tr>
                         </tbody>
                       </table>
 
-                      {/* Remarks */}
-                      <div style={{ fontSize: '11px', color: '#000000', fontStyle: 'italic', marginBottom: '20px', fontWeight: 600 }}>
-                        Note: {b2bReceipt.remarks}
+                      {/* Amount in Words Box */}
+                      <div style={{
+                        border: '1px solid #CBD5E1',
+                        background: '#F8FAFC',
+                        borderRadius: '4px',
+                        padding: '6px 10px',
+                        fontSize: '11px',
+                        color: '#000000',
+                        marginBottom: '10px',
+                      }}>
+                        <span style={{ fontWeight: 800, color: '#475569' }}>Amount in Words: </span>
+                        <strong style={{ color: '#0F172A' }}>{numberToWordsINR(b2bReceipt.totalDisbursed)}</strong>
                       </div>
+
+                      {/* Remarks */}
+                      {b2bReceipt.remarks && (
+                        <div style={{ fontSize: '11px', color: '#334155', fontStyle: 'italic', marginBottom: '14px', fontWeight: 600 }}>
+                          Note / Reference: {b2bReceipt.remarks}
+                        </div>
+                      )}
                     </div>
 
                     {/* OFFICIAL "PAID" RUBBER STAMP (ONLY IF ACTUALLY COMPLETED!) */}

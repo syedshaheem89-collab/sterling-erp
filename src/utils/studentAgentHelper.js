@@ -315,6 +315,121 @@ export function syncAllStudentsToB2BPayments() {
 }
 
 /**
+ * Parse any raw transfer account string into clean, structured banking fields
+ * (Bank Name, Account Number, IFSC, Beneficiary / Account Holder, UPI)
+ */
+export function parseTransferAccountDetails(accStr, partnerName = '') {
+  if (!accStr || typeof accStr !== 'string') {
+    return {
+      bankName: 'Not provided',
+      accountNumber: 'Not provided',
+      ifsc: 'N/A',
+      beneficiary: partnerName || 'Not provided',
+      upiId: '',
+      raw: accStr || '',
+    };
+  }
+
+  const raw = accStr.trim();
+  let bankName = '';
+  let accountNumber = '';
+  let ifsc = '';
+  let beneficiary = partnerName;
+  let upiId = '';
+
+  // Extract A/C
+  const acMatch = raw.match(/(?:A\/C|Account(?:\s*No|\s*Number)?|IBAN)\s*[:#\-]?\s*([A-Za-z0-9]+)/i);
+  if (acMatch) accountNumber = acMatch[1].trim();
+
+  // Extract IFSC / Swift
+  const ifscMatch = raw.match(/(?:IFSC(?:\/Swift)?|Swift(?:\/BIC)?|BIC)\s*[:#\-]?\s*([A-Za-z0-9]+)/i);
+  if (ifscMatch) ifsc = ifscMatch[1].trim();
+
+  // Extract Beneficiary
+  const benMatch = raw.match(/(?:Beneficiary|Holder|Payee)\s*[:#\-]?\s*([^|;,\n]+)/i);
+  if (benMatch) beneficiary = benMatch[1].trim();
+
+  // Extract UPI
+  const upiMatch = raw.match(/(?:UPI(?:\s*ID)?)\s*[:#\-]?\s*([a-zA-Z0-9.\-_@]+)/i);
+  if (upiMatch) upiId = upiMatch[1].trim();
+
+  // Extract Bank Name (often the first segment before | or A/C)
+  const segments = raw.split('|').map((s) => s.trim());
+  if (segments.length > 0) {
+    const first = segments[0];
+    if (!first.toLowerCase().includes('a/c') && !first.toLowerCase().includes('account') && !first.toLowerCase().includes('upi')) {
+      bankName = first;
+    }
+  }
+
+  if (!bankName) {
+    const bankRegex = /([A-Za-z\s]+(?:Bank|Co-?operative Bank|Grameena Bank)[A-Za-z\s]*)/i;
+    const bMatch = raw.match(bankRegex);
+    if (bMatch) bankName = bMatch[1].trim();
+  }
+
+  // If no account number was found via regex, check if raw is a pure number or swift string
+  if (!accountNumber) {
+    const pureNumMatch = raw.match(/\b\d{9,18}\b/);
+    if (pureNumMatch) {
+      accountNumber = pureNumMatch[0];
+    } else {
+      accountNumber = raw.length > 30 ? raw.slice(0, 30) + '...' : raw;
+    }
+  }
+
+  return {
+    bankName: bankName || 'Partner Bank',
+    accountNumber: accountNumber || 'Not provided',
+    ifsc: ifsc || 'N/A',
+    beneficiary: beneficiary || partnerName || 'B2B Beneficiary',
+    upiId: upiId || '',
+    raw: raw,
+  };
+}
+
+/**
+ * Convert numbers to Indian Rupees in words (e.g. ₹1,06,200 -> Rupees One Lakh Six Thousand Two Hundred Only)
+ */
+export function numberToWordsINR(num) {
+  const n = Math.round(Number(num) || 0);
+  if (n <= 0) return 'Rupees Zero Only';
+
+  const a = [
+    '', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten',
+    'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'
+  ];
+  const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+  function inWords(val) {
+    if (val < 20) return a[val];
+    const digit = val % 10;
+    return b[Math.floor(val / 10)] + (digit ? ' ' + a[digit] : '');
+  }
+
+  let str = '';
+  let crore = Math.floor(n / 10000000);
+  let rem = n % 10000000;
+  let lakh = Math.floor(rem / 100000);
+  rem = rem % 100000;
+  let thousand = Math.floor(rem / 1000);
+  rem = rem % 1000;
+  let hundred = Math.floor(rem / 100);
+  rem = rem % 100;
+
+  if (crore) str += inWords(crore) + ' Crore ';
+  if (lakh) str += inWords(lakh) + ' Lakh ';
+  if (thousand) str += inWords(thousand) + ' Thousand ';
+  if (hundred) str += inWords(hundred) + ' Hundred ';
+  if (rem) {
+    if (str !== '') str += 'and ';
+    str += inWords(rem) + ' ';
+  }
+
+  return 'Rupees ' + str.trim() + ' Only';
+}
+
+/**
  * Strip metadata tags from notes for clean human display
  */
 export function getCleanNotes(notes) {
