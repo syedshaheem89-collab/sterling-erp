@@ -617,6 +617,7 @@ export default function B2BPayments({ setCurrentPage }) {
 
   // Accounts Payment Disbursement Sheet Modal State (for Sterling Accounts Team)
   const [showAccountsSheetModal, setShowAccountsSheetModal] = useState(false);
+  const [accountsSheetFilter, setAccountsSheetFilter] = useState('all'); // 'all' | 'inr' | 'forex'
 
   // Download / Export Customization Modal State
   const [showExportModal, setShowExportModal] = useState(false);
@@ -4723,6 +4724,58 @@ export default function B2BPayments({ setCurrentPage }) {
                 </span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {/* 3 Quick View / Print Filters */}
+                <div style={{ display: 'inline-flex', background: 'rgba(255,255,255,0.06)', borderRadius: '6px', padding: '2px', marginRight: '6px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setAccountsSheetFilter('all')}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: '4px',
+                      border: 'none',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      background: accountsSheetFilter === 'all' ? '#4F46E5' : 'transparent',
+                      color: accountsSheetFilter === 'all' ? '#fff' : '#94A3B8',
+                    }}
+                  >
+                    All Pending ({metrics.pendingCount})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAccountsSheetFilter('inr')}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: '4px',
+                      border: 'none',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      background: accountsSheetFilter === 'inr' ? '#10B981' : 'transparent',
+                      color: accountsSheetFilter === 'inr' ? '#fff' : '#94A3B8',
+                    }}
+                  >
+                    🇮🇳 Domestic INR ({payments.filter(p => p.status !== 'completed' && (!p.currency || p.currency === 'INR')).length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAccountsSheetFilter('forex')}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: '4px',
+                      border: 'none',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      background: accountsSheetFilter === 'forex' ? '#2563EB' : 'transparent',
+                      color: accountsSheetFilter === 'forex' ? '#fff' : '#94A3B8',
+                    }}
+                  >
+                    🌍 Forex SWIFT ({payments.filter(p => p.status !== 'completed' && p.currency && p.currency !== 'INR').length})
+                  </button>
+                </div>
+
                 <button
                   type="button"
                   className="btn-simple-primary"
@@ -4803,226 +4856,272 @@ export default function B2BPayments({ setCurrentPage }) {
             `}</style>
 
             {/* Print-ready A4 Canvas Container */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '16px', background: 'var(--bg3, #F4F6FC)' }}>
-              <div
-                id="accounts-disbursement-printable"
-                style={{
-                  maxWidth: '920px',
-                  margin: '0 auto',
-                  background: '#ffffff',
-                  color: '#000000',
-                  padding: '20px 26px 30px 26px',
-                  borderRadius: '6px',
-                  boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-                  fontFamily: "'Inter', sans-serif",
-                  fontSize: '11px',
-                  lineHeight: '1.4',
-                }}
-              >
-                {/* Physical letterhead top header banner: 100% PDF/print capture with zero extra vertical gap */}
-                <div
-                  className="print-letterhead-wrapper"
-                  style={{
-                    width: '100%',
-                    height: '140px',
-                    overflow: 'hidden',
-                    marginBottom: '16px',
-                    borderRadius: '4px',
-                  }}
-                >
-                  <img
-                    src="/sterling-letterhead.jpg"
-                    alt="Sterling Study Abroad"
-                    className="print-letterhead"
+            {(() => {
+              const displayedDisbursements = payments.filter((p) => {
+                if (p.status === 'completed') return false;
+                const isForex = p.currency && p.currency !== 'INR';
+                if (accountsSheetFilter === 'inr') return !isForex;
+                if (accountsSheetFilter === 'forex') return isForex;
+                return true;
+              });
+
+              let inrBase = 0;
+              let inrGst = 0;
+              let inrTotal = 0;
+              const forexMap = {};
+
+              displayedDisbursements.forEach((p) => {
+                const fin = calculateFinancials(p);
+                const curr = p.currency || 'INR';
+                if (curr === 'INR') {
+                  inrBase += fin.baseAmount;
+                  inrGst += fin.gstAmount;
+                  inrTotal += fin.totalAmount;
+                } else {
+                  forexMap[curr] = (forexMap[curr] || 0) + fin.totalAmount;
+                }
+              });
+
+              const hasForex = Object.keys(forexMap).length > 0;
+              const hasInr = inrTotal > 0 || accountsSheetFilter === 'inr';
+
+              return (
+                <div style={{ flex: 1, overflowY: 'auto', padding: '16px', background: 'var(--bg3, #F4F6FC)' }}>
+                  <div
+                    id="accounts-disbursement-printable"
                     style={{
-                      width: '100%',
-                      height: 'auto',
-                      display: 'block',
+                      maxWidth: '920px',
+                      margin: '0 auto',
+                      background: '#ffffff',
+                      color: '#000000',
+                      padding: '20px 26px 30px 26px',
+                      borderRadius: '6px',
+                      boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+                      fontFamily: "'Inter', sans-serif",
+                      fontSize: '11px',
+                      lineHeight: '1.4',
                     }}
-                  />
-                </div>
+                  >
+                    {/* Physical letterhead top header banner: 100% PDF/print capture with zero extra vertical gap */}
+                    <div
+                      className="print-letterhead-wrapper"
+                      style={{
+                        width: '100%',
+                        height: '140px',
+                        overflow: 'hidden',
+                        marginBottom: '16px',
+                        borderRadius: '4px',
+                      }}
+                    >
+                      <img
+                        src="/sterling-letterhead.jpg"
+                        alt="Sterling Study Abroad"
+                        className="print-letterhead"
+                        style={{
+                          width: '100%',
+                          height: 'auto',
+                          display: 'block',
+                        }}
+                      />
+                    </div>
 
-                {/* Header (Company name removed as it is already on the letterhead banner) */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #000000', paddingBottom: '10px', marginBottom: '14px' }}>
-                  <div>
-                    <div style={{ fontSize: '12px', fontWeight: 900, color: '#1E293B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                      Central Accounts &amp; Finance Division
-                    </div>
-                    <div style={{ fontSize: '10px', color: '#64748B', marginTop: '2px' }}>
-                      B2B Partner Disbursements &bull; Bank Net Banking Clearance Batch
-                    </div>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '14px', fontWeight: 900, color: '#047857', letterSpacing: '0.4px' }}>
-                      ACCOUNTS DISBURSEMENT SHEET
-                    </div>
-                    <div style={{ fontSize: '11px', color: '#000000', fontWeight: 700 }}>
-                      Date: {new Date().toLocaleDateString('en-GB').replace(/\//g, '.')}
-                    </div>
-                    <div style={{ fontSize: '10px', color: '#64748B' }}>
-                      Ref: STERLING-ACCOUNTS-PAY-{new Date().getFullYear()}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Executive Summary Cards */}
-                <div style={{ display: 'grid', gridTemplateColumns: Object.keys(metrics.forexPending || {}).length > 0 ? 'repeat(5, 1fr)' : 'repeat(4, 1fr)', gap: '10px', marginBottom: '16px' }}>
-                  <div style={{ border: '1.5px solid #000000', padding: '8px 10px', borderRadius: '4px', background: '#F8FAFC' }}>
-                    <div style={{ fontSize: '10px', fontWeight: 800, color: '#64748B', textTransform: 'uppercase' }}>Pending Transfers</div>
-                    <div style={{ fontSize: '15px', fontWeight: 900, color: '#000000' }}>{metrics.pendingCount} Items</div>
-                  </div>
-                  <div style={{ border: '1.5px solid #000000', padding: '8px 10px', borderRadius: '4px', background: '#F8FAFC' }}>
-                    <div style={{ fontSize: '10px', fontWeight: 800, color: '#64748B', textTransform: 'uppercase' }}>Base Net (INR)</div>
-                    <div style={{ fontSize: '14.5px', fontWeight: 900, color: '#000000' }}>{formatMoney(metrics.pendingWithoutGstINR, 'INR')}</div>
-                  </div>
-                  <div style={{ border: '1.5px solid #000000', padding: '8px 10px', borderRadius: '4px', background: '#F8FAFC' }}>
-                    <div style={{ fontSize: '10px', fontWeight: 800, color: '#64748B', textTransform: 'uppercase' }}>GST 18% Total</div>
-                    <div style={{ fontSize: '14.5px', fontWeight: 900, color: '#D97706' }}>{formatMoney(metrics.pendingGstAmountINR, 'INR')}</div>
-                  </div>
-                  <div style={{ border: '1.5px solid #047857', padding: '8px 10px', borderRadius: '4px', background: '#F0FDF4' }}>
-                    <div style={{ fontSize: '10px', fontWeight: 800, color: '#047857', textTransform: 'uppercase' }}>Total Domestic (INR)</div>
-                    <div style={{ fontSize: '15.5px', fontWeight: 900, color: '#047857' }}>{formatMoney(metrics.pendingWithGstINR, 'INR')}</div>
-                  </div>
-                  {Object.keys(metrics.forexPending || {}).length > 0 && (
-                    <div style={{ border: '1.5px solid #2563EB', padding: '8px 10px', borderRadius: '4px', background: '#EFF6FF' }}>
-                      <div style={{ fontSize: '10px', fontWeight: 800, color: '#1D4ED8', textTransform: 'uppercase' }}>Foreign Outflow (0% GST)</div>
-                      <div style={{ fontSize: '14px', fontWeight: 900, color: '#1E40AF' }}>
-                        {Object.entries(metrics.forexPending).map(([curr, amt]) => formatMoney(amt, curr)).join(' + ')}
+                    {/* Header (Company name removed as it is already on the letterhead banner) */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #000000', paddingBottom: '10px', marginBottom: '14px' }}>
+                      <div>
+                        <div style={{ fontSize: '12px', fontWeight: 900, color: '#1E293B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                          Central Accounts &amp; Finance Division
+                        </div>
+                        <div style={{ fontSize: '10px', color: '#64748B', marginTop: '2px' }}>
+                          {accountsSheetFilter === 'inr'
+                            ? 'Indian B2B Sub-Agent Payables • Net Banking / NEFT Clearance Batch'
+                            : accountsSheetFilter === 'forex'
+                            ? 'Overseas Sub-Agent & University Remittances • SWIFT Wire Clearance Batch'
+                            : 'B2B Partner Disbursements • Central Bank Net Banking Clearance Batch'}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: '13px', fontWeight: 900, color: accountsSheetFilter === 'forex' ? '#2563EB' : '#047857', letterSpacing: '0.4px' }}>
+                          {accountsSheetFilter === 'inr'
+                            ? 'ACCOUNTS DISBURSEMENT SHEET (DOMESTIC INR)'
+                            : accountsSheetFilter === 'forex'
+                            ? 'ACCOUNTS DISBURSEMENT SHEET (FOREX SWIFT WIRE)'
+                            : 'ACCOUNTS DISBURSEMENT SHEET'}
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#000000', fontWeight: 700 }}>
+                          Date: {new Date().toLocaleDateString('en-GB').replace(/\//g, '.')}
+                        </div>
+                        <div style={{ fontSize: '10px', color: '#64748B' }}>
+                          Ref: STERLING-ACCOUNTS-PAY-{new Date().getFullYear()}
+                        </div>
                       </div>
                     </div>
-                  )}
-                </div>
 
-                {/* Pending Payments Table with separate B2B Partner, Category, Purpose, Account, Base, GST, Total Amount */}
-                <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '18px', tableLayout: 'fixed' }}>
-                  <colgroup>
-                    <col style={{ width: '3.5%' }} />
-                    <col style={{ width: '15%' }} />
-                    <col style={{ width: '13%' }} />
-                    <col style={{ width: '15%' }} />
-                    <col style={{ width: '22%' }} />
-                    <col style={{ width: '11%' }} />
-                    <col style={{ width: '8.5%' }} />
-                    <col style={{ width: '12%' }} />
-                  </colgroup>
-                  <thead>
-                    <tr style={{ background: '#E2E8F0' }}>
-                      <th style={{ border: '1.5px solid #000000', padding: '6px 4px', textAlign: 'center', fontWeight: 900, color: '#000000', fontSize: '9.5px' }}>#</th>
-                      <th style={{ border: '1.5px solid #000000', padding: '6px 6px', textAlign: 'left', fontWeight: 900, color: '#000000', fontSize: '9.5px' }}>B2B Partner</th>
-                      <th style={{ border: '1.5px solid #000000', padding: '6px 6px', textAlign: 'left', fontWeight: 900, color: '#000000', fontSize: '9.5px' }}>Category</th>
-                      <th style={{ border: '1.5px solid #000000', padding: '6px 6px', textAlign: 'left', fontWeight: 900, color: '#000000', fontSize: '9.5px' }}>Purpose / Candidate(s)</th>
-                      <th style={{ border: '1.5px solid #000000', padding: '6px 6px', textAlign: 'left', fontWeight: 900, color: '#000000', fontSize: '9.5px' }}>Transfer Account (Credit To)</th>
-                      <th style={{ border: '1.5px solid #000000', padding: '6px 6px', textAlign: 'right', fontWeight: 900, color: '#000000', fontSize: '9.5px' }}>Base Amount</th>
-                      <th style={{ border: '1.5px solid #000000', padding: '6px 6px', textAlign: 'center', fontWeight: 900, color: '#000000', fontSize: '9.5px' }}>GST Section</th>
-                      <th style={{ border: '1.5px solid #000000', padding: '6px 6px', textAlign: 'right', fontWeight: 900, color: '#000000', fontSize: '9.5px' }}>Net Payable</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {payments.filter(p => p.status !== 'completed').map((p, idx) => {
-                      const fin = calculateFinancials(p);
-                      return (
-                        <tr key={p.id}>
-                          <td style={{ border: '1.5px solid #000000', padding: '6px 4px', textAlign: 'center', fontWeight: 800, color: '#000000', fontSize: '10px' }}>
-                            {idx + 1}
-                          </td>
-                          <td style={{ border: '1.5px solid #000000', padding: '6px 8px', color: '#000000', wordBreak: 'break-word' }}>
-                            <strong style={{ fontSize: '11px' }}>{p.partner_name}</strong>
-                          </td>
-                          <td style={{ border: '1.5px solid #000000', padding: '6px 8px', color: '#000000', fontSize: '10px', wordBreak: 'break-word' }}>
-                            <span style={{ fontWeight: 700, color: '#1E293B' }}>{p.category || 'Commission'}</span>
-                          </td>
-                          <td style={{ border: '1.5px solid #000000', padding: '6px 8px', color: '#000000', fontSize: '10px', wordBreak: 'break-word' }}>
-                            <div style={{ fontWeight: 600 }}>{p.student_names || 'General Referrals'}</div>
-                          </td>
-                          <td style={{ border: '1.5px solid #000000', padding: '6px 8px', color: '#000000', fontSize: '9.5px', lineHeight: '1.35', wordBreak: 'break-word', fontFamily: 'monospace' }}>
-                            {p.transfer_account || 'Account details pending'}
-                          </td>
-                          <td style={{ border: '1.5px solid #000000', padding: '6px 8px', textAlign: 'right', fontWeight: 700, color: '#000000', fontSize: '10.5px' }}>
-                            {formatMoney(fin.baseAmount, p.currency)}
-                          </td>
-                          <td style={{ border: '1.5px solid #000000', padding: '6px 6px', textAlign: 'center', color: '#000000', fontSize: '9.5px' }}>
-                            {fin.gstAmount > 0 ? (
-                              <div>
-                                <span style={{ fontWeight: 800, color: '#D97706' }}>+18% GST</span>
-                                <div style={{ fontSize: '9px', color: '#475569' }}>+{formatMoney(fin.gstAmount, p.currency)}</div>
-                              </div>
-                            ) : (
-                              <span style={{ color: '#64748B' }}>0% (Exempt)</span>
-                            )}
-                          </td>
-                          <td style={{ border: '1.5px solid #000000', padding: '6px 8px', textAlign: 'right', fontWeight: 900, color: '#0F172A', fontSize: '11.5px' }}>
-                            {formatMoney(fin.totalAmount, p.currency)}
-                          </td>
+                    {/* Executive Summary Cards */}
+                    <div style={{ display: 'grid', gridTemplateColumns: hasForex && hasInr ? 'repeat(5, 1fr)' : hasForex ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: '10px', marginBottom: '16px' }}>
+                      <div style={{ border: '1.5px solid #000000', padding: '8px 10px', borderRadius: '4px', background: '#F8FAFC' }}>
+                        <div style={{ fontSize: '10px', fontWeight: 800, color: '#64748B', textTransform: 'uppercase' }}>Pending Transfers</div>
+                        <div style={{ fontSize: '15px', fontWeight: 900, color: '#000000' }}>{displayedDisbursements.length} Items</div>
+                      </div>
+                      {hasInr && (
+                        <>
+                          <div style={{ border: '1.5px solid #000000', padding: '8px 10px', borderRadius: '4px', background: '#F8FAFC' }}>
+                            <div style={{ fontSize: '10px', fontWeight: 800, color: '#64748B', textTransform: 'uppercase' }}>Base Net (INR)</div>
+                            <div style={{ fontSize: '14.5px', fontWeight: 900, color: '#000000' }}>{formatMoney(inrBase, 'INR')}</div>
+                          </div>
+                          <div style={{ border: '1.5px solid #000000', padding: '8px 10px', borderRadius: '4px', background: '#F8FAFC' }}>
+                            <div style={{ fontSize: '10px', fontWeight: 800, color: '#64748B', textTransform: 'uppercase' }}>GST 18% Total</div>
+                            <div style={{ fontSize: '14.5px', fontWeight: 900, color: '#D97706' }}>{formatMoney(inrGst, 'INR')}</div>
+                          </div>
+                          <div style={{ border: '1.5px solid #047857', padding: '8px 10px', borderRadius: '4px', background: '#F0FDF4' }}>
+                            <div style={{ fontSize: '10px', fontWeight: 800, color: '#047857', textTransform: 'uppercase' }}>Total Domestic (INR)</div>
+                            <div style={{ fontSize: '15.5px', fontWeight: 900, color: '#047857' }}>{formatMoney(inrTotal, 'INR')}</div>
+                          </div>
+                        </>
+                      )}
+                      {hasForex && (
+                        <div style={{ border: '1.5px solid #2563EB', padding: '8px 10px', borderRadius: '4px', background: '#EFF6FF' }}>
+                          <div style={{ fontSize: '10px', fontWeight: 800, color: '#1D4ED8', textTransform: 'uppercase' }}>Foreign Outflow (0% GST)</div>
+                          <div style={{ fontSize: '14px', fontWeight: 900, color: '#1E40AF' }}>
+                            {Object.entries(forexMap).map(([curr, amt]) => formatMoney(amt, curr)).join(' + ')}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Pending Payments Table with separate B2B Partner, Category, Purpose, Account, Base, GST, Total Amount */}
+                    <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '18px', tableLayout: 'fixed' }}>
+                      <colgroup>
+                        <col style={{ width: '3.5%' }} />
+                        <col style={{ width: '15%' }} />
+                        <col style={{ width: '13%' }} />
+                        <col style={{ width: '15%' }} />
+                        <col style={{ width: '22%' }} />
+                        <col style={{ width: '11%' }} />
+                        <col style={{ width: '8.5%' }} />
+                        <col style={{ width: '12%' }} />
+                      </colgroup>
+                      <thead>
+                        <tr style={{ background: '#E2E8F0' }}>
+                          <th style={{ border: '1.5px solid #000000', padding: '6px 4px', textAlign: 'center', fontWeight: 900, color: '#000000', fontSize: '9.5px' }}>#</th>
+                          <th style={{ border: '1.5px solid #000000', padding: '6px 6px', textAlign: 'left', fontWeight: 900, color: '#000000', fontSize: '9.5px' }}>B2B Partner</th>
+                          <th style={{ border: '1.5px solid #000000', padding: '6px 6px', textAlign: 'left', fontWeight: 900, color: '#000000', fontSize: '9.5px' }}>Category</th>
+                          <th style={{ border: '1.5px solid #000000', padding: '6px 6px', textAlign: 'left', fontWeight: 900, color: '#000000', fontSize: '9.5px' }}>Purpose / Candidate(s)</th>
+                          <th style={{ border: '1.5px solid #000000', padding: '6px 6px', textAlign: 'left', fontWeight: 900, color: '#000000', fontSize: '9.5px' }}>Transfer Account (Credit To)</th>
+                          <th style={{ border: '1.5px solid #000000', padding: '6px 6px', textAlign: 'right', fontWeight: 900, color: '#000000', fontSize: '9.5px' }}>Base Amount</th>
+                          <th style={{ border: '1.5px solid #000000', padding: '6px 6px', textAlign: 'center', fontWeight: 900, color: '#000000', fontSize: '9.5px' }}>GST Section</th>
+                          <th style={{ border: '1.5px solid #000000', padding: '6px 6px', textAlign: 'right', fontWeight: 900, color: '#000000', fontSize: '9.5px' }}>Net Payable</th>
                         </tr>
-                      );
-                    })}
+                      </thead>
+                      <tbody>
+                        {displayedDisbursements.map((p, idx) => {
+                          const fin = calculateFinancials(p);
+                          return (
+                            <tr key={p.id}>
+                              <td style={{ border: '1.5px solid #000000', padding: '6px 4px', textAlign: 'center', fontWeight: 800, color: '#000000', fontSize: '10px' }}>
+                                {idx + 1}
+                              </td>
+                              <td style={{ border: '1.5px solid #000000', padding: '6px 8px', color: '#000000', wordBreak: 'break-word' }}>
+                                <strong style={{ fontSize: '11px' }}>{p.partner_name}</strong>
+                              </td>
+                              <td style={{ border: '1.5px solid #000000', padding: '6px 8px', color: '#000000', fontSize: '10px', wordBreak: 'break-word' }}>
+                                <span style={{ fontWeight: 700, color: '#1E293B' }}>{p.category || 'Commission'}</span>
+                              </td>
+                              <td style={{ border: '1.5px solid #000000', padding: '6px 8px', color: '#000000', fontSize: '10px', wordBreak: 'break-word' }}>
+                                <div style={{ fontWeight: 600 }}>{p.student_names || 'General Referrals'}</div>
+                              </td>
+                              <td style={{ border: '1.5px solid #000000', padding: '6px 8px', color: '#000000', fontSize: '9.5px', lineHeight: '1.35', wordBreak: 'break-word', fontFamily: 'monospace' }}>
+                                {p.transfer_account || 'Account details pending'}
+                              </td>
+                              <td style={{ border: '1.5px solid #000000', padding: '6px 8px', textAlign: 'right', fontWeight: 700, color: '#000000', fontSize: '10.5px' }}>
+                                {formatMoney(fin.baseAmount, p.currency)}
+                              </td>
+                              <td style={{ border: '1.5px solid #000000', padding: '6px 6px', textAlign: 'center', color: '#000000', fontSize: '9.5px' }}>
+                                {fin.gstAmount > 0 ? (
+                                  <div>
+                                    <span style={{ fontWeight: 800, color: '#D97706' }}>+18% GST</span>
+                                    <div style={{ fontSize: '9px', color: '#475569' }}>+{formatMoney(fin.gstAmount, p.currency)}</div>
+                                  </div>
+                                ) : (
+                                  <span style={{ color: '#64748B' }}>0% (Exempt)</span>
+                                )}
+                              </td>
+                              <td style={{ border: '1.5px solid #000000', padding: '6px 8px', textAlign: 'right', fontWeight: 900, color: '#0F172A', fontSize: '11.5px' }}>
+                                {formatMoney(fin.totalAmount, p.currency)}
+                              </td>
+                            </tr>
+                          );
+                        })}
 
-                    {/* Domestic INR Grand Total Row */}
-                    <tr style={{ background: '#F8FAFC' }}>
-                      <td colSpan={5} style={{ border: '1.5px solid #000000', padding: '8px 10px', fontWeight: 900, fontSize: '10.5px', color: '#000000', textAlign: 'right' }}>
-                        TOTAL DOMESTIC DISBURSEMENTS (INR, INCL. 18% GST):
-                      </td>
-                      <td style={{ border: '1.5px solid #000000', padding: '8px', textAlign: 'right', fontWeight: 900, fontSize: '10.5px', color: '#000000' }}>
-                        {formatMoney(metrics.pendingWithoutGstINR, 'INR')}
-                      </td>
-                      <td style={{ border: '1.5px solid #000000', padding: '8px', textAlign: 'center', fontWeight: 900, fontSize: '10px', color: '#D97706' }}>
-                        +{formatMoney(metrics.pendingGstAmountINR, 'INR')}
-                      </td>
-                      <td style={{ border: '1.5px solid #000000', padding: '8px', textAlign: 'right', fontWeight: 900, fontSize: '12px', color: '#047857' }}>
-                        {formatMoney(metrics.pendingWithGstINR, 'INR')}
-                      </td>
-                    </tr>
+                        {/* Domestic INR Grand Total Row */}
+                        {hasInr && (
+                          <tr style={{ background: '#F8FAFC' }}>
+                            <td colSpan={5} style={{ border: '1.5px solid #000000', padding: '8px 10px', fontWeight: 900, fontSize: '10.5px', color: '#000000', textAlign: 'right' }}>
+                              TOTAL DOMESTIC DISBURSEMENTS (INR, INCL. 18% GST):
+                            </td>
+                            <td style={{ border: '1.5px solid #000000', padding: '8px', textAlign: 'right', fontWeight: 900, fontSize: '10.5px', color: '#000000' }}>
+                              {formatMoney(inrBase, 'INR')}
+                            </td>
+                            <td style={{ border: '1.5px solid #000000', padding: '8px', textAlign: 'center', fontWeight: 900, fontSize: '10px', color: '#D97706' }}>
+                              +{formatMoney(inrGst, 'INR')}
+                            </td>
+                            <td style={{ border: '1.5px solid #000000', padding: '8px', textAlign: 'right', fontWeight: 900, fontSize: '12px', color: '#047857' }}>
+                              {formatMoney(inrTotal, 'INR')}
+                            </td>
+                          </tr>
+                        )}
 
-                    {/* Foreign Outflow Grand Total Rows (0% GST - Export Remittance) */}
-                    {Object.entries(metrics.forexPending || {}).map(([curr, amt]) => (
-                      <tr key={curr} style={{ background: '#EFF6FF' }}>
-                        <td colSpan={5} style={{ border: '1.5px solid #2563EB', padding: '7px 10px', fontWeight: 900, fontSize: '10px', color: '#1D4ED8', textAlign: 'right' }}>
-                          TOTAL FOREIGN OUTFLOW ({curr} - INTERNATIONAL WIRE / SWIFT):
-                        </td>
-                        <td style={{ border: '1.5px solid #2563EB', padding: '7px 8px', textAlign: 'right', fontWeight: 900, fontSize: '10.5px', color: '#1E40AF' }}>
-                          {formatMoney(amt, curr)}
-                        </td>
-                        <td style={{ border: '1.5px solid #2563EB', padding: '7px 8px', textAlign: 'center', fontWeight: 800, fontSize: '9.5px', color: '#2563EB' }}>
-                          0% (Exempt)
-                        </td>
-                        <td style={{ border: '1.5px solid #2563EB', padding: '7px 8px', textAlign: 'right', fontWeight: 900, fontSize: '12px', color: '#1D4ED8' }}>
-                          {formatMoney(amt, curr)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                        {/* Foreign Outflow Grand Total Rows (0% GST - Export Remittance) */}
+                        {hasForex && Object.entries(forexMap).map(([curr, amt]) => (
+                          <tr key={curr} style={{ background: '#EFF6FF' }}>
+                            <td colSpan={5} style={{ border: '1.5px solid #2563EB', padding: '7px 10px', fontWeight: 900, fontSize: '10px', color: '#1D4ED8', textAlign: 'right' }}>
+                              TOTAL FOREIGN OUTFLOW ({curr} - INTERNATIONAL WIRE / SWIFT):
+                            </td>
+                            <td style={{ border: '1.5px solid #2563EB', padding: '7px 8px', textAlign: 'right', fontWeight: 900, fontSize: '10.5px', color: '#1E40AF' }}>
+                              {formatMoney(amt, curr)}
+                            </td>
+                            <td style={{ border: '1.5px solid #2563EB', padding: '7px 8px', textAlign: 'center', fontWeight: 800, fontSize: '9.5px', color: '#2563EB' }}>
+                              0% (Exempt)
+                            </td>
+                            <td style={{ border: '1.5px solid #2563EB', padding: '7px 8px', textAlign: 'right', fontWeight: 900, fontSize: '12px', color: '#1D4ED8' }}>
+                              {formatMoney(amt, curr)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
 
-                {/* Accounts Routing Notice */}
-                <div style={{ fontSize: '9.5px', color: '#64748B', marginTop: '-10px', marginBottom: '14px', lineHeight: '1.4' }}>
-                  * <strong>Accounts Transfer Routing Notice:</strong> Domestic INR disbursements are payable through Indian Corporate Net Banking (IMPS / NEFT). Foreign currency disbursements ({Object.keys(metrics.forexPending || {}).length > 0 ? Object.keys(metrics.forexPending).join(', ') : 'USD, EUR, GBP'}) are processed as International Outward Remittances (SWIFT / Form A2 - 0% GST Export Exempt under Foreign Exchange regulations).
-                </div>
+                    {/* Accounts Routing Notice */}
+                    <div style={{ fontSize: '9.5px', color: '#64748B', marginTop: '-10px', marginBottom: '14px', lineHeight: '1.4' }}>
+                      * <strong>Accounts Transfer Routing Notice:</strong> Domestic INR disbursements are payable through Indian Corporate Net Banking (IMPS / NEFT). Foreign currency disbursements ({hasForex ? Object.keys(forexMap).join(', ') : 'USD, EUR, GBP'}) are processed as International Outward Remittances (SWIFT / Form A2 - 0% GST Export Exempt under Foreign Exchange regulations).
+                    </div>
 
-                {/* Sign-off & Audit Trail (For Sterling Accounts Team) */}
-                <div style={{ border: '1.5px solid #000000', padding: '12px 14px', borderRadius: '4px', background: '#F8FAFC' }}>
-                  <div style={{ fontSize: '10px', fontWeight: 800, color: '#000000', textTransform: 'uppercase', marginBottom: '8px' }}>
-                    Sterling Accounts Team Verification &amp; Bank Clearance Workflow:
+                    {/* Sign-off & Audit Trail (For Sterling Accounts Team) */}
+                    <div style={{ border: '1.5px solid #000000', padding: '12px 14px', borderRadius: '4px', background: '#F8FAFC' }}>
+                      <div style={{ fontSize: '10px', fontWeight: 800, color: '#000000', textTransform: 'uppercase', marginBottom: '8px' }}>
+                        Sterling Accounts Team Verification &amp; Bank Clearance Workflow:
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', fontSize: '10px' }}>
+                        <div style={{ border: '1px solid #000000', padding: '8px', borderRadius: '4px', background: '#ffffff' }}>
+                          <div style={{ fontWeight: 800, color: '#000000', marginBottom: '22px' }}>1. Prepared &amp; Reconciled By:</div>
+                          <div style={{ borderBottom: '1px solid #000000', marginBottom: '4px' }}></div>
+                          <div style={{ color: '#000000', fontWeight: 600 }}>Accounts Desk / Staff Sign &amp; Date</div>
+                        </div>
+                        <div style={{ border: '1.5px solid #047857', padding: '8px', borderRadius: '4px', background: '#F0FDF4' }}>
+                          <div style={{ fontWeight: 900, color: '#047857', marginBottom: '22px' }}>2. Authorized for Payment:</div>
+                          <div style={{ borderBottom: '1px solid #047857', marginBottom: '4px' }}></div>
+                          <div style={{ color: '#047857', fontWeight: 700 }}>Accounts Manager Clearance &amp; Date</div>
+                        </div>
+                        <div style={{ border: '1px solid #000000', padding: '8px', borderRadius: '4px', background: '#ffffff' }}>
+                          <div style={{ fontWeight: 800, color: '#000000', marginBottom: '22px' }}>3. Disbursed From Sterling Bank:</div>
+                          <div style={{ borderBottom: '1px solid #000000', marginBottom: '4px' }}></div>
+                          <div style={{ color: '#000000', fontWeight: 600 }}>Debited Bank, Bank UTR &amp; Date</div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', fontSize: '10px' }}>
-                    <div style={{ border: '1px solid #000000', padding: '8px', borderRadius: '4px', background: '#ffffff' }}>
-                      <div style={{ fontWeight: 800, color: '#000000', marginBottom: '22px' }}>1. Prepared &amp; Reconciled By:</div>
-                      <div style={{ borderBottom: '1px solid #000000', marginBottom: '4px' }}></div>
-                      <div style={{ color: '#000000', fontWeight: 600 }}>Accounts Desk / Staff Sign &amp; Date</div>
-                    </div>
-                    <div style={{ border: '1.5px solid #047857', padding: '8px', borderRadius: '4px', background: '#F0FDF4' }}>
-                      <div style={{ fontWeight: 900, color: '#047857', marginBottom: '22px' }}>2. Authorized for Payment:</div>
-                      <div style={{ borderBottom: '1px solid #047857', marginBottom: '4px' }}></div>
-                      <div style={{ color: '#047857', fontWeight: 700 }}>Accounts Manager Clearance &amp; Date</div>
-                    </div>
-                    <div style={{ border: '1px solid #000000', padding: '8px', borderRadius: '4px', background: '#ffffff' }}>
-                      <div style={{ fontWeight: 800, color: '#000000', marginBottom: '22px' }}>3. Disbursed From Sterling Bank:</div>
-                      <div style={{ borderBottom: '1px solid #000000', marginBottom: '4px' }}></div>
-                      <div style={{ color: '#000000', fontWeight: 600 }}>Debited Bank, Bank UTR &amp; Date</div>
-                    </div>
-                  </div>
                 </div>
-              </div>
-            </div>
+              );
+            })()}
 
             <div className="b2b-modal-footer">
               <button type="button" className="btn-cancel" onClick={() => setShowAccountsSheetModal(false)}>
