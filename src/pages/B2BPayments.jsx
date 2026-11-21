@@ -412,11 +412,14 @@ export const INITIAL_B2B_PAYMENTS = [
 const CATEGORIES = [
   'Sub-Agent Commission',
   'B2B Sub-Agent',
+  'VFS & Embassy Fee',
+  'Local Consultancy / Partner Processing Fee',
   'VFS & Insurance',
   'Apostille Charges',
   'Partner University / B2B',
   'University Fee',
   'Courier / Dispatch',
+  'Special Student Direct Expense',
   'Other',
 ];
 
@@ -618,6 +621,7 @@ export default function B2BPayments({ setCurrentPage }) {
   // Accounts Payment Disbursement Sheet Modal State (for Sterling Accounts Team)
   const [showAccountsSheetModal, setShowAccountsSheetModal] = useState(false);
   const [accountsSheetFilter, setAccountsSheetFilter] = useState('all'); // 'all' | 'inr' | 'forex'
+  const [accountsSheetPartner, setAccountsSheetPartner] = useState('All'); // 'All' | partner_name
 
   // Download / Export Customization Modal State
   const [showExportModal, setShowExportModal] = useState(false);
@@ -2410,7 +2414,10 @@ export default function B2BPayments({ setCurrentPage }) {
           {/* Sterling Accounts Payment Disbursement Sheet */}
           <button
             className="btn-simple-download"
-            onClick={() => setShowAccountsSheetModal(true)}
+            onClick={() => {
+              setAccountsSheetPartner(partnerFilter || 'All');
+              setShowAccountsSheetModal(true);
+            }}
             title="Download / Print Accounts Payment Disbursement Sheet for Sterling Accounts Team"
             style={{
               background: 'rgba(16, 185, 129, 0.12)',
@@ -2419,7 +2426,7 @@ export default function B2BPayments({ setCurrentPage }) {
               fontWeight: 700,
             }}
           >
-            <span>🏦 Accounts Payment Sheet ({metrics.pendingCount})</span>
+            <span>🏦 {partnerFilter !== 'All' ? `${partnerFilter} Payment Sheet` : 'Accounts Payment Sheet'} ({partnerFilter !== 'All' ? payments.filter(p => p.status !== 'completed' && p.partner_name === partnerFilter).length : metrics.pendingCount})</span>
           </button>
 
           {/* Download All / Custom Excel */}
@@ -2715,6 +2722,51 @@ export default function B2BPayments({ setCurrentPage }) {
                 {formatMoney(selectedPartnerLedger.remainingDue, selectedPartnerLedger.currency)}
               </div>
             </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                const partnerPending = payments.filter((p) => p.partner_name === selectedPartnerLedger.partnerName && p.status !== 'completed');
+                const itemsToUse = partnerPending.length > 0 ? partnerPending : payments.filter((p) => p.partner_name === selectedPartnerLedger.partnerName);
+                const totalBase = itemsToUse.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+                const hasGst = itemsToUse.some((p) => p.has_gst || p.is_gst_applicable);
+                const studentNamesList = itemsToUse.map((p) => p.student_names).filter(Boolean).join(', ') || `${itemsToUse.length} Students`;
+                const combinedPayment = {
+                  id: `BATCH-${selectedPartnerLedger.partnerName.replace(/[^a-zA-Z0-9]+/g, '').toUpperCase()}`,
+                  partner_name: selectedPartnerLedger.partnerName,
+                  student_names: `${studentNamesList} (${itemsToUse.length} Students Referral)`,
+                  category: selectedPartnerLedger.categories || 'Sub-Agent Commission',
+                  amount: totalBase,
+                  currency: selectedPartnerLedger.currency || 'INR',
+                  has_gst: hasGst,
+                  is_gst_applicable: hasGst,
+                  transfer_account: selectedPartnerLedger.transferAccount,
+                  status: 'pending',
+                  payment_mode: 'Bank Transfer (IMPS / NEFT)',
+                };
+                setDocModalPayment(combinedPayment);
+                setDocModalMode('b2b_receipt');
+                setShowDocModal(true);
+              }}
+              style={{
+                background: 'linear-gradient(135deg, #4F46E5, #6366F1)',
+                border: '1px solid #818CF8',
+                color: '#FFFFFF',
+                padding: '7px 14px',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: '0 2px 4px rgba(79, 70, 229, 0.3)',
+              }}
+              title={`Print official combined requisition voucher/invoice for ${selectedPartnerLedger.partnerName}`}
+            >
+              <span>📄</span>
+              <span>Print {selectedPartnerLedger.partnerName} Invoice / Voucher</span>
+            </button>
 
             <button
               type="button"
@@ -3514,62 +3566,26 @@ export default function B2BPayments({ setCurrentPage }) {
                   )}
                 </div>
 
-                {/* Linked Student(s) or Batch Selection */}
+                {/* Linked Student(s) Selection */}
                 <div className="form-field">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                    <label style={{ margin: 0, fontWeight: 600 }}>Linked Student(s) or Batch</label>
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      <button
-                        type="button"
-                        style={{
-                          background: 'linear-gradient(135deg, #8B5CF6, #6366F1)',
-                          color: '#ffffff',
-                          border: 'none',
-                          borderRadius: '6px',
-                          padding: '3px 9px',
-                          fontSize: '11px',
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          boxShadow: '0 2px 4px rgba(139, 92, 246, 0.25)',
-                        }}
-                        onClick={() => {
-                          const count = 30;
-                          setBatchStudentCount(count);
-                          const amt = parseFloat(formData.amount) || 59550;
-                          const perStu = Math.round(amt / count);
-                          setFormData({
-                            ...formData,
-                            student_names: '30 Students (Apostille Batch)',
-                            batch_count: 30,
-                            category: formData.category || 'Apostille Charges',
-                            notes: (formData.notes ? `${formData.notes} | ` : '') + `Apostille for 30 students batch (~₹${perStu.toLocaleString('en-IN')}/student)`,
-                          });
-                          setShowBatchCalculator(true);
-                          toast.success(`Set 30 Students Batch (~₹${perStu.toLocaleString('en-IN')}/student)`);
-                        }}
-                      >
-                        👥 30 Students Batch
-                      </button>
-                      <button
-                        type="button"
-                        style={{
-                          background: showBatchCalculator ? 'rgba(99, 102, 241, 0.25)' : 'rgba(255, 255, 255, 0.08)',
-                          color: showBatchCalculator ? '#818CF8' : 'var(--muted, #94A3B8)',
-                          border: '1px solid rgba(148, 163, 225, 0.25)',
-                          borderRadius: '6px',
-                          padding: '3px 8px',
-                          fontSize: '11px',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                        }}
-                        onClick={() => setShowBatchCalculator(!showBatchCalculator)}
-                      >
-                        🧮 {showBatchCalculator ? 'Hide Split Calc' : 'Batch Split Calc'}
-                      </button>
-                    </div>
+                    <label style={{ margin: 0, fontWeight: 600 }}>Linked Student(s) or Candidates *</label>
+                    <button
+                      type="button"
+                      style={{
+                        background: showBatchCalculator ? 'rgba(99, 102, 241, 0.25)' : 'none',
+                        color: showBatchCalculator ? '#818CF8' : '#94A3B8',
+                        border: 'none',
+                        borderRadius: '4px',
+                        padding: '2px 6px',
+                        fontSize: '11px',
+                        cursor: 'pointer',
+                        textDecoration: showBatchCalculator ? 'none' : 'underline',
+                      }}
+                      onClick={() => setShowBatchCalculator(!showBatchCalculator)}
+                    >
+                      {showBatchCalculator ? '✕ Hide Split Calc' : '🧮 Split batch among multiple students?'}
+                    </button>
                   </div>
 
                   {/* Expandable Batch Split Calculator */}
@@ -3583,7 +3599,7 @@ export default function B2BPayments({ setCurrentPage }) {
                     }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                         <span style={{ fontSize: '12px', fontWeight: 700, color: '#C4B5FD', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          🧮 Batch Cost Split Calculator (Apostille / VFS / Insurance)
+                          🧮 Batch Cost Split Calculator
                         </span>
                         <span style={{ fontSize: '11px', color: '#94A3B8' }}>
                           Auto-computes per-student debit
@@ -3609,7 +3625,7 @@ export default function B2BPayments({ setCurrentPage }) {
                             type="text"
                             value={batchDescription}
                             onChange={(e) => setBatchDescription(e.target.value)}
-                            placeholder="e.g. Apostille Batch (Malta / Europe)"
+                            placeholder="e.g. 3 Bulgaria Students (VFS Fee)"
                             style={{ width: '100%', padding: '5px 8px', fontSize: '12px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#F8FAFC' }}
                           />
                         </div>
@@ -3618,9 +3634,9 @@ export default function B2BPayments({ setCurrentPage }) {
                           <button
                             type="button"
                             onClick={() => {
-                              const count = batchStudentCount || 30;
-                              const amt = parseFloat(formData.amount) || 59550;
-                              const perStudent = Math.round(amt / count);
+                              const count = batchStudentCount || 3;
+                              const amt = parseFloat(formData.amount) || 0;
+                              const perStudent = amt > 0 ? Math.round(amt / count) : 0;
                               const formattedPerStudent = perStudent.toLocaleString('en-IN');
                               setFormData({
                                 ...formData,
@@ -3628,7 +3644,7 @@ export default function B2BPayments({ setCurrentPage }) {
                                 batch_count: count,
                                 notes: (formData.notes ? `${formData.notes} | ` : '') + `Total ${formData.currency || 'INR'} ${amt.toLocaleString('en-IN')} split for ${count} students (${formData.currency || 'INR'} ${formattedPerStudent}/student)`,
                               });
-                              toast.success(`Applied: ${count} Students @ ₹${formattedPerStudent} per student`);
+                              toast.success(`Applied: ${count} Students @ ${formData.currency || 'INR'} ${formattedPerStudent} per student`);
                             }}
                             style={{
                               background: '#10B981',
@@ -3642,7 +3658,7 @@ export default function B2BPayments({ setCurrentPage }) {
                               whiteSpace: 'nowrap',
                             }}
                           >
-                            ✓ Apply to Payment
+                            ✓ Apply
                           </button>
                         </div>
                       </div>
@@ -3650,10 +3666,10 @@ export default function B2BPayments({ setCurrentPage }) {
                       {/* Live Calculation preview */}
                       <div style={{ marginTop: '8px', padding: '6px 10px', background: 'rgba(15, 23, 42, 0.6)', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div style={{ fontSize: '11.5px', color: '#E2E8F0' }}>
-                          <strong>Cost Breakdown:</strong> {formData.currency || 'INR'} {parseFloat(formData.amount || 59550).toLocaleString('en-IN')} ÷ {batchStudentCount || 30} Students
+                          <strong>Cost Breakdown:</strong> {formData.currency || 'INR'} {parseFloat(formData.amount || 0).toLocaleString('en-IN')} ÷ {batchStudentCount || 1} Students
                         </div>
                         <div style={{ fontSize: '13px', fontWeight: 800, color: '#34D399' }}>
-                          = {formData.currency || 'INR'} {Math.round(parseFloat(formData.amount || 59550) / (batchStudentCount || 30)).toLocaleString('en-IN')} / student
+                          = {formData.currency || 'INR'} {Math.round(parseFloat(formData.amount || 0) / (batchStudentCount || 1)).toLocaleString('en-IN')} / student
                         </div>
                       </div>
                     </div>
@@ -3661,7 +3677,8 @@ export default function B2BPayments({ setCurrentPage }) {
 
                   <input
                     type="text"
-                    placeholder="Type student name(s) or select a Batch preset below"
+                    required
+                    placeholder="Type student name(s), e.g. Achsah Treasa Mathew, or 3 Bulgaria Students"
                     value={formData.student_names}
                     onChange={(e) => {
                       const val = e.target.value;
@@ -3678,43 +3695,6 @@ export default function B2BPayments({ setCurrentPage }) {
                     }}
                     onBlur={() => setTimeout(() => setShowStudentSuggestions(false), 200)}
                   />
-
-                  {/* Quick Preset Buttons */}
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
-                    <span style={{ fontSize: '10.5px', color: '#94A3B8', alignSelf: 'center' }}>Quick Presets:</span>
-                    {[
-                      { label: '👥 30 Students (Apostille)', count: 30, desc: '30 Students (Apostille Batch)' },
-                      { label: '👥 20 Students Batch', count: 20, desc: '20 Students (Embassy/VFS Batch)' },
-                      { label: '👥 10 Students Batch', count: 10, desc: '10 Students Batch' },
-                      { label: '🏢 General Agency Batch', count: null, desc: 'Batch / General Agency Service' },
-                    ].map((preset) => (
-                      <button
-                        key={preset.label}
-                        type="button"
-                        onClick={() => {
-                          setFormData({
-                            ...formData,
-                            student_names: preset.desc,
-                            batch_count: preset.count,
-                          });
-                          if (preset.count) {
-                            setBatchStudentCount(preset.count);
-                          }
-                        }}
-                        style={{
-                          background: formData.student_names === preset.desc ? 'rgba(99, 102, 241, 0.3)' : 'rgba(255, 255, 255, 0.05)',
-                          border: formData.student_names === preset.desc ? '1px solid #818CF8' : '1px solid rgba(148, 163, 225, 0.2)',
-                          borderRadius: '12px',
-                          padding: '2px 8px',
-                          fontSize: '10.5px',
-                          color: formData.student_names === preset.desc ? '#C7D2FE' : '#94A3B8',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        {preset.label}
-                      </button>
-                    ))}
-                  </div>
 
                   {showStudentSuggestions && (
                     <div className="student-autocomplete-menu" style={{ maxHeight: '240px', overflowY: 'auto' }}>
@@ -4723,7 +4703,30 @@ export default function B2BPayments({ setCurrentPage }) {
                   Internal accounts payment order and fund transfer tracking for Sterling Accounts Department.
                 </span>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                {/* Partner Filter Dropdown */}
+                <select
+                  value={accountsSheetPartner}
+                  onChange={(e) => setAccountsSheetPartner(e.target.value)}
+                  style={{
+                    padding: '5px 9px',
+                    borderRadius: '6px',
+                    border: '1px solid var(--border, rgba(148, 163, 225, 0.25))',
+                    background: 'var(--bg2, #131B2E)',
+                    color: 'var(--text, #EDEFFA)',
+                    fontSize: '11.5px',
+                    fontWeight: 700,
+                  }}
+                  title="Filter accounts sheet by specific partner"
+                >
+                  <option value="All">All Partners ({uniquePartnerNames.length})</option>
+                  {uniquePartnerNames.map((name) => (
+                    <option key={name} value={name}>
+                      🤝 {name}
+                    </option>
+                  ))}
+                </select>
+
                 {/* 3 Quick View / Print Filters */}
                 <div style={{ display: 'inline-flex', background: 'rgba(255,255,255,0.06)', borderRadius: '6px', padding: '2px', marginRight: '6px' }}>
                   <button
@@ -4859,6 +4862,7 @@ export default function B2BPayments({ setCurrentPage }) {
             {(() => {
               const displayedDisbursements = payments.filter((p) => {
                 if (p.status === 'completed') return false;
+                if (accountsSheetPartner !== 'All' && p.partner_name !== accountsSheetPartner) return false;
                 const isForex = p.currency && p.currency !== 'INR';
                 if (accountsSheetFilter === 'inr') return !isForex;
                 if (accountsSheetFilter === 'forex') return isForex;
@@ -4932,7 +4936,9 @@ export default function B2BPayments({ setCurrentPage }) {
                           Central Accounts &amp; Finance Division
                         </div>
                         <div style={{ fontSize: '10px', color: '#64748B', marginTop: '2px' }}>
-                          {accountsSheetFilter === 'inr'
+                          {accountsSheetPartner !== 'All'
+                            ? `Pending Remittances & Payables for ${accountsSheetPartner} • Bank Net Banking Clearance Batch`
+                            : accountsSheetFilter === 'inr'
                             ? 'Indian B2B Sub-Agent Payables • Net Banking / NEFT Clearance Batch'
                             : accountsSheetFilter === 'forex'
                             ? 'Overseas Sub-Agent & University Remittances • SWIFT Wire Clearance Batch'
@@ -4941,7 +4947,9 @@ export default function B2BPayments({ setCurrentPage }) {
                       </div>
                       <div style={{ textAlign: 'right' }}>
                         <div style={{ fontSize: '13px', fontWeight: 900, color: accountsSheetFilter === 'forex' ? '#2563EB' : '#047857', letterSpacing: '0.4px' }}>
-                          {accountsSheetFilter === 'inr'
+                          {accountsSheetPartner !== 'All'
+                            ? `ACCOUNTS DISBURSEMENT SHEET - ${accountsSheetPartner.toUpperCase()}`
+                            : accountsSheetFilter === 'inr'
                             ? 'ACCOUNTS DISBURSEMENT SHEET (DOMESTIC INR)'
                             : accountsSheetFilter === 'forex'
                             ? 'ACCOUNTS DISBURSEMENT SHEET (FOREX SWIFT WIRE)'
