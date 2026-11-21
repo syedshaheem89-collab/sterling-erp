@@ -2286,14 +2286,14 @@ export default function B2BPayments({ setCurrentPage }) {
           top: 100%;
           left: 0;
           right: 0;
-          background: var(--bg2, #ffffff);
+          background: var(--bg2solid, #11162a);
           border: 1px solid var(--border-strong, rgba(148, 163, 225, 0.3));
-          border-radius: 6px;
+          border-radius: 8px;
           margin-top: 4px;
           max-height: 160px;
           overflow-y: auto;
           z-index: 100;
-          box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+          box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
         }
 
         .student-autocomplete-row {
@@ -2574,13 +2574,14 @@ export default function B2BPayments({ setCurrentPage }) {
             onChange={(e) => setPartnerFilter(e.target.value)}
             title="Filter records by B2B Partner"
             style={{
-              padding: '6px 10px',
-              borderRadius: '6px',
-              border: '1px solid var(--border, rgba(148, 163, 225, 0.25))',
-              background: 'var(--bg2, #ffffff)',
+              padding: '7px 11px',
+              borderRadius: '8px',
+              border: '1px solid var(--border-strong, rgba(148, 163, 225, 0.22))',
+              background: 'var(--bg2solid, #11162a)',
               color: 'var(--text, #EDEFFA)',
               fontSize: '12.5px',
               fontWeight: 600,
+              cursor: 'pointer',
             }}
           >
             <option value="All">All Partners ({uniquePartnerNames.length})</option>
@@ -2595,12 +2596,13 @@ export default function B2BPayments({ setCurrentPage }) {
             value={currencyFilter}
             onChange={(e) => setCurrencyFilter(e.target.value)}
             style={{
-              padding: '6px 10px',
-              borderRadius: '6px',
-              border: '1px solid var(--border, rgba(148, 163, 225, 0.25))',
-              background: 'var(--bg2, #ffffff)',
+              padding: '7px 11px',
+              borderRadius: '8px',
+              border: '1px solid var(--border-strong, rgba(148, 163, 225, 0.22))',
+              background: 'var(--bg2solid, #11162a)',
               color: 'var(--text, #EDEFFA)',
               fontSize: '12.5px',
+              cursor: 'pointer',
             }}
           >
             <option value="All">All Currencies</option>
@@ -2616,12 +2618,13 @@ export default function B2BPayments({ setCurrentPage }) {
             onChange={(e) => setPayingBankFilter(e.target.value)}
             title="Filter by which Sterling Bank account disbursed the funds"
             style={{
-              padding: '6px 10px',
-              borderRadius: '6px',
-              border: '1px solid var(--border, rgba(148, 163, 225, 0.25))',
-              background: 'var(--bg2, #ffffff)',
+              padding: '7px 11px',
+              borderRadius: '8px',
+              border: '1px solid var(--border-strong, rgba(148, 163, 225, 0.22))',
+              background: 'var(--bg2solid, #11162a)',
               color: 'var(--text, #EDEFFA)',
               fontSize: '12.5px',
+              cursor: 'pointer',
             }}
           >
             <option value="All">All Paying Banks (Our Accounts)</option>
@@ -4299,7 +4302,15 @@ export default function B2BPayments({ setCurrentPage }) {
                         placeholder="Company Name"
                         value={newCompanyNameInput}
                         onChange={(e) => setNewCompanyNameInput(e.target.value)}
-                        style={{ padding: '6px 8px', fontSize: '12px', borderRadius: '4px', border: '1px solid #4F46E5' }}
+                        style={{
+                          padding: '7px 10px',
+                          fontSize: '12px',
+                          borderRadius: '6px',
+                          border: '1px solid #7C6FFF',
+                          background: 'var(--bg3, #161b2e)',
+                          color: 'var(--text, #EDEFFA)',
+                          outline: 'none',
+                        }}
                       />
                       <div style={{ display: 'flex', gap: '4px' }}>
                         <button type="submit" className="btn-simple-primary" style={{ padding: '3px 8px', fontSize: '11px', flex: 1 }}>
@@ -4709,13 +4720,14 @@ export default function B2BPayments({ setCurrentPage }) {
                   value={accountsSheetPartner}
                   onChange={(e) => setAccountsSheetPartner(e.target.value)}
                   style={{
-                    padding: '5px 9px',
-                    borderRadius: '6px',
-                    border: '1px solid var(--border, rgba(148, 163, 225, 0.25))',
-                    background: 'var(--bg2, #131B2E)',
+                    padding: '6px 10px',
+                    borderRadius: '8px',
+                    border: '1px solid var(--border-strong, rgba(148, 163, 225, 0.25))',
+                    background: 'var(--bg2solid, #11162a)',
                     color: 'var(--text, #EDEFFA)',
                     fontSize: '11.5px',
                     fontWeight: 700,
+                    cursor: 'pointer',
                   }}
                   title="Filter accounts sheet by specific partner"
                 >

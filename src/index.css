@@ -9,6 +9,7 @@
    1. DESIGN TOKENS & ROOT VARIABLES
    -------------------------------------------------------------------------- */
 :root {
+  color-scheme: dark;
   /* Surface Colors */
   --bg: #080A12;
   --bg2: rgba(17, 22, 35, 0.46);
@@ -73,6 +74,7 @@
    -------------------------------------------------------------------------- */
 /* Light Theme */
 html[data-theme='light'] {
+  color-scheme: light;
   --bg: #F4F6FB;
   --bg2: rgba(255, 255, 255, 0.75);
   --bg2solid: #FFFFFF;
@@ -93,6 +95,7 @@ html[data-theme='light'] {
 
 /* Black / AMOLED Theme */
 html[data-theme='black'] {
+  color-scheme: dark;
   --bg: #000000;
   --bg2: rgba(8, 8, 12, 0.7);
   --bg2solid: #09090D;
@@ -148,6 +151,25 @@ body {
 input, button, textarea, select {
   font: inherit;
   color: inherit;
+}
+
+input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not([type='file']),
+textarea,
+select {
+  background-color: var(--bg3);
+  color: var(--text);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--muted);
+  opacity: 0.72;
+}
+
+select option,
+select optgroup {
+  background-color: var(--bg2solid);
+  color: var(--text);
 }
 
 button {
