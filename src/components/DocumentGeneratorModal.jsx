@@ -150,8 +150,8 @@ export default function DocumentGeneratorModal({
     selectedBankId: 'comp-bank-wio-1',
     bankDetails: {
       accountHolder: 'Sterling Overseas Consultancy LLC',
-      businessId: 'TRN-100482931200003',
-      licenseNumber: 'CN-4829104',
+      businessId: '', // Blank by default (user can add real TRN/Tax ID if needed)
+      licenseNumber: '',
       bankName: 'WIO BANK PJSC',
       address: 'Etihad Airways Centre 5th Floor, Abu Dhabi, UAE',
       accountNumber: '0860000009569370024',
@@ -459,8 +459,7 @@ export default function DocumentGeneratorModal({
     const feeAmount = Number(stu.service_fee || stu.total_fee || stu.amount || stu.committed || 1000);
     const feeCurr = stu.currency || (stu.country === 'Malta' || stu.country === 'Germany' || stu.country === 'France' ? 'EUR' : 'USD');
     const courseName = stu.course || 'Study Abroad Consultation & Processing';
-    const targetUni = stu.university || stu.college || (stu.country === 'Malta' ? 'MCAST - Malta College of Arts, Science & Technology' : `${stu.country || 'Europe'} Partner University`);
-    const studentAddress = stu.address || (stu.city ? `${stu.city}, ${stu.state || 'India'}` : (stu.country === 'Malta' ? 'MALTA (Permanent Resident / Candidate)' : 'Kerala, India'));
+    const studentAddress = stu.address || stu.country || 'MALTA';
     const passportNo = stu.passport_number || stu.passport || '';
 
     // Generate clean short 3-4 char ID instead of raw UUID
@@ -486,15 +485,14 @@ export default function DocumentGeneratorModal({
       dueDate: todayStr,
       studentName: (stu.name || 'STUDENT NAME').toUpperCase(),
       studentAddress: studentAddress,
-      targetUniversity: targetUni,
       courseDetails: courseName,
-      intake: stu.intake || 'Upcoming Intake',
+      intake: stu.intake || '',
       passportNumber: passportNo,
       currency: feeCurr,
       items: [
         {
           id: 1,
-          description: `Professional Documentation, Higher Education Application & Visa Facilitation Fee (${courseName} - ${targetUni})`,
+          description: 'Administration & Visa Processing Fee',
           quantity: 1,
           unitPrice: feeAmount,
           taxPercent: 0,
@@ -608,8 +606,8 @@ export default function DocumentGeneratorModal({
       selectedBankId: 'comp-bank-wio-1',
       bankDetails: {
         accountHolder: 'Sterling Overseas Consultancy LLC',
-        businessId: 'TRN-100482931200003',
-        licenseNumber: 'CN-4829104',
+        businessId: '',
+        licenseNumber: '',
         bankName: 'WIO BANK PJSC',
         address: 'Etihad Airways Centre 5th Floor, Abu Dhabi, UAE',
         accountNumber: '0860000009569370024',
@@ -1364,23 +1362,12 @@ export default function DocumentGeneratorModal({
                   </div>
 
                   <div>
-                    <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Student Home Address (Bank KYC)</label>
+                    <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Student Address / Country</label>
                     <input
                       type="text"
                       value={studentInvoice.studentAddress}
                       onChange={(e) => setStudentInvoice({ ...studentInvoice, studentAddress: e.target.value })}
-                      placeholder="e.g. Pala, Kottayam, Kerala - 686575"
-                      style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff' }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Target University / Institution</label>
-                    <input
-                      type="text"
-                      value={studentInvoice.targetUniversity || ''}
-                      onChange={(e) => setStudentInvoice({ ...studentInvoice, targetUniversity: e.target.value })}
-                      placeholder="e.g. MCAST - Malta College of Arts, Science & Technology"
+                      placeholder="e.g. MALTA or Kerala, India"
                       style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff' }}
                     />
                   </div>
@@ -1436,13 +1423,13 @@ export default function DocumentGeneratorModal({
                               currency: 'INR',
                               bankDetails: {
                                 accountHolder: 'Sterling Study Abroad & Overseas Consultancy',
-                                businessId: 'GSTIN: 32AAVCS1829L1Z5',
-                                licenseNumber: 'Reg: KL-CL-2018-0918',
+                                businessId: '',
+                                licenseNumber: '',
                                 bankName: 'Axis Bank',
-                                address: 'Tirur / Malappuram Branch, Kerala, India',
+                                address: 'Tirur / Malappuram Branch, Kerala',
                                 accountNumber: '921020048291039',
-                                iban: 'N/A (Domestic NEFT / IMPS)',
-                                swiftCode: 'UTIB0000829 (IFSC)',
+                                iban: 'N/A',
+                                swiftCode: 'UTIB0000829',
                                 isDomestic: true,
                               },
                             }));
@@ -1453,13 +1440,13 @@ export default function DocumentGeneratorModal({
                               currency: 'INR',
                               bankDetails: {
                                 accountHolder: 'Sterling Study Abroad & Overseas Consultancy',
-                                businessId: 'GSTIN: 32AAVCS1829L1Z5',
-                                licenseNumber: 'Reg: KL-CL-2018-0918',
+                                businessId: '',
+                                licenseNumber: '',
                                 bankName: 'Federal Bank',
-                                address: 'Valanchery Main Branch, Kerala, India',
+                                address: 'Valanchery Main Branch, Kerala',
                                 accountNumber: '14200200039281',
-                                iban: 'N/A (Domestic NEFT / IMPS)',
-                                swiftCode: 'FDRL0001420 (IFSC)',
+                                iban: 'N/A',
+                                swiftCode: 'FDRL0001420',
                                 isDomestic: true,
                               },
                             }));
@@ -1469,8 +1456,8 @@ export default function DocumentGeneratorModal({
                               selectedBankId: 'comp-bank-wio-1',
                               bankDetails: {
                                 accountHolder: 'Sterling Overseas Consultancy LLC',
-                                businessId: 'TRN-100482931200003',
-                                licenseNumber: 'CN-4829104',
+                                businessId: '',
+                                licenseNumber: '',
                                 bankName: 'WIO BANK PJSC',
                                 address: 'Etihad Airways Centre 5th Floor, Abu Dhabi, UAE',
                                 accountNumber: '0860000009569370024',
@@ -1569,7 +1556,7 @@ export default function DocumentGeneratorModal({
 
                   {/* Bank Details Editor */}
                   <div>
-                    <label style={{ color: '#94A3B8', fontWeight: 600, display: 'block', marginBottom: '4px' }}>WIO Bank UAE Details</label>
+                    <label style={{ color: '#94A3B8', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Bank & Remittance Details</label>
                     <input
                       type="text"
                       value={studentInvoice.bankDetails.accountHolder}
@@ -1587,10 +1574,26 @@ export default function DocumentGeneratorModal({
                     <input
                       type="text"
                       value={studentInvoice.bankDetails.swiftCode}
-                      placeholder="SWIFT Code"
+                      placeholder="SWIFT / IFSC Code"
                       onChange={(e) => setStudentInvoice({ ...studentInvoice, bankDetails: { ...studentInvoice.bankDetails, swiftCode: e.target.value } })}
-                      style={{ width: '100%', padding: '4px 6px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff' }}
+                      style={{ width: '100%', padding: '4px 6px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff', marginBottom: '4px' }}
                     />
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                      <input
+                        type="text"
+                        value={studentInvoice.bankDetails.businessId || ''}
+                        placeholder="Tax / TRN # (Optional)"
+                        onChange={(e) => setStudentInvoice({ ...studentInvoice, bankDetails: { ...studentInvoice.bankDetails, businessId: e.target.value } })}
+                        style={{ width: '100%', padding: '4px 6px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff', fontSize: '11px' }}
+                      />
+                      <input
+                        type="text"
+                        value={studentInvoice.bankDetails.licenseNumber || ''}
+                        placeholder="Trade License # (Optional)"
+                        onChange={(e) => setStudentInvoice({ ...studentInvoice, bankDetails: { ...studentInvoice.bankDetails, licenseNumber: e.target.value } })}
+                        style={{ width: '100%', padding: '4px 6px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff', fontSize: '11px' }}
+                      />
+                    </div>
                   </div>
                 </div>
               )}
@@ -2105,8 +2108,8 @@ export default function DocumentGeneratorModal({
                               </div>
                               <div style={{ fontSize: '11px', color: '#475569', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                                 {studentInvoice.bankDetails?.isDomestic
-                                  ? 'Higher Education & Visa Advisory • Reg No: KL-CL-2018-0918'
-                                  : 'International Admissions & Higher Education • UAE Trade License: CN-4829104'}
+                                  ? (studentInvoice.bankDetails?.licenseNumber?.trim() ? `Higher Education & Visa Advisory • ${studentInvoice.bankDetails.licenseNumber}` : 'Higher Education & Visa Advisory')
+                                  : (studentInvoice.bankDetails?.licenseNumber?.trim() ? `International Admissions & Higher Education • ${studentInvoice.bankDetails.licenseNumber}` : 'International Admissions & Higher Education')}
                               </div>
                             </>
                           ) : (
@@ -2116,11 +2119,11 @@ export default function DocumentGeneratorModal({
                                   ? 'Central Admissions & Student Accounts Division' 
                                   : 'International Admissions & Student Accounts Division'}
                               </div>
-                              <div style={{ fontSize: '10px', color: '#64748B', fontWeight: 600 }}>
-                                {studentInvoice.bankDetails?.isDomestic
-                                  ? 'Govt. Registered Overseas Education Advisory • GSTIN: 32AAVCS1829L1Z5'
-                                  : 'UAE Regulated Consultancy • Trade License: CN-4829104 • TRN: 100482931200003'}
-                              </div>
+                              {studentInvoice.bankDetails?.businessId?.trim() ? (
+                                <div style={{ fontSize: '10px', color: '#64748B', fontWeight: 600 }}>
+                                  Tax / Reg ID: {studentInvoice.bankDetails.businessId}
+                                </div>
+                              ) : null}
                             </div>
                           )}
                         </div>
@@ -2141,14 +2144,14 @@ export default function DocumentGeneratorModal({
                           <tr>
                             <td style={{ border: '1.5px solid #000000', padding: '9px 12px', width: '54%', verticalAlign: 'top', background: '#ffffff', color: '#000000' }}>
                               <div style={{ fontSize: '10.5px', color: '#64748B', fontWeight: 800, textTransform: 'uppercase', marginBottom: '2px' }}>
-                                {studentDocType === 'receipt' ? 'RECEIVED FROM (CANDIDATE):' : 'BILL TO (CANDIDATE):'}
+                                {studentDocType === 'receipt' ? 'RECEIVED FROM (CANDIDATE):' : 'BILL TO:'}
                               </div>
                               <div style={{ fontSize: '15px', fontWeight: 900, color: '#000000', letterSpacing: '0.2px' }}>
                                 {studentInvoice.studentName || 'STUDENT NAME'}
                               </div>
                               {studentInvoice.passportNumber && (
-                                <div style={{ fontSize: '11px', fontWeight: 800, color: '#1E293B', marginTop: '3px' }}>
-                                  Passport / KYC Ref: <span style={{ fontFamily: 'monospace' }}>{studentInvoice.passportNumber}</span>
+                                <div style={{ fontSize: '11px', fontWeight: 700, color: '#1E293B', marginTop: '3px' }}>
+                                  Passport / KYC: <span style={{ fontFamily: 'monospace' }}>{studentInvoice.passportNumber}</span>
                                 </div>
                               )}
                             </td>
@@ -2166,17 +2169,13 @@ export default function DocumentGeneratorModal({
                           <tr>
                             <td style={{ border: '1.5px solid #000000', padding: '9px 12px', verticalAlign: 'top', background: '#ffffff', color: '#000000' }}>
                               <div style={{ fontSize: '11px', color: '#000000' }}>
-                                <span style={{ fontWeight: 800 }}>Permanent Address: </span>
-                                <span>{studentInvoice.studentAddress || 'Kerala, India'}</span>
+                                <span style={{ fontWeight: 800 }}>Address: </span>
+                                <span>{studentInvoice.studentAddress || 'MALTA'}</span>
                               </div>
-                              {studentInvoice.targetUniversity && (
-                                <div style={{ fontSize: '11px', color: '#000000', fontWeight: 700, marginTop: '3px' }}>
-                                  Target Institution: {studentInvoice.targetUniversity}
-                                </div>
-                              )}
                               {studentInvoice.courseDetails && (
-                                <div style={{ fontSize: '11px', color: '#000000', fontWeight: 600, marginTop: '2px' }}>
-                                  Program: {studentInvoice.courseDetails} {studentInvoice.intake ? `(${studentInvoice.intake})` : ''}
+                                <div style={{ fontSize: '11px', color: '#000000', fontWeight: 600, marginTop: '3px' }}>
+                                  <span style={{ fontWeight: 800 }}>Program: </span>
+                                  <span>{studentInvoice.courseDetails} {studentInvoice.intake ? `(${studentInvoice.intake})` : ''}</span>
                                 </div>
                               )}
                             </td>
@@ -2216,11 +2215,6 @@ export default function DocumentGeneratorModal({
                               </td>
                               <td style={{ border: '1.5px solid #000000', padding: '10px 10px', fontWeight: 700, color: '#000000' }}>
                                 <div>{it.description}</div>
-                                {studentInvoice.targetUniversity && (
-                                  <div style={{ fontSize: '10px', color: '#475569', fontWeight: 600, marginTop: '2px' }}>
-                                    Higher Education Admission &amp; Visa File Clearance
-                                  </div>
-                                )}
                               </td>
                               <td style={{ border: '1.5px solid #000000', padding: '10px 10px', textAlign: 'center', fontWeight: 700, color: '#000000' }}>
                                 {it.quantity}
@@ -2268,10 +2262,12 @@ export default function DocumentGeneratorModal({
                               <td style={{ border: '1.5px solid #000000', padding: '5px 10px', width: '30%', fontWeight: 800, color: '#000000' }}>Account Holder:</td>
                               <td style={{ border: '1.5px solid #000000', padding: '5px 10px', fontWeight: 900, color: '#000000' }}>{studentInvoice.bankDetails.accountHolder}</td>
                             </tr>
-                            <tr>
-                              <td style={{ border: '1.5px solid #000000', padding: '5px 10px', fontWeight: 800, color: '#000000' }}>Tax / Reg Identification:</td>
-                              <td style={{ border: '1.5px solid #000000', padding: '5px 10px', fontWeight: 700, color: '#000000' }}>{studentInvoice.bankDetails.businessId}</td>
-                            </tr>
+                            {studentInvoice.bankDetails?.businessId?.trim() ? (
+                              <tr>
+                                <td style={{ border: '1.5px solid #000000', padding: '5px 10px', fontWeight: 800, color: '#000000' }}>Tax / Reg Identification:</td>
+                                <td style={{ border: '1.5px solid #000000', padding: '5px 10px', fontWeight: 700, color: '#000000' }}>{studentInvoice.bankDetails.businessId}</td>
+                              </tr>
+                            ) : null}
                             <tr>
                               <td style={{ border: '1.5px solid #000000', padding: '5px 10px', fontWeight: 800, color: '#000000' }}>Bank Name &amp; Branch:</td>
                               <td style={{ border: '1.5px solid #000000', padding: '5px 10px', fontWeight: 900, color: '#047857' }}>
