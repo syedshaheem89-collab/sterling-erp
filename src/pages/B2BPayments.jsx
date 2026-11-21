@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import DocumentGeneratorModal, { STERLING_COMPANY_BANKS_DEFAULT } from '../components/DocumentGeneratorModal';
 import B2BInvoiceViewerModal from '../components/B2BInvoiceViewerModal';
-import { getStudentAgentMeta } from '../utils/studentAgentHelper';
+import { getStudentAgentMeta, syncAllStudentsToB2BPayments } from '../utils/studentAgentHelper';
 
 /**
  * INITIAL_PARTNER_ACCOUNTS
@@ -182,7 +182,7 @@ export const INITIAL_PARTNER_ACCOUNTS = {
  * Pre-populated with the user's 9 live entries from Microsoft To-Do,
  * linked to the partner accounts directory.
  */
-const INITIAL_B2B_PAYMENTS = [
+export const INITIAL_B2B_PAYMENTS = [
   {
     id: 'b2b-001',
     partner_name: 'Consult Fox',
@@ -632,7 +632,7 @@ export default function B2BPayments({ setCurrentPage }) {
     }
   }, [payments]);
 
-  // Fetch ERP students on mount for autocomplete
+  // Fetch ERP students on mount for autocomplete & auto-sync pending partner dues
   useEffect(() => {
     async function fetchStudents() {
       try {
@@ -642,12 +642,45 @@ export default function B2BPayments({ setCurrentPage }) {
           .order('name');
         if (!error && data) {
           setErpStudents(data);
+          syncAllStudentsToB2BPayments(data);
+          // Reload payments from localStorage after synchronization
+          const latest = localStorage.getItem('sterling_b2b_payments');
+          if (latest) {
+            try {
+              const parsed = JSON.parse(latest);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                setPayments(parsed);
+              }
+            } catch (e) {}
+          }
         }
       } catch (err) {
         console.warn('Student lookup not available:', err);
       }
     }
     fetchStudents();
+  }, []);
+
+  // Listen for real-time updates dispatched from student application edits
+  useEffect(() => {
+    const handleUpdate = () => {
+      try {
+        const saved = localStorage.getItem('sterling_b2b_payments');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) {
+            setPayments(parsed);
+          }
+        }
+      } catch (e) {}
+    };
+
+    window.addEventListener('sterling_b2b_payments_updated', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+    return () => {
+      window.removeEventListener('sterling_b2b_payments_updated', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+    };
   }, []);
 
   // Helper: Retrieve saved accounts for a partner (case-insensitive lookup)
