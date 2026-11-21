@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import DocumentGeneratorModal, { STERLING_COMPANY_BANKS_DEFAULT } from '../components/DocumentGeneratorModal';
 import B2BInvoiceViewerModal from '../components/B2BInvoiceViewerModal';
+import { getStudentAgentMeta } from '../utils/studentAgentHelper';
 
 /**
  * INITIAL_PARTNER_ACCOUNTS
@@ -637,7 +638,7 @@ export default function B2BPayments({ setCurrentPage }) {
       try {
         const { data, error } = await supabase
           .from('students')
-          .select('id, name, country, intake')
+          .select('id, name, country, intake, notes, b2b_charge, other_expense')
           .order('name');
         if (!error && data) {
           setErpStudents(data);
@@ -878,6 +879,81 @@ export default function B2BPayments({ setCurrentPage }) {
       upi_id: '',
     });
     toast.success(`Saved new account "${label}" for ${partnerKey}!`);
+  };
+
+  // Compute pending partner dues from student applications (B2B, Apostille, Insurance)
+  const studentsWithPendingPartnerDues = useMemo(() => {
+    if (!erpStudents || !erpStudents.length) return [];
+    const list = [];
+    erpStudents.forEach((stu) => {
+      const meta = getStudentAgentMeta(stu);
+      const b2bDue = Math.max(0, Number(meta.b2b_committed || 0) - Number(meta.b2b_paid || 0));
+      const apoDue = Math.max(0, Number(meta.apostille_committed || 0) - Number(meta.apostille_paid || 0));
+      const insDue = Math.max(0, Number(meta.insurance_committed || 0) - Number(meta.insurance_paid || 0));
+
+      if (meta.b2b_agent_name && (b2bDue > 0 || !meta.b2b_paid)) {
+        list.push({ student: stu, type: 'b2b', partner: meta.b2b_agent_name, due: b2bDue || Number(meta.b2b_committed || 0), label: 'Sub-Agent' });
+      }
+      if (meta.apostille_agent && (apoDue > 0 || !meta.apostille_paid)) {
+        list.push({ student: stu, type: 'apostille', partner: meta.apostille_agent, due: apoDue || Number(meta.apostille_committed || 0), label: 'Apostille' });
+      }
+      if (meta.insurance_agent && (insDue > 0 || !meta.insurance_paid)) {
+        list.push({ student: stu, type: 'insurance', partner: meta.insurance_agent, due: insDue || Number(meta.insurance_committed || 0), label: 'Insurance' });
+      }
+    });
+    return list;
+  }, [erpStudents]);
+
+  // 1-Click Autofill voucher from student partner application data
+  const handleAutofillFromStudent = (student, partnerType) => {
+    const meta = getStudentAgentMeta(student);
+    let partnerName = '';
+    let dueAmount = 0;
+    let category = 'Sub-Agent Commission';
+
+    if (partnerType === 'b2b') {
+      partnerName = meta.b2b_agent_name;
+      const comm = Number(meta.b2b_committed || 0);
+      const paid = Number(meta.b2b_paid || 0);
+      dueAmount = Math.max(0, comm - paid) || comm || 10000;
+      category = 'Sub-Agent Commission';
+    } else if (partnerType === 'apostille') {
+      partnerName = meta.apostille_agent;
+      const comm = Number(meta.apostille_committed || 0);
+      const paid = Number(meta.apostille_paid || 0);
+      dueAmount = Math.max(0, comm - paid) || comm || 3500;
+      category = 'Apostille Charges';
+    } else if (partnerType === 'insurance') {
+      partnerName = meta.insurance_agent;
+      const comm = Number(meta.insurance_committed || 0);
+      const paid = Number(meta.insurance_paid || 0);
+      dueAmount = Math.max(0, comm - paid) || comm || 2500;
+      category = 'VFS & Insurance';
+    }
+
+    if (!partnerName) return;
+
+    // Retrieve accounts for this partner
+    const accounts = getAccountsForPartner(partnerName);
+    const defAcc = accounts.find((a) => a.is_default) || accounts[0];
+    const transferAcc = defAcc
+      ? defAcc.details_string || `${defAcc.bank_name} A/C: ${defAcc.account_number} | IFSC: ${defAcc.ifsc || ''} | Beneficiary: ${defAcc.beneficiary_name}`
+      : 'Not provided';
+
+    setFormData((prev) => ({
+      ...prev,
+      partner_name: partnerName,
+      selected_account_id: defAcc ? defAcc.id : '',
+      transfer_account: transferAcc,
+      student_names: student.name,
+      amount: dueAmount,
+      currency: 'INR',
+      category: category,
+      notes: (prev.notes ? `${prev.notes} | ` : '') + `${category} for student ${student.name}`,
+    }));
+
+    setShowStudentSuggestions(false);
+    toast.success(`⚡ Autofilled ${partnerName} voucher for ${student.name} (₹${dueAmount.toLocaleString('en-IN')})`);
   };
 
   // Quick Add Parser (Microsoft To-Do style)
@@ -2855,6 +2931,62 @@ export default function B2BPayments({ setCurrentPage }) {
 
             <form onSubmit={handleSaveModal}>
               <div className="b2b-modal-body">
+                {/* 1-Click Autofill from Student Applications with Pending Dues */}
+                {studentsWithPendingPartnerDues.length > 0 && !editingPayment && (
+                  <div
+                    style={{
+                      background: 'rgba(79, 70, 229, 0.08)',
+                      border: '1px solid rgba(79, 70, 229, 0.25)',
+                      borderRadius: '8px',
+                      padding: '8px 10px',
+                      marginBottom: '10px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                      <span style={{ fontSize: '11px', fontWeight: 700, color: '#4F46E5', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        ⚡ 1-Click Fill from Student Applications:
+                      </span>
+                      <span style={{ fontSize: '10px', color: '#8E9BB5' }}>
+                        {studentsWithPendingPartnerDues.length} pending partner payable{studentsWithPendingPartnerDues.length > 1 ? 's' : ''}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '3px' }}>
+                      {studentsWithPendingPartnerDues.slice(0, 8).map((item, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => handleAutofillFromStudent(item.student, item.type)}
+                          title={`Click to fill voucher for ${item.partner} (${item.student.name})`}
+                          style={{
+                            background: 'var(--bg, #ffffff)',
+                            border: '1px solid rgba(79, 70, 229, 0.35)',
+                            borderRadius: '6px',
+                            padding: '3px 8px',
+                            fontSize: '11px',
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            color: 'var(--text, #1E293B)',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                          }}
+                        >
+                          <span style={{ color: '#4F46E5', fontWeight: 700 }}>{item.partner}</span>
+                          <span style={{ color: '#94A3B8' }}>({item.label})</span>
+                          <span style={{ color: '#94A3B8' }}>•</span>
+                          <span>{item.student.name}</span>
+                          {item.due > 0 && (
+                            <span style={{ color: '#10B981', fontWeight: 700, marginLeft: '2px' }}>
+                              ₹{item.due.toLocaleString('en-IN')}
+                            </span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Partner Name with Datalist Suggestions */}
                 <div className="form-field">
                   <label>Partner / Agency / Beneficiary Name *</label>
@@ -3243,24 +3375,111 @@ export default function B2BPayments({ setCurrentPage }) {
                   </div>
 
                   {showStudentSuggestions && (
-                    <div className="student-autocomplete-menu">
-                      {studentSuggestions.map((stu) => (
-                        <div
-                          key={stu.id}
-                          className="student-autocomplete-row"
-                          onMouseDown={() => {
-                            setFormData({
-                              ...formData,
-                              student_names: formData.student_names
-                                ? `${formData.student_names}, ${stu.name}`
-                                : stu.name,
-                            });
-                            setShowStudentSuggestions(false);
-                          }}
-                        >
-                          <strong>{stu.name}</strong> ({stu.country || 'Global'})
-                        </div>
-                      ))}
+                    <div className="student-autocomplete-menu" style={{ maxHeight: '240px', overflowY: 'auto' }}>
+                      {studentSuggestions.map((stu) => {
+                        const meta = getStudentAgentMeta(stu);
+                        return (
+                          <div
+                            key={stu.id}
+                            style={{
+                              padding: '8px 10px',
+                              borderBottom: '1px solid rgba(148, 163, 225, 0.1)',
+                            }}
+                          >
+                            <div
+                              className="student-autocomplete-row"
+                              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+                              onMouseDown={() => {
+                                setFormData({
+                                  ...formData,
+                                  student_names: formData.student_names
+                                    ? `${formData.student_names}, ${stu.name}`
+                                    : stu.name,
+                                });
+                                setShowStudentSuggestions(false);
+                              }}
+                            >
+                              <div>
+                                <strong>{stu.name}</strong>{' '}
+                                <span style={{ color: '#8E9BB5', fontSize: '11px' }}>({stu.country || 'Global'})</span>
+                              </div>
+                              <span style={{ fontSize: '11px', color: '#4F46E5', fontWeight: 600 }}>+ Select Name</span>
+                            </div>
+
+                            {/* Linked Partners for this Student */}
+                            {(meta.b2b_agent_name || meta.apostille_agent || meta.insurance_agent) && (
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '5px' }}>
+                                {meta.b2b_agent_name && (
+                                  <button
+                                    type="button"
+                                    onMouseDown={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      handleAutofillFromStudent(stu, 'b2b');
+                                    }}
+                                    style={{
+                                      background: 'rgba(124, 58, 237, 0.12)',
+                                      border: '1px solid rgba(124, 58, 237, 0.35)',
+                                      borderRadius: '4px',
+                                      padding: '2px 6px',
+                                      fontSize: '10.5px',
+                                      color: '#C4B5FD',
+                                      cursor: 'pointer',
+                                    }}
+                                  >
+                                    ⚡ B2B: {meta.b2b_agent_name}
+                                    {Number(meta.b2b_committed || 0) > 0 && ` (₹${(Number(meta.b2b_committed || 0) - Number(meta.b2b_paid || 0) || Number(meta.b2b_committed)).toLocaleString('en-IN')})`}
+                                  </button>
+                                )}
+                                {meta.apostille_agent && (
+                                  <button
+                                    type="button"
+                                    onMouseDown={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      handleAutofillFromStudent(stu, 'apostille');
+                                    }}
+                                    style={{
+                                      background: 'rgba(59, 130, 246, 0.12)',
+                                      border: '1px solid rgba(59, 130, 246, 0.35)',
+                                      borderRadius: '4px',
+                                      padding: '2px 6px',
+                                      fontSize: '10.5px',
+                                      color: '#93C5FD',
+                                      cursor: 'pointer',
+                                    }}
+                                  >
+                                    ⚡ Apostille: {meta.apostille_agent}
+                                    {Number(meta.apostille_committed || 0) > 0 && ` (₹${(Number(meta.apostille_committed || 0) - Number(meta.apostille_paid || 0) || Number(meta.apostille_committed)).toLocaleString('en-IN')})`}
+                                  </button>
+                                )}
+                                {meta.insurance_agent && (
+                                  <button
+                                    type="button"
+                                    onMouseDown={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      handleAutofillFromStudent(stu, 'insurance');
+                                    }}
+                                    style={{
+                                      background: 'rgba(16, 185, 129, 0.12)',
+                                      border: '1px solid rgba(16, 185, 129, 0.35)',
+                                      borderRadius: '4px',
+                                      padding: '2px 6px',
+                                      fontSize: '10.5px',
+                                      color: '#6EE7B7',
+                                      cursor: 'pointer',
+                                    }}
+                                  >
+                                    ⚡ Insurance: {meta.insurance_agent}
+                                    {Number(meta.insurance_committed || 0) > 0 && ` (₹${(Number(meta.insurance_committed || 0) - Number(meta.insurance_paid || 0) || Number(meta.insurance_committed)).toLocaleString('en-IN')})`}
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>

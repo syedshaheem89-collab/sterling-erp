@@ -4,6 +4,13 @@ import { supabase } from '../supabase';
 import toast from 'react-hot-toast';
 import { uploadPaymentProof, extractReceiptUrl, embedReceiptIntoNotes } from '../utils/paymentProofHelper';
 import ReceiptViewerModal from './ReceiptViewerModal';
+import {
+  getStudentAgentMeta,
+  saveStudentAgentMeta,
+  KNOWN_B2B_PARTNERS,
+  KNOWN_APOSTILLE_AGENTS,
+  KNOWN_INSURANCE_AGENTS,
+} from '../utils/studentAgentHelper';
 
 // Format Indian Currency for compact chips (e.g. ₹2.16 L, ₹87.4K, ₹0)
 function formatCompactINR(amount) {
@@ -39,6 +46,115 @@ export default function StudentPopupModal({
   const [isUploadingReceipt, setIsUploadingReceipt] = useState(false);
   const [viewerReceipt, setViewerReceipt] = useState(null); // For full-screen lightbox
   const fileInputRef = useRef(null);
+
+  // Edit Student Details State
+  const [isEditingStudent, setIsEditingStudent] = useState(false);
+  const [editStudentData, setEditStudentData] = useState({});
+  const [isSavingStudent, setIsSavingStudent] = useState(false);
+
+  const handleStartEdit = () => {
+    if (!selectedStudent) return;
+    const meta = getStudentAgentMeta(selectedStudent);
+    setEditStudentData({
+      name: selectedStudent.name || '',
+      mobile: selectedStudent.mobile || '',
+      email: selectedStudent.email || '',
+      country: selectedStudent.country || '',
+      intake: selectedStudent.intake || '',
+      university: selectedStudent.university || '',
+      course: selectedStudent.course || '',
+      counselor_name: selectedStudent.counselor_name || '',
+      team_lead: selectedStudent.team_lead || '',
+      committed: selectedStudent.committed || '',
+      commission: selectedStudent.commission || '',
+      b2b_agent_name: meta.b2b_agent_name || '',
+      b2b_committed: meta.b2b_committed || '',
+      b2b_paid: meta.b2b_paid || '',
+      apostille_agent: meta.apostille_agent || '',
+      apostille_committed: meta.apostille_committed || '',
+      apostille_paid: meta.apostille_paid || '',
+      insurance_agent: meta.insurance_agent || '',
+      insurance_committed: meta.insurance_committed || '',
+      insurance_paid: meta.insurance_paid || '',
+      notes: selectedStudent.notes || '',
+    });
+    setIsEditingStudent(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!selectedStudent?.id) return;
+    setIsSavingStudent(true);
+    try {
+      const b2bCharge = Number(editStudentData.b2b_paid || editStudentData.b2b_committed || 0);
+      const otherExpense = Number(editStudentData.apostille_paid || editStudentData.apostille_committed || 0) +
+                           Number(editStudentData.insurance_paid || editStudentData.insurance_committed || 0);
+
+      const agentMeta = {
+        b2b_agent_name: editStudentData.b2b_agent_name || '',
+        b2b_committed: Number(editStudentData.b2b_committed || 0),
+        b2b_paid: Number(editStudentData.b2b_paid || 0),
+        apostille_agent: editStudentData.apostille_agent || '',
+        apostille_committed: Number(editStudentData.apostille_committed || 0),
+        apostille_paid: Number(editStudentData.apostille_paid || 0),
+        insurance_agent: editStudentData.insurance_agent || '',
+        insurance_committed: Number(editStudentData.insurance_committed || 0),
+        insurance_paid: Number(editStudentData.insurance_paid || 0),
+      };
+
+      const finalNotes = saveStudentAgentMeta(
+        selectedStudent.id,
+        editStudentData.name || selectedStudent.name,
+        agentMeta,
+        editStudentData.notes
+      );
+
+      const updatePayload = {
+        name: editStudentData.name,
+        country: editStudentData.country || null,
+        intake: editStudentData.intake || null,
+        university: editStudentData.university || null,
+        course: editStudentData.course || null,
+        team_lead: editStudentData.team_lead || null,
+        counselor_name: editStudentData.counselor_name || null,
+        committed: Number(editStudentData.committed || 0),
+        commission: Number(editStudentData.commission || 0),
+        b2b_charge: b2bCharge,
+        other_expense: otherExpense,
+        notes: finalNotes,
+      };
+
+      const { data, error } = await supabase
+        .from('students')
+        .update(updatePayload)
+        .eq('id', selectedStudent.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      saveStudentAgentMeta(
+        selectedStudent.id,
+        editStudentData.name || selectedStudent.name,
+        agentMeta,
+        finalNotes
+      );
+
+      setSelectedStudent((prev) => ({
+        ...prev,
+        ...updatePayload,
+        ...agentMeta,
+      }));
+
+      setIsEditingStudent(false);
+      toast.success('Student details updated successfully!');
+      if (onStudentUpdated) onStudentUpdated();
+    } catch (err) {
+      console.error(err);
+      toast.error(err.message || 'Failed to update student details');
+    } finally {
+      setIsSavingStudent(false);
+    }
+  };
 
   // If modal is closed, return null
   if (!isOpen) return null;
@@ -602,16 +718,19 @@ export default function StudentPopupModal({
             </div>
 
             {/* Scrollable Content Body */}
-            <div
-              style={{
-                flex: 1,
-                overflowY: 'auto',
-                padding: '16px 20px 24px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '16px',
-              }}
-            >
+            {(() => {
+              const agentMeta = getStudentAgentMeta(selectedStudent);
+              return (
+                <div
+                  style={{
+                    flex: 1,
+                    overflowY: 'auto',
+                    padding: '16px 20px 24px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '16px',
+                  }}
+                >
               {/* Badges Row */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                 <span
@@ -673,9 +792,7 @@ export default function StudentPopupModal({
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 <button
                   type="button"
-                  onClick={() => {
-                    toast('To edit personal information, visit Students tab', { icon: '✏️' });
-                  }}
+                  onClick={handleStartEdit}
                   style={{
                     background: 'linear-gradient(135deg, #7C6FFF 0%, #6959f6 100%)',
                     color: '#fff',
@@ -692,7 +809,7 @@ export default function StudentPopupModal({
                   }}
                 >
                   <span>✏️</span>
-                  <span>Edit Details</span>
+                  <span>{isEditingStudent ? 'Editing Details...' : 'Edit Details'}</span>
                 </button>
 
                 <button
@@ -718,6 +835,220 @@ export default function StudentPopupModal({
                   <span>Delete Student</span>
                 </button>
               </div>
+
+              {/* EDIT APPLICATION MODE IN DRAWER */}
+              {isEditingStudent && (
+                <div
+                  style={{
+                    background: 'rgba(20, 26, 48, 0.95)',
+                    border: '1px solid rgba(124, 111, 255, 0.45)',
+                    borderRadius: '12px',
+                    padding: '14px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px',
+                    boxShadow: '0 8px 30px rgba(0,0,0,0.5)',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(148, 163, 225, 0.15)', paddingBottom: '8px' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 800, color: '#fff' }}>✏️ Edit Application &amp; Partners</span>
+                    <span style={{ fontSize: '10.5px', color: '#8E9BB5' }}>Accounts managed in B2B</span>
+                  </div>
+
+                  {/* Candidate Fields */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                    <div>
+                      <label style={{ fontSize: '10.5px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Full Name *</label>
+                      <input
+                        type="text"
+                        value={editStudentData.name || ''}
+                        onChange={(e) => setEditStudentData({ ...editStudentData, name: e.target.value })}
+                        style={{ width: '100%', padding: '6px 8px', fontSize: '12px', borderRadius: '6px', border: '1px solid rgba(148, 163, 225, 0.25)', background: '#0F172A', color: '#fff' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '10.5px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Country</label>
+                      <input
+                        type="text"
+                        value={editStudentData.country || ''}
+                        onChange={(e) => setEditStudentData({ ...editStudentData, country: e.target.value })}
+                        style={{ width: '100%', padding: '6px 8px', fontSize: '12px', borderRadius: '6px', border: '1px solid rgba(148, 163, 225, 0.25)', background: '#0F172A', color: '#fff' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '10.5px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Target Intake</label>
+                      <input
+                        type="text"
+                        value={editStudentData.intake || ''}
+                        onChange={(e) => setEditStudentData({ ...editStudentData, intake: e.target.value })}
+                        style={{ width: '100%', padding: '6px 8px', fontSize: '12px', borderRadius: '6px', border: '1px solid rgba(148, 163, 225, 0.25)', background: '#0F172A', color: '#fff' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '10.5px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>University</label>
+                      <input
+                        type="text"
+                        value={editStudentData.university || ''}
+                        onChange={(e) => setEditStudentData({ ...editStudentData, university: e.target.value })}
+                        style={{ width: '100%', padding: '6px 8px', fontSize: '12px', borderRadius: '6px', border: '1px solid rgba(148, 163, 225, 0.25)', background: '#0F172A', color: '#fff' }}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '10.5px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Committed from Student (₹)</label>
+                    <input
+                      type="number"
+                      value={editStudentData.committed || ''}
+                      onChange={(e) => setEditStudentData({ ...editStudentData, committed: e.target.value })}
+                      style={{ width: '100%', padding: '6px 8px', fontSize: '12px', borderRadius: '6px', border: '1px solid rgba(148, 163, 225, 0.25)', background: '#0F172A', color: '#fff' }}
+                    />
+                  </div>
+
+                  {/* 3 Dedicated Partner Cards */}
+                  {/* 1. B2B Sub-Agent */}
+                  <div style={{ background: 'rgba(99, 102, 241, 0.1)', border: '1px solid rgba(99, 102, 241, 0.3)', borderRadius: '8px', padding: '10px' }}>
+                    <div style={{ fontSize: '11px', fontWeight: 700, color: '#C7D2FE', marginBottom: '6px' }}>🤝 B2B Sub-Agent / Referral Partner</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: '6px' }}>
+                      <div>
+                        <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Agent Name</label>
+                        <input
+                          type="text"
+                          list="popup-b2b-list"
+                          value={editStudentData.b2b_agent_name || ''}
+                          onChange={(e) => setEditStudentData({ ...editStudentData, b2b_agent_name: e.target.value })}
+                          placeholder="e.g. Consult Fox"
+                          style={{ width: '100%', padding: '5px 6px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
+                        />
+                        <datalist id="popup-b2b-list">
+                          {KNOWN_B2B_PARTNERS.map((a) => (
+                            <option key={a} value={a} />
+                          ))}
+                        </datalist>
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Committed (₹)</label>
+                        <input
+                          type="number"
+                          value={editStudentData.b2b_committed || ''}
+                          onChange={(e) => setEditStudentData({ ...editStudentData, b2b_committed: e.target.value })}
+                          style={{ width: '100%', padding: '5px 6px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Paid (₹)</label>
+                        <input
+                          type="number"
+                          value={editStudentData.b2b_paid || ''}
+                          onChange={(e) => setEditStudentData({ ...editStudentData, b2b_paid: e.target.value })}
+                          style={{ width: '100%', padding: '5px 6px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 2. Apostille Partner */}
+                  <div style={{ background: 'rgba(139, 92, 246, 0.1)', border: '1px solid rgba(139, 92, 246, 0.3)', borderRadius: '8px', padding: '10px' }}>
+                    <div style={{ fontSize: '11px', fontWeight: 700, color: '#DDD6FE', marginBottom: '6px' }}>📑 Apostille (General Expense)</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: '6px' }}>
+                      <div>
+                        <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Apostille Agent</label>
+                        <input
+                          type="text"
+                          list="popup-apostille-list"
+                          value={editStudentData.apostille_agent || ''}
+                          onChange={(e) => setEditStudentData({ ...editStudentData, apostille_agent: e.target.value })}
+                          placeholder="e.g. Comfort Travel"
+                          style={{ width: '100%', padding: '5px 6px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
+                        />
+                        <datalist id="popup-apostille-list">
+                          {KNOWN_APOSTILLE_AGENTS.map((a) => (
+                            <option key={a} value={a} />
+                          ))}
+                        </datalist>
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Committed (₹)</label>
+                        <input
+                          type="number"
+                          value={editStudentData.apostille_committed || ''}
+                          onChange={(e) => setEditStudentData({ ...editStudentData, apostille_committed: e.target.value })}
+                          style={{ width: '100%', padding: '5px 6px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Paid (₹)</label>
+                        <input
+                          type="number"
+                          value={editStudentData.apostille_paid || ''}
+                          onChange={(e) => setEditStudentData({ ...editStudentData, apostille_paid: e.target.value })}
+                          style={{ width: '100%', padding: '5px 6px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 3. Insurance Partner */}
+                  <div style={{ background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '8px', padding: '10px' }}>
+                    <div style={{ fontSize: '11px', fontWeight: 700, color: '#A7F3D0', marginBottom: '6px' }}>🛡️ Insurance / VFS Partner</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: '6px' }}>
+                      <div>
+                        <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Insurance Partner</label>
+                        <input
+                          type="text"
+                          list="popup-insurance-list"
+                          value={editStudentData.insurance_agent || ''}
+                          onChange={(e) => setEditStudentData({ ...editStudentData, insurance_agent: e.target.value })}
+                          placeholder="e.g. VFS & Insurance"
+                          style={{ width: '100%', padding: '5px 6px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
+                        />
+                        <datalist id="popup-insurance-list">
+                          {KNOWN_INSURANCE_AGENTS.map((a) => (
+                            <option key={a} value={a} />
+                          ))}
+                        </datalist>
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Committed (₹)</label>
+                        <input
+                          type="number"
+                          value={editStudentData.insurance_committed || ''}
+                          onChange={(e) => setEditStudentData({ ...editStudentData, insurance_committed: e.target.value })}
+                          style={{ width: '100%', padding: '5px 6px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Paid (₹)</label>
+                        <input
+                          type="number"
+                          value={editStudentData.insurance_paid || ''}
+                          onChange={(e) => setEditStudentData({ ...editStudentData, insurance_paid: e.target.value })}
+                          style={{ width: '100%', padding: '5px 6px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Buttons */}
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '6px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingStudent(false)}
+                      style={{ padding: '7px 14px', borderRadius: '8px', background: 'transparent', border: '1px solid #475569', color: '#8E9BB5', fontSize: '12px', cursor: 'pointer' }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSaveEdit}
+                      disabled={isSavingStudent}
+                      style={{ padding: '7px 18px', borderRadius: '8px', background: 'linear-gradient(135deg, #10B981, #059669)', border: 'none', color: '#fff', fontSize: '12px', fontWeight: 700, cursor: isSavingStudent ? 'wait' : 'pointer' }}
+                    >
+                      {isSavingStudent ? 'Saving...' : '✓ Save Changes'}
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* General Info Card */}
               <div
@@ -869,8 +1200,15 @@ export default function StudentPopupModal({
                     <span style={{ color: '#FF6F8E' }}>- {formatCompactINR(selectedStudent.refund || 0)}</span>
                   </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#8E9BB5' }}>B2B Charge</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: '#8E9BB5', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      B2B Charge
+                      {agentMeta.b2b_agent_name && (
+                        <span style={{ fontSize: '10px', color: '#A78BFA', background: 'rgba(124, 58, 237, 0.15)', padding: '1px 5px', borderRadius: '4px' }}>
+                          {agentMeta.b2b_agent_name}
+                        </span>
+                      )}
+                    </span>
                     <span style={{ color: '#FF6F8E' }}>- {formatCompactINR(selectedStudent.b2b_charge || 0)}</span>
                   </div>
 
@@ -884,8 +1222,15 @@ export default function StudentPopupModal({
                     <span style={{ color: '#FF6F8E' }}>- {formatCompactINR(selectedStudent.incentive_company || 0)}</span>
                   </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#8E9BB5' }}>General Expenses</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: '#8E9BB5', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      General Expenses
+                      {(agentMeta.apostille_agent || agentMeta.insurance_agent) && (
+                        <span style={{ fontSize: '10px', color: '#60A5FA', background: 'rgba(59, 130, 246, 0.15)', padding: '1px 5px', borderRadius: '4px' }}>
+                          {[agentMeta.apostille_agent, agentMeta.insurance_agent].filter(Boolean).join(' • ')}
+                        </span>
+                      )}
+                    </span>
                     <span style={{ color: '#FF6F8E' }}>- {formatCompactINR(selectedStudent.other_expense || 0)}</span>
                   </div>
 
@@ -966,6 +1311,79 @@ export default function StudentPopupModal({
                   </div>
                 </div>
               </div>
+
+              {/* Partner Dues & Vendors (B2B, Apostille, Insurance) */}
+              {(agentMeta.b2b_agent_name || agentMeta.apostille_agent || agentMeta.insurance_agent) && (
+                <div>
+                  <div style={{ fontSize: '12px', fontWeight: 800, color: '#fff', marginBottom: '8px' }}>
+                    Partner Dues &amp; Vendors
+                  </div>
+
+                  <div
+                    style={{
+                      background: 'rgba(20, 26, 48, 0.55)',
+                      border: '1px solid rgba(148, 163, 225, 0.12)',
+                      borderRadius: '12px',
+                      padding: '12px 14px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px',
+                      fontSize: '11.5px',
+                    }}
+                  >
+                    {agentMeta.b2b_agent_name && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <div style={{ color: '#fff', fontWeight: 600 }}>{agentMeta.b2b_agent_name}</div>
+                          <div style={{ color: '#8E9BB5', fontSize: '10px' }}>B2B Sub-Agent</div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <span style={{ color: '#00E5A0', fontWeight: 700 }}>₹{Number(agentMeta.b2b_paid || 0).toLocaleString('en-IN')}</span>
+                          {Math.max(0, Number(agentMeta.b2b_committed || 0) - Number(agentMeta.b2b_paid || 0)) > 0 && (
+                            <div style={{ color: '#FFB020', fontSize: '10.5px', fontWeight: 600 }}>
+                              Due: ₹{Math.max(0, Number(agentMeta.b2b_committed || 0) - Number(agentMeta.b2b_paid || 0)).toLocaleString('en-IN')}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {agentMeta.apostille_agent && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: agentMeta.b2b_agent_name ? '1px solid rgba(148, 163, 225, 0.08)' : 'none', paddingTop: agentMeta.b2b_agent_name ? '7px' : '0' }}>
+                        <div>
+                          <div style={{ color: '#fff', fontWeight: 600 }}>{agentMeta.apostille_agent}</div>
+                          <div style={{ color: '#8E9BB5', fontSize: '10px' }}>Apostille Partner</div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <span style={{ color: '#00E5A0', fontWeight: 700 }}>₹{Number(agentMeta.apostille_paid || 0).toLocaleString('en-IN')}</span>
+                          {Math.max(0, Number(agentMeta.apostille_committed || 0) - Number(agentMeta.apostille_paid || 0)) > 0 && (
+                            <div style={{ color: '#FFB020', fontSize: '10.5px', fontWeight: 600 }}>
+                              Due: ₹{Math.max(0, Number(agentMeta.apostille_committed || 0) - Number(agentMeta.apostille_paid || 0)).toLocaleString('en-IN')}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {agentMeta.insurance_agent && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(148, 163, 225, 0.08)', paddingTop: '7px' }}>
+                        <div>
+                          <div style={{ color: '#fff', fontWeight: 600 }}>{agentMeta.insurance_agent}</div>
+                          <div style={{ color: '#8E9BB5', fontSize: '10px' }}>Insurance / VFS Partner</div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <span style={{ color: '#00E5A0', fontWeight: 700 }}>₹{Number(agentMeta.insurance_paid || 0).toLocaleString('en-IN')}</span>
+                          {Math.max(0, Number(agentMeta.insurance_committed || 0) - Number(agentMeta.insurance_paid || 0)) > 0 && (
+                            <div style={{ color: '#FFB020', fontSize: '10.5px', fontWeight: 600 }}>
+                              Due: ₹{Math.max(0, Number(agentMeta.insurance_committed || 0) - Number(agentMeta.insurance_paid || 0)).toLocaleString('en-IN')}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Payment History Section (Dynamic Installments & No Horizontal Overflow) */}
               <div>
@@ -1253,7 +1671,9 @@ export default function StudentPopupModal({
                 </div>
               </div>
 
-            </div>
+                </div>
+              );
+            })()}
 
             {/* =========================================================================
                 INLINE EDIT / ADD PAYMENT MODAL (Amount, Date, Bank & Slot)
