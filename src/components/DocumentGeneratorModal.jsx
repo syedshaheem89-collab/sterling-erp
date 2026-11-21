@@ -120,7 +120,10 @@ export default function DocumentGeneratorModal({
 
   // --- 1. STUDENT DUBAI INVOICE / RECEIPT STATE (WIO Bank Abu Dhabi Template) ---
   const [studentInvoice, setStudentInvoice] = useState({
+    companyName: 'Sterling Study Abroad',
     docHeading: 'INVOICE', // 'INVOICE' | 'PROFORMA INVOICE' | 'TAX INVOICE' | 'FEE PAYMENT ADVICE'
+    applyGst: false,
+    gstRate: 18,
     invoiceNumber: `INV-DXB-${new Date().getFullYear()}-084`,
     invoiceDate: new Date().toLocaleDateString('en-GB').replace(/\//g, '.'),
     dueDate: new Date().toLocaleDateString('en-GB').replace(/\//g, '.'),
@@ -505,6 +508,7 @@ export default function DocumentGeneratorModal({
         },
       ],
       subTotal: feeAmount,
+      taxTotal: 0,
       grandTotal: feeAmount,
     }));
 
@@ -581,7 +585,10 @@ export default function DocumentGeneratorModal({
     const todayStr = new Date().toLocaleDateString('en-GB').replace(/\//g, '.');
     setSelectedStudentId('');
     setStudentInvoice({
+      companyName: 'Sterling Study Abroad',
       docHeading: 'INVOICE',
+      applyGst: false,
+      gstRate: 18,
       invoiceNumber: `INV-DXB-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`,
       invoiceDate: todayStr,
       dueDate: todayStr,
@@ -699,11 +706,13 @@ export default function DocumentGeneratorModal({
       newItems[index].amount = qty * unit;
 
       const sub = newItems.reduce((acc, it) => acc + (Number(it.amount) || 0), 0);
+      const tax = prev.applyGst ? Math.round(sub * ((Number(prev.gstRate) || 18) / 100)) : 0;
       return {
         ...prev,
         items: newItems,
         subTotal: sub,
-        grandTotal: sub,
+        taxTotal: tax,
+        grandTotal: sub + tax,
       };
     });
   };
@@ -719,16 +728,18 @@ export default function DocumentGeneratorModal({
           description: 'Document Verification / Processing Fee',
           quantity: 1,
           unitPrice: 200,
-          taxPercent: 0,
+          taxPercent: prev.applyGst ? (Number(prev.gstRate) || 18) : 0,
           amount: 200,
         },
       ];
       const sub = newItems.reduce((acc, it) => acc + (Number(it.amount) || 0), 0);
+      const tax = prev.applyGst ? Math.round(sub * ((Number(prev.gstRate) || 18) / 100)) : 0;
       return {
         ...prev,
         items: newItems,
         subTotal: sub,
-        grandTotal: sub,
+        taxTotal: tax,
+        grandTotal: sub + tax,
       };
     });
   };
@@ -742,11 +753,13 @@ export default function DocumentGeneratorModal({
     setStudentInvoice((prev) => {
       const newItems = prev.items.filter((_, i) => i !== index);
       const sub = newItems.reduce((acc, it) => acc + (Number(it.amount) || 0), 0);
+      const tax = prev.applyGst ? Math.round(sub * ((Number(prev.gstRate) || 18) / 100)) : 0;
       return {
         ...prev,
         items: newItems,
         subTotal: sub,
-        grandTotal: sub,
+        taxTotal: tax,
+        grandTotal: sub + tax,
       };
     });
   };
@@ -1316,6 +1329,18 @@ export default function DocumentGeneratorModal({
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '8px' }}>
                     <div>
+                      <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Company Name (Header)</label>
+                      <select
+                        value={studentInvoice.companyName || 'Sterling Study Abroad'}
+                        onChange={(e) => setStudentInvoice({ ...studentInvoice, companyName: e.target.value })}
+                        style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff', fontSize: '12px' }}
+                      >
+                        <option value="Sterling Study Abroad">Sterling Study Abroad (India &amp; UK)</option>
+                        <option value="Sterling Overseas Consultancy LLC">Sterling Overseas Consultancy LLC (Dubai)</option>
+                        <option value="Sterling Study Abroad &amp; Overseas Consultancy">Sterling Study Abroad &amp; Overseas</option>
+                      </select>
+                    </div>
+                    <div>
                       <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Document Title</label>
                       <select
                         value={studentInvoice.docHeading || 'INVOICE'}
@@ -1328,15 +1353,16 @@ export default function DocumentGeneratorModal({
                         <option value="FEE PAYMENT ADVICE">FEE PAYMENT ADVICE</option>
                       </select>
                     </div>
-                    <div>
-                      <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Document #</label>
-                      <input
-                        type="text"
-                        value={studentInvoice.invoiceNumber}
-                        onChange={(e) => setStudentInvoice({ ...studentInvoice, invoiceNumber: e.target.value })}
-                        style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff' }}
-                      />
-                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Document #</label>
+                    <input
+                      type="text"
+                      value={studentInvoice.invoiceNumber}
+                      onChange={(e) => setStudentInvoice({ ...studentInvoice, invoiceNumber: e.target.value })}
+                      style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff' }}
+                    />
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
@@ -1434,14 +1460,26 @@ export default function DocumentGeneratorModal({
                       <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>Currency</label>
                       <select
                         value={studentInvoice.currency}
-                        onChange={(e) => setStudentInvoice({ ...studentInvoice, currency: e.target.value })}
+                        onChange={(e) => {
+                          const newCurr = e.target.value;
+                          setStudentInvoice((prev) => {
+                            const sub = Number(prev.subTotal) || 0;
+                            const tax = prev.applyGst ? Math.round(sub * 0.18) : 0;
+                            return {
+                              ...prev,
+                              currency: newCurr,
+                              taxTotal: tax,
+                              grandTotal: sub + tax,
+                            };
+                          });
+                        }}
                         style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff' }}
                       >
+                        <option value="INR">INR (₹)</option>
                         <option value="EUR">EUR (€)</option>
                         <option value="USD">USD ($)</option>
                         <option value="GBP">GBP (£)</option>
                         <option value="AED">AED (د.إ)</option>
-                        <option value="INR">INR (₹)</option>
                       </select>
                     </div>
                     <div>
@@ -1455,8 +1493,9 @@ export default function DocumentGeneratorModal({
                               ...prev,
                               selectedBankId: bId,
                               currency: 'INR',
+                              companyName: prev.companyName || 'Sterling Study Abroad',
                               bankDetails: {
-                                accountHolder: 'Sterling Study Abroad & Overseas Consultancy',
+                                accountHolder: 'Sterling Study Abroad',
                                 businessId: '',
                                 licenseNumber: '',
                                 bankName: 'Axis Bank',
@@ -1472,8 +1511,9 @@ export default function DocumentGeneratorModal({
                               ...prev,
                               selectedBankId: bId,
                               currency: 'INR',
+                              companyName: prev.companyName || 'Sterling Study Abroad',
                               bankDetails: {
-                                accountHolder: 'Sterling Study Abroad & Overseas Consultancy',
+                                accountHolder: 'Sterling Study Abroad',
                                 businessId: '',
                                 licenseNumber: '',
                                 bankName: 'Federal Bank',
@@ -1508,6 +1548,38 @@ export default function DocumentGeneratorModal({
                         <option value="comp-bank-axis-1">Axis Bank (India - INR)</option>
                         <option value="comp-bank-fed-1">Federal Bank (India - INR)</option>
                       </select>
+                    </div>
+                  </div>
+
+                  {/* Optional GST section for INR / Domestic or anytime */}
+                  <div style={{ background: '#131B2E', padding: '8px 10px', borderRadius: '6px', border: studentInvoice.applyGst ? '1px solid #10B981' : '1px solid #2B3A5A' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <label style={{ color: '#fff', fontWeight: 600, fontSize: '12px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', margin: 0 }}>
+                        <input
+                          type="checkbox"
+                          checked={studentInvoice.applyGst || false}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            const base = Number(studentInvoice.subTotal) || 0;
+                            const tax = checked ? Math.round(base * 0.18) : 0;
+                            setStudentInvoice((prev) => ({
+                              ...prev,
+                              applyGst: checked,
+                              gstRate: 18,
+                              taxTotal: tax,
+                              grandTotal: base + tax,
+                              items: prev.items.map((it) => ({ ...it, taxPercent: checked ? 18 : 0 })),
+                            }));
+                          }}
+                          style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: '#3B82F6' }}
+                        />
+                        <span>Apply 18% GST (Optional)</span>
+                      </label>
+                      {studentInvoice.applyGst ? (
+                        <span style={{ fontSize: '11px', color: '#10B981', fontWeight: 800 }}>+18% GST Added</span>
+                      ) : (
+                        <span style={{ fontSize: '11px', color: '#64748B' }}>0% GST (Exempt)</span>
+                      )}
                     </div>
                   </div>
 
@@ -2136,19 +2208,22 @@ export default function DocumentGeneratorModal({
                           {!includeLetterheadBg ? (
                             <>
                               <div style={{ fontWeight: 900, fontSize: '16px', color: '#000000', letterSpacing: '-0.2px', marginBottom: '2px' }}>
-                                {studentInvoice.bankDetails?.isDomestic 
-                                  ? 'Sterling Study Abroad & Overseas Consultancy' 
-                                  : 'Sterling Overseas Consultancy LLC'}
+                                {studentInvoice.companyName || 'Sterling Study Abroad'}
                               </div>
                               <div style={{ fontSize: '11px', color: '#475569', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                                 {studentInvoice.bankDetails?.isDomestic
                                   ? (studentInvoice.bankDetails?.licenseNumber?.trim() ? `Higher Education & Visa Advisory • ${studentInvoice.bankDetails.licenseNumber}` : 'Higher Education & Visa Advisory')
-                                  : (studentInvoice.bankDetails?.licenseNumber?.trim() ? `International Admissions & Higher Education • ${studentInvoice.bankDetails.licenseNumber}` : 'International Admissions & Higher Education')}
+                                  : (studentInvoice.companyName === 'Sterling Study Abroad'
+                                      ? 'International Admissions & Higher Education'
+                                      : (studentInvoice.bankDetails?.licenseNumber?.trim() ? `International Admissions & Higher Education • ${studentInvoice.bankDetails.licenseNumber}` : 'International Admissions & Higher Education'))}
                               </div>
                             </>
                           ) : (
                             <div>
-                              <div style={{ fontSize: '12px', fontWeight: 900, color: '#1E293B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                              <div style={{ fontSize: '13px', fontWeight: 900, color: '#1E293B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                {studentInvoice.companyName || 'Sterling Study Abroad'}
+                              </div>
+                              <div style={{ fontSize: '10px', color: '#64748B', fontWeight: 600 }}>
                                 {studentInvoice.bankDetails?.isDomestic 
                                   ? 'Central Admissions & Student Accounts Division' 
                                   : 'International Admissions & Student Accounts Division'}
@@ -2280,10 +2355,17 @@ export default function DocumentGeneratorModal({
                             <span>Sub Total:</span>
                             <span>{Number(studentInvoice.subTotal).toLocaleString()} {studentInvoice.currency}</span>
                           </div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, color: '#000000' }}>
-                            <span>Total (Tax):</span>
-                            <span>0.00</span>
-                          </div>
+                          {studentInvoice.applyGst ? (
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, color: '#000000' }}>
+                              <span>GST ({studentInvoice.gstRate || 18}%):</span>
+                              <span>+{Number(studentInvoice.taxTotal).toLocaleString()} {studentInvoice.currency}</span>
+                            </div>
+                          ) : (
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, color: '#000000' }}>
+                              <span>Total (Tax):</span>
+                              <span>0.00</span>
+                            </div>
+                          )}
                           <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 900, fontSize: '15px', borderTop: '2px solid #000000', paddingTop: '4px', marginTop: '4px', color: '#000000' }}>
                             <span>Total Payable:</span>
                             <span>{Number(studentInvoice.grandTotal).toLocaleString()} {studentInvoice.currency}</span>

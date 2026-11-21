@@ -2389,9 +2389,9 @@ export default function B2BPayments({ setCurrentPage }) {
       {/* 1. CLEAN TOP HEADER */}
       <div className="b2b-top-header">
         <div className="header-title-box">
-          <h1>B2B Partner Payments & Accounts Reminders</h1>
+          <h1>Billing, Payouts &amp; Accounts Reminders</h1>
           <p>
-            Track transfers owed to B2B sub-agents & university partners with multiple bank accounts and 18% GST.
+            Track invoices, partner payouts, and disbursements across Sterling banks with multi-currency and GST tracking.
           </p>
         </div>
 

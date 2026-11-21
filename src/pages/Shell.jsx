@@ -93,7 +93,7 @@ export default function Shell() {
     { id: 'overview', label: 'Overview', icon: '📊', minLevel: 1 },
     { id: 'students', label: 'Students', icon: '👥', minLevel: 1 },
     { id: 'course-finder', label: 'Course Finder', icon: '🎓', minLevel: 1 }, // Available to all staff & counselors
-    { id: 'b2b-payments', label: 'B2B Payments', icon: '🤝', minLevel: 1 }, // Microsoft To-Do style B2B Partner Reminders
+    { id: 'b2b-payments', label: 'Billing & Payouts', icon: '💳', minLevel: 1 }, // Microsoft To-Do style Partner Reminders & Disbursements
     { id: 'country', label: 'Country', icon: '🌍', minLevel: 3 }, // director & above
     { id: 'admissions', label: 'Admissions', icon: '🏆', minLevel: 2 }, // manager & above
     { id: 'finance', label: 'Finance', icon: '💰', minLevel: 3 }, // director & above
@@ -128,8 +128,8 @@ export default function Shell() {
         };
       case 'b2b-payments':
         return {
-          title: 'B2B Payments & Partner Reminders',
-          description: 'Track payables owed to B2B sub-agents, partners, and vendors with smart due date reminders per student.',
+          title: 'Billing, Payouts & Accounts Reminders',
+          description: 'Track invoices, partner payouts, sub-agent commissions, and accounts clearance across Sterling house banks.',
         };
       case 'country':
         return {
