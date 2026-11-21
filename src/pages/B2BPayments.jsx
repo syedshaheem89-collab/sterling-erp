@@ -754,6 +754,8 @@ export default function B2BPayments({ setCurrentPage }) {
 
     let pendingUSD = 0;
     let pendingEUR = 0;
+    let pendingGBP = 0;
+    const forexPending = {}; // Dynamic map: { USD: 250, EUR: 1000, ... }
     let overdueCount = 0;
     let pendingCount = 0;
 
@@ -761,14 +763,16 @@ export default function B2BPayments({ setCurrentPage }) {
       if (p.status !== 'completed') {
         pendingCount++;
         const fin = calculateFinancials(p);
-        if (p.currency === 'INR') {
+        const curr = p.currency || 'INR';
+        if (curr === 'INR') {
           pendingWithoutGstINR += fin.baseAmount;
           pendingGstAmountINR += fin.gstAmount;
           pendingWithGstINR += fin.totalAmount;
-        } else if (p.currency === 'USD') {
-          pendingUSD += fin.baseAmount;
-        } else if (p.currency === 'EUR') {
-          pendingEUR += fin.baseAmount;
+        } else {
+          forexPending[curr] = (forexPending[curr] || 0) + fin.totalAmount;
+          if (curr === 'USD') pendingUSD += fin.baseAmount;
+          if (curr === 'EUR') pendingEUR += fin.baseAmount;
+          if (curr === 'GBP') pendingGBP += fin.baseAmount;
         }
 
         const due = getDueStatus(p.due_date);
@@ -782,6 +786,8 @@ export default function B2BPayments({ setCurrentPage }) {
       pendingWithGstINR,
       pendingUSD,
       pendingEUR,
+      pendingGBP,
+      forexPending,
       overdueCount,
       pendingCount,
     };
@@ -2491,10 +2497,9 @@ export default function B2BPayments({ setCurrentPage }) {
         <div className="simple-kpi-card" style={{ borderLeft: '3px solid #3B82F6' }}>
           <div className="simple-kpi-label">Foreign Transfers (No GST)</div>
           <div className="simple-kpi-val" style={{ fontSize: '18px' }}>
-            {metrics.pendingUSD > 0 && `$${metrics.pendingUSD.toLocaleString()} USD`}
-            {metrics.pendingUSD > 0 && metrics.pendingEUR > 0 && ' + '}
-            {metrics.pendingEUR > 0 && `€${metrics.pendingEUR.toLocaleString()} EUR`}
-            {metrics.pendingUSD === 0 && metrics.pendingEUR === 0 && '$0'}
+            {Object.keys(metrics.forexPending || {}).length > 0
+              ? Object.entries(metrics.forexPending).map(([curr, amt]) => formatMoney(amt, curr)).join(' + ')
+              : '$0'}
           </div>
           <div className="simple-kpi-sub">0% GST (Foreign export exempt)</div>
         </div>
@@ -4783,9 +4788,9 @@ export default function B2BPayments({ setCurrentPage }) {
                 }
                 #accounts-disbursement-printable .print-letterhead-wrapper {
                   width: 100% !important;
-                  height: 28mm !important;
+                  height: 33mm !important;
                   overflow: hidden !important;
-                  margin-bottom: 3mm !important;
+                  margin-bottom: 4mm !important;
                   display: block !important;
                 }
                 #accounts-disbursement-printable img.print-letterhead {
@@ -4819,9 +4824,9 @@ export default function B2BPayments({ setCurrentPage }) {
                   className="print-letterhead-wrapper"
                   style={{
                     width: '100%',
-                    height: '110px',
+                    height: '140px',
                     overflow: 'hidden',
-                    marginBottom: '14px',
+                    marginBottom: '16px',
                     borderRadius: '4px',
                   }}
                 >
@@ -4861,7 +4866,7 @@ export default function B2BPayments({ setCurrentPage }) {
                 </div>
 
                 {/* Executive Summary Cards */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '16px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: Object.keys(metrics.forexPending || {}).length > 0 ? 'repeat(5, 1fr)' : 'repeat(4, 1fr)', gap: '10px', marginBottom: '16px' }}>
                   <div style={{ border: '1.5px solid #000000', padding: '8px 10px', borderRadius: '4px', background: '#F8FAFC' }}>
                     <div style={{ fontSize: '10px', fontWeight: 800, color: '#64748B', textTransform: 'uppercase' }}>Pending Transfers</div>
                     <div style={{ fontSize: '15px', fontWeight: 900, color: '#000000' }}>{metrics.pendingCount} Items</div>
@@ -4875,9 +4880,17 @@ export default function B2BPayments({ setCurrentPage }) {
                     <div style={{ fontSize: '14.5px', fontWeight: 900, color: '#D97706' }}>{formatMoney(metrics.pendingGstAmountINR, 'INR')}</div>
                   </div>
                   <div style={{ border: '1.5px solid #047857', padding: '8px 10px', borderRadius: '4px', background: '#F0FDF4' }}>
-                    <div style={{ fontSize: '10px', fontWeight: 800, color: '#047857', textTransform: 'uppercase' }}>Total Net Payable</div>
+                    <div style={{ fontSize: '10px', fontWeight: 800, color: '#047857', textTransform: 'uppercase' }}>Total Domestic (INR)</div>
                     <div style={{ fontSize: '15.5px', fontWeight: 900, color: '#047857' }}>{formatMoney(metrics.pendingWithGstINR, 'INR')}</div>
                   </div>
+                  {Object.keys(metrics.forexPending || {}).length > 0 && (
+                    <div style={{ border: '1.5px solid #2563EB', padding: '8px 10px', borderRadius: '4px', background: '#EFF6FF' }}>
+                      <div style={{ fontSize: '10px', fontWeight: 800, color: '#1D4ED8', textTransform: 'uppercase' }}>Foreign Outflow (0% GST)</div>
+                      <div style={{ fontSize: '14px', fontWeight: 900, color: '#1E40AF' }}>
+                        {Object.entries(metrics.forexPending).map(([curr, amt]) => formatMoney(amt, curr)).join(' + ')}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Pending Payments Table with separate B2B Partner, Category, Purpose, Account, Base, GST, Total Amount */}
@@ -4944,10 +4957,10 @@ export default function B2BPayments({ setCurrentPage }) {
                       );
                     })}
 
-                    {/* Grand Total Row */}
+                    {/* Domestic INR Grand Total Row */}
                     <tr style={{ background: '#F8FAFC' }}>
                       <td colSpan={5} style={{ border: '1.5px solid #000000', padding: '8px 10px', fontWeight: 900, fontSize: '10.5px', color: '#000000', textAlign: 'right' }}>
-                        TOTAL DISBURSEMENT LIABILITY (NET PAYABLE):
+                        TOTAL DOMESTIC DISBURSEMENTS (INR, INCL. 18% GST):
                       </td>
                       <td style={{ border: '1.5px solid #000000', padding: '8px', textAlign: 'right', fontWeight: 900, fontSize: '10.5px', color: '#000000' }}>
                         {formatMoney(metrics.pendingWithoutGstINR, 'INR')}
@@ -4959,8 +4972,31 @@ export default function B2BPayments({ setCurrentPage }) {
                         {formatMoney(metrics.pendingWithGstINR, 'INR')}
                       </td>
                     </tr>
+
+                    {/* Foreign Outflow Grand Total Rows (0% GST - Export Remittance) */}
+                    {Object.entries(metrics.forexPending || {}).map(([curr, amt]) => (
+                      <tr key={curr} style={{ background: '#EFF6FF' }}>
+                        <td colSpan={5} style={{ border: '1.5px solid #2563EB', padding: '7px 10px', fontWeight: 900, fontSize: '10px', color: '#1D4ED8', textAlign: 'right' }}>
+                          TOTAL FOREIGN OUTFLOW ({curr} - INTERNATIONAL WIRE / SWIFT):
+                        </td>
+                        <td style={{ border: '1.5px solid #2563EB', padding: '7px 8px', textAlign: 'right', fontWeight: 900, fontSize: '10.5px', color: '#1E40AF' }}>
+                          {formatMoney(amt, curr)}
+                        </td>
+                        <td style={{ border: '1.5px solid #2563EB', padding: '7px 8px', textAlign: 'center', fontWeight: 800, fontSize: '9.5px', color: '#2563EB' }}>
+                          0% (Exempt)
+                        </td>
+                        <td style={{ border: '1.5px solid #2563EB', padding: '7px 8px', textAlign: 'right', fontWeight: 900, fontSize: '12px', color: '#1D4ED8' }}>
+                          {formatMoney(amt, curr)}
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
+
+                {/* Accounts Routing Notice */}
+                <div style={{ fontSize: '9.5px', color: '#64748B', marginTop: '-10px', marginBottom: '14px', lineHeight: '1.4' }}>
+                  * <strong>Accounts Transfer Routing Notice:</strong> Domestic INR disbursements are payable through Indian Corporate Net Banking (IMPS / NEFT). Foreign currency disbursements ({Object.keys(metrics.forexPending || {}).length > 0 ? Object.keys(metrics.forexPending).join(', ') : 'USD, EUR, GBP'}) are processed as International Outward Remittances (SWIFT / Form A2 - 0% GST Export Exempt under Foreign Exchange regulations).
+                </div>
 
                 {/* Sign-off & Audit Trail (For Sterling Accounts Team) */}
                 <div style={{ border: '1.5px solid #000000', padding: '12px 14px', borderRadius: '4px', background: '#F8FAFC' }}>

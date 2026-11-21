@@ -31,19 +31,48 @@ export const KNOWN_INSURANCE_AGENTS = [
   'Bajaj Allianz Global Care',
 ];
 
+export const SUPPORTED_CURRENCIES = [
+  { code: 'INR', symbol: '₹', label: 'INR (₹)' },
+  { code: 'EUR', symbol: '€', label: 'EUR (€)' },
+  { code: 'USD', symbol: '$', label: 'USD ($)' },
+  { code: 'GBP', symbol: '£', label: 'GBP (£)' },
+];
+
+export function getCurrencySymbol(currency = 'INR') {
+  if (currency === 'USD') return '$';
+  if (currency === 'EUR') return '€';
+  if (currency === 'GBP') return '£';
+  return '₹';
+}
+
+export function formatPartnerMoney(amount, currency = 'INR') {
+  const num = Number(amount) || 0;
+  if (currency === 'INR') return '₹' + num.toLocaleString('en-IN');
+  if (currency === 'USD') return '$' + num.toLocaleString('en-US');
+  if (currency === 'EUR') return '€' + num.toLocaleString('en-DE');
+  if (currency === 'GBP') return '£' + num.toLocaleString('en-GB');
+  return `${currency} ${num.toLocaleString()}`;
+}
+
 const DEFAULT_META = {
   b2b_agent_name: '',
   b2b_committed: 0,
   b2b_paid: 0,
+  b2b_currency: 'INR',
+  b2b_has_gst: true,
   apostille_agent: '',
   apostille_committed: 0,
   apostille_paid: 0,
+  apostille_currency: 'INR',
+  apostille_has_gst: false,
   insurance_agent: '',
   insurance_committed: 0,
   insurance_paid: 0,
+  insurance_currency: 'INR',
+  insurance_has_gst: false,
   uni_commission_committed: 0,
   uni_commission_received: 0,
-  uni_commission_currency: 'INR',
+  uni_commission_currency: 'EUR',
 };
 
 /**
@@ -90,6 +119,15 @@ export function getStudentAgentMeta(student) {
   meta.uni_commission_committed = Number(meta.uni_commission_committed || (student && student.commission ? student.commission : 0));
   meta.uni_commission_received = Number(meta.uni_commission_received || (student && student.commission_received ? student.commission_received : 0));
 
+  // Currencies & GST settings (Foreign currencies USD/EUR/GBP are 0% GST exempt)
+  meta.b2b_currency = meta.b2b_currency || 'INR';
+  meta.b2b_has_gst = meta.b2b_currency === 'INR' ? (meta.b2b_has_gst !== undefined ? Boolean(meta.b2b_has_gst) : true) : false;
+  meta.apostille_currency = meta.apostille_currency || 'INR';
+  meta.apostille_has_gst = meta.apostille_currency === 'INR' ? Boolean(meta.apostille_has_gst) : false;
+  meta.insurance_currency = meta.insurance_currency || 'INR';
+  meta.insurance_has_gst = meta.insurance_currency === 'INR' ? Boolean(meta.insurance_has_gst) : false;
+  meta.uni_commission_currency = meta.uni_commission_currency || (student && student.currency ? student.currency : 'EUR');
+
   // Compute remaining dues
   meta.b2b_remaining = Math.max(0, meta.b2b_committed - meta.b2b_paid);
   meta.apostille_remaining = Math.max(0, meta.apostille_committed - meta.apostille_paid);
@@ -108,15 +146,21 @@ export function saveStudentAgentMeta(studentId, studentName, meta, existingNotes
     b2b_agent_name: meta.b2b_agent_name?.trim() || '',
     b2b_committed: Number(meta.b2b_committed || 0),
     b2b_paid: Number(meta.b2b_paid || 0),
+    b2b_currency: meta.b2b_currency || 'INR',
+    b2b_has_gst: meta.b2b_currency === 'INR' ? (meta.b2b_has_gst !== undefined ? Boolean(meta.b2b_has_gst) : true) : false,
     apostille_agent: meta.apostille_agent?.trim() || '',
     apostille_committed: Number(meta.apostille_committed || 0),
     apostille_paid: Number(meta.apostille_paid || 0),
+    apostille_currency: meta.apostille_currency || 'INR',
+    apostille_has_gst: meta.apostille_currency === 'INR' ? Boolean(meta.apostille_has_gst) : false,
     insurance_agent: meta.insurance_agent?.trim() || '',
     insurance_committed: Number(meta.insurance_committed || 0),
     insurance_paid: Number(meta.insurance_paid || 0),
+    insurance_currency: meta.insurance_currency || 'INR',
+    insurance_has_gst: meta.insurance_currency === 'INR' ? Boolean(meta.insurance_has_gst) : false,
     uni_commission_committed: Number(meta.uni_commission_committed || 0),
     uni_commission_received: Number(meta.uni_commission_received || 0),
-    uni_commission_currency: meta.uni_commission_currency || 'INR',
+    uni_commission_currency: meta.uni_commission_currency || 'EUR',
   };
 
   // 1. Save to localStorage
@@ -204,6 +248,8 @@ export function syncStudentPartnerToB2BPayments(studentId, studentName, meta) {
         partner: meta.b2b_agent_name?.trim(),
         committed: Number(meta.b2b_committed || 0),
         paid: Number(meta.b2b_paid || 0),
+        currency: meta.b2b_currency || 'INR',
+        has_gst: meta.b2b_currency === 'INR' ? (meta.b2b_has_gst !== undefined ? Boolean(meta.b2b_has_gst) : true) : false,
         category: 'Sub-Agent Commission',
       },
       {
@@ -211,6 +257,8 @@ export function syncStudentPartnerToB2BPayments(studentId, studentName, meta) {
         partner: meta.apostille_agent?.trim(),
         committed: Number(meta.apostille_committed || 0),
         paid: Number(meta.apostille_paid || 0),
+        currency: meta.apostille_currency || 'INR',
+        has_gst: meta.apostille_currency === 'INR' ? Boolean(meta.apostille_has_gst) : false,
         category: 'Apostille Charges',
       },
       {
@@ -218,6 +266,8 @@ export function syncStudentPartnerToB2BPayments(studentId, studentName, meta) {
         partner: meta.insurance_agent?.trim(),
         committed: Number(meta.insurance_committed || 0),
         paid: Number(meta.insurance_paid || 0),
+        currency: meta.insurance_currency || 'INR',
+        has_gst: meta.insurance_currency === 'INR' ? Boolean(meta.insurance_has_gst) : false,
         category: 'VFS & Insurance',
       },
     ];
@@ -241,7 +291,7 @@ export function syncStudentPartnerToB2BPayments(studentId, studentName, meta) {
 
     let hasChanges = false;
 
-    partnersToSync.forEach(({ type, partner, committed, paid, category }) => {
+    partnersToSync.forEach(({ type, partner, committed, paid, category, currency, has_gst }) => {
       if (!partner || committed <= 0) return;
 
       const remainingDue = Math.max(0, committed - paid);
@@ -273,6 +323,8 @@ export function syncStudentPartnerToB2BPayments(studentId, studentName, meta) {
           partner_name: partner,
           partner_type: type,
           amount: remainingDue > 0 ? remainingDue : (cur.amount || committed),
+          currency: currency || cur.currency || 'INR',
+          has_gst: (currency || cur.currency || 'INR') === 'INR' ? (has_gst !== undefined ? has_gst : cur.has_gst) : false,
           category: category,
           status: newStatus,
           transfer_account: cur.transfer_account && cur.transfer_account !== 'Not provided' ? cur.transfer_account : accInfo.details,
@@ -291,8 +343,8 @@ export function syncStudentPartnerToB2BPayments(studentId, studentName, meta) {
           transfer_account: accInfo.details,
           selected_account_id: accInfo.id,
           amount: remainingDue,
-          currency: 'INR',
-          has_gst: false,
+          currency: currency || 'INR',
+          has_gst: (currency || 'INR') === 'INR' ? Boolean(has_gst) : false,
           category: category,
           due_date: new Date(Date.now() + 5 * 86400000).toISOString().split('T')[0],
           priority: false,

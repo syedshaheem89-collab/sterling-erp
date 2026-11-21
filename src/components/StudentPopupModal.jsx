@@ -10,6 +10,9 @@ import {
   KNOWN_B2B_PARTNERS,
   KNOWN_APOSTILLE_AGENTS,
   KNOWN_INSURANCE_AGENTS,
+  SUPPORTED_CURRENCIES,
+  getCurrencySymbol,
+  formatPartnerMoney,
 } from '../utils/studentAgentHelper';
 
 // Format Indian Currency for compact chips (e.g. ₹2.16 L, ₹87.4K, ₹0)
@@ -70,14 +73,21 @@ export default function StudentPopupModal({
       b2b_agent_name: meta.b2b_agent_name || '',
       b2b_committed: meta.b2b_committed || '',
       b2b_paid: meta.b2b_paid || '',
+      b2b_currency: meta.b2b_currency || 'INR',
+      b2b_has_gst: meta.b2b_has_gst !== undefined ? meta.b2b_has_gst : true,
       apostille_agent: meta.apostille_agent || '',
       apostille_committed: meta.apostille_committed || '',
       apostille_paid: meta.apostille_paid || '',
+      apostille_currency: meta.apostille_currency || 'INR',
+      apostille_has_gst: meta.apostille_has_gst !== undefined ? meta.apostille_has_gst : false,
       insurance_agent: meta.insurance_agent || '',
       insurance_committed: meta.insurance_committed || '',
       insurance_paid: meta.insurance_paid || '',
+      insurance_currency: meta.insurance_currency || 'INR',
+      insurance_has_gst: meta.insurance_has_gst !== undefined ? meta.insurance_has_gst : false,
       uni_commission_committed: meta.uni_commission_committed || selectedStudent.commission || '',
       uni_commission_received: meta.uni_commission_received || '',
+      uni_commission_currency: meta.uni_commission_currency || selectedStudent.currency || 'EUR',
       notes: selectedStudent.notes || '',
     });
     setIsEditingStudent(true);
@@ -100,14 +110,21 @@ export default function StudentPopupModal({
         b2b_agent_name: editStudentData.b2b_agent_name || '',
         b2b_committed: Number(editStudentData.b2b_committed || 0),
         b2b_paid: Number(editStudentData.b2b_paid || 0),
+        b2b_currency: editStudentData.b2b_currency || 'INR',
+        b2b_has_gst: editStudentData.b2b_currency === 'INR' ? (editStudentData.b2b_has_gst !== undefined ? Boolean(editStudentData.b2b_has_gst) : true) : false,
         apostille_agent: editStudentData.apostille_agent || '',
         apostille_committed: Number(editStudentData.apostille_committed || 0),
         apostille_paid: Number(editStudentData.apostille_paid || 0),
+        apostille_currency: editStudentData.apostille_currency || 'INR',
+        apostille_has_gst: editStudentData.apostille_currency === 'INR' ? Boolean(editStudentData.apostille_has_gst) : false,
         insurance_agent: editStudentData.insurance_agent || '',
         insurance_committed: Number(editStudentData.insurance_committed || 0),
         insurance_paid: Number(editStudentData.insurance_paid || 0),
+        insurance_currency: editStudentData.insurance_currency || 'INR',
+        insurance_has_gst: editStudentData.insurance_currency === 'INR' ? Boolean(editStudentData.insurance_has_gst) : false,
         uni_commission_committed: commExpected,
         uni_commission_received: commReceived,
+        uni_commission_currency: editStudentData.uni_commission_currency || 'EUR',
         uni_commission_remaining: Math.max(0, commExpected - commReceived),
       };
 
@@ -955,46 +972,83 @@ export default function StudentPopupModal({
                         <span style={{ fontSize: '11px', fontWeight: 700, color: '#C7D2FE' }}>🤝 B2B Sub-Agent / Partner</span>
                         {Number(editStudentData.b2b_committed) > 0 && (
                           <span style={{ fontSize: '10.5px', color: '#FCD34D', fontWeight: 700 }}>
-                            Due: ₹{Math.max(0, Number(editStudentData.b2b_committed) - (Number(editStudentData.b2b_paid) || 0)).toLocaleString('en-IN')}
+                            Due: {getCurrencySymbol(editStudentData.b2b_currency || 'INR')}{Math.max(0, Number(editStudentData.b2b_committed) - (Number(editStudentData.b2b_paid) || 0)).toLocaleString()}
                           </span>
                         )}
                       </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: '6px' }}>
-                        <div>
-                          <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Agent Name</label>
-                          <input
-                            type="text"
-                            list="popup-b2b-list"
-                            value={editStudentData.b2b_agent_name || ''}
-                            onChange={(e) => setEditStudentData({ ...editStudentData, b2b_agent_name: e.target.value })}
-                            placeholder="e.g. Consult Fox"
-                            style={{ width: '100%', padding: '5px 7px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
-                          />
-                          <datalist id="popup-b2b-list">
-                            {KNOWN_B2B_PARTNERS.map((a) => (
-                              <option key={a} value={a} />
-                            ))}
-                          </datalist>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '6px' }}>
+                          <div>
+                            <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Agent Name</label>
+                            <input
+                              type="text"
+                              list="popup-b2b-list"
+                              value={editStudentData.b2b_agent_name || ''}
+                              onChange={(e) => setEditStudentData({ ...editStudentData, b2b_agent_name: e.target.value })}
+                              placeholder="e.g. Consult Fox"
+                              style={{ width: '100%', padding: '5px 7px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
+                            />
+                            <datalist id="popup-b2b-list">
+                              {KNOWN_B2B_PARTNERS.map((a) => (
+                                <option key={a} value={a} />
+                              ))}
+                            </datalist>
+                          </div>
+                          <div>
+                            <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Currency</label>
+                            <select
+                              value={editStudentData.b2b_currency || 'INR'}
+                              onChange={(e) => setEditStudentData({ ...editStudentData, b2b_currency: e.target.value })}
+                              style={{ width: '100%', padding: '5px 7px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
+                            >
+                              {SUPPORTED_CURRENCIES.map((c) => (
+                                <option key={c.code} value={c.code}>{c.label}</option>
+                              ))}
+                            </select>
+                          </div>
                         </div>
-                        <div>
-                          <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Committed (₹)</label>
-                          <input
-                            type="number"
-                            value={editStudentData.b2b_committed || ''}
-                            onChange={(e) => setEditStudentData({ ...editStudentData, b2b_committed: e.target.value })}
-                            placeholder="0"
-                            style={{ width: '100%', padding: '5px 7px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
-                          />
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                          <div>
+                            <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>
+                              Committed ({getCurrencySymbol(editStudentData.b2b_currency || 'INR')})
+                            </label>
+                            <input
+                              type="number"
+                              value={editStudentData.b2b_committed || ''}
+                              onChange={(e) => setEditStudentData({ ...editStudentData, b2b_committed: e.target.value })}
+                              placeholder="0"
+                              style={{ width: '100%', padding: '5px 7px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
+                            />
+                          </div>
+                          <div>
+                            <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>
+                              Paid ({getCurrencySymbol(editStudentData.b2b_currency || 'INR')})
+                            </label>
+                            <input
+                              type="number"
+                              value={editStudentData.b2b_paid || ''}
+                              onChange={(e) => setEditStudentData({ ...editStudentData, b2b_paid: e.target.value })}
+                              placeholder="0"
+                              style={{ width: '100%', padding: '5px 7px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
+                            />
+                          </div>
                         </div>
-                        <div>
-                          <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Paid (₹)</label>
-                          <input
-                            type="number"
-                            value={editStudentData.b2b_paid || ''}
-                            onChange={(e) => setEditStudentData({ ...editStudentData, b2b_paid: e.target.value })}
-                            placeholder="0"
-                            style={{ width: '100%', padding: '5px 7px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
-                          />
+                        <div style={{ marginTop: '2px', fontSize: '10px' }}>
+                          {(!editStudentData.b2b_currency || editStudentData.b2b_currency === 'INR') ? (
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer', color: '#C7D2FE' }}>
+                              <input
+                                type="checkbox"
+                                checked={editStudentData.b2b_has_gst !== false}
+                                onChange={(e) => setEditStudentData({ ...editStudentData, b2b_has_gst: e.target.checked })}
+                                style={{ accentColor: '#6366F1', cursor: 'pointer' }}
+                              />
+                              <span>18% GST Applicable (Indian Sub-Agent)</span>
+                            </label>
+                          ) : (
+                            <span style={{ color: '#34D399', fontSize: '10px', fontWeight: 600 }}>
+                              ✓ 0% GST (Foreign Export Remittance Exempt)
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1005,46 +1059,83 @@ export default function StudentPopupModal({
                         <span style={{ fontSize: '11px', fontWeight: 700, color: '#DDD6FE' }}>📑 Apostille (General Expense)</span>
                         {Number(editStudentData.apostille_committed) > 0 && (
                           <span style={{ fontSize: '10.5px', color: '#FCD34D', fontWeight: 700 }}>
-                            Due: ₹{Math.max(0, Number(editStudentData.apostille_committed) - (Number(editStudentData.apostille_paid) || 0)).toLocaleString('en-IN')}
+                            Due: {getCurrencySymbol(editStudentData.apostille_currency || 'INR')}{Math.max(0, Number(editStudentData.apostille_committed) - (Number(editStudentData.apostille_paid) || 0)).toLocaleString()}
                           </span>
                         )}
                       </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: '6px' }}>
-                        <div>
-                          <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Apostille Agent</label>
-                          <input
-                            type="text"
-                            list="popup-apostille-list"
-                            value={editStudentData.apostille_agent || ''}
-                            onChange={(e) => setEditStudentData({ ...editStudentData, apostille_agent: e.target.value })}
-                            placeholder="e.g. Comfort Travel"
-                            style={{ width: '100%', padding: '5px 7px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
-                          />
-                          <datalist id="popup-apostille-list">
-                            {KNOWN_APOSTILLE_AGENTS.map((a) => (
-                              <option key={a} value={a} />
-                            ))}
-                          </datalist>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '6px' }}>
+                          <div>
+                            <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Apostille Agent</label>
+                            <input
+                              type="text"
+                              list="popup-apostille-list"
+                              value={editStudentData.apostille_agent || ''}
+                              onChange={(e) => setEditStudentData({ ...editStudentData, apostille_agent: e.target.value })}
+                              placeholder="e.g. Comfort Travel"
+                              style={{ width: '100%', padding: '5px 7px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
+                            />
+                            <datalist id="popup-apostille-list">
+                              {KNOWN_APOSTILLE_AGENTS.map((a) => (
+                                <option key={a} value={a} />
+                              ))}
+                            </datalist>
+                          </div>
+                          <div>
+                            <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Currency</label>
+                            <select
+                              value={editStudentData.apostille_currency || 'INR'}
+                              onChange={(e) => setEditStudentData({ ...editStudentData, apostille_currency: e.target.value })}
+                              style={{ width: '100%', padding: '5px 7px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
+                            >
+                              {SUPPORTED_CURRENCIES.map((c) => (
+                                <option key={c.code} value={c.code}>{c.label}</option>
+                              ))}
+                            </select>
+                          </div>
                         </div>
-                        <div>
-                          <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Committed (₹)</label>
-                          <input
-                            type="number"
-                            value={editStudentData.apostille_committed || ''}
-                            onChange={(e) => setEditStudentData({ ...editStudentData, apostille_committed: e.target.value })}
-                            placeholder="0"
-                            style={{ width: '100%', padding: '5px 7px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
-                          />
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                          <div>
+                            <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>
+                              Committed ({getCurrencySymbol(editStudentData.apostille_currency || 'INR')})
+                            </label>
+                            <input
+                              type="number"
+                              value={editStudentData.apostille_committed || ''}
+                              onChange={(e) => setEditStudentData({ ...editStudentData, apostille_committed: e.target.value })}
+                              placeholder="0"
+                              style={{ width: '100%', padding: '5px 7px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
+                            />
+                          </div>
+                          <div>
+                            <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>
+                              Paid ({getCurrencySymbol(editStudentData.apostille_currency || 'INR')})
+                            </label>
+                            <input
+                              type="number"
+                              value={editStudentData.apostille_paid || ''}
+                              onChange={(e) => setEditStudentData({ ...editStudentData, apostille_paid: e.target.value })}
+                              placeholder="0"
+                              style={{ width: '100%', padding: '5px 7px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
+                            />
+                          </div>
                         </div>
-                        <div>
-                          <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Paid (₹)</label>
-                          <input
-                            type="number"
-                            value={editStudentData.apostille_paid || ''}
-                            onChange={(e) => setEditStudentData({ ...editStudentData, apostille_paid: e.target.value })}
-                            placeholder="0"
-                            style={{ width: '100%', padding: '5px 7px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
-                          />
+                        <div style={{ marginTop: '2px', fontSize: '10px' }}>
+                          {(!editStudentData.apostille_currency || editStudentData.apostille_currency === 'INR') ? (
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer', color: '#DDD6FE' }}>
+                              <input
+                                type="checkbox"
+                                checked={Boolean(editStudentData.apostille_has_gst)}
+                                onChange={(e) => setEditStudentData({ ...editStudentData, apostille_has_gst: e.target.checked })}
+                                style={{ accentColor: '#8B5CF6', cursor: 'pointer' }}
+                              />
+                              <span>18% GST Applicable (Apostille)</span>
+                            </label>
+                          ) : (
+                            <span style={{ color: '#34D399', fontSize: '10px', fontWeight: 600 }}>
+                              ✓ 0% GST (Foreign Exempt)
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1055,46 +1146,83 @@ export default function StudentPopupModal({
                         <span style={{ fontSize: '11px', fontWeight: 700, color: '#A7F3D0' }}>🛡️ Insurance / VFS Partner</span>
                         {Number(editStudentData.insurance_committed) > 0 && (
                           <span style={{ fontSize: '10.5px', color: '#FCD34D', fontWeight: 700 }}>
-                            Due: ₹{Math.max(0, Number(editStudentData.insurance_committed) - (Number(editStudentData.insurance_paid) || 0)).toLocaleString('en-IN')}
+                            Due: {getCurrencySymbol(editStudentData.insurance_currency || 'INR')}{Math.max(0, Number(editStudentData.insurance_committed) - (Number(editStudentData.insurance_paid) || 0)).toLocaleString()}
                           </span>
                         )}
                       </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: '6px' }}>
-                        <div>
-                          <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Insurance Partner</label>
-                          <input
-                            type="text"
-                            list="popup-insurance-list"
-                            value={editStudentData.insurance_agent || ''}
-                            onChange={(e) => setEditStudentData({ ...editStudentData, insurance_agent: e.target.value })}
-                            placeholder="e.g. VFS & Insurance"
-                            style={{ width: '100%', padding: '5px 7px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
-                          />
-                          <datalist id="popup-insurance-list">
-                            {KNOWN_INSURANCE_AGENTS.map((a) => (
-                              <option key={a} value={a} />
-                            ))}
-                          </datalist>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '6px' }}>
+                          <div>
+                            <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Insurance Partner</label>
+                            <input
+                              type="text"
+                              list="popup-insurance-list"
+                              value={editStudentData.insurance_agent || ''}
+                              onChange={(e) => setEditStudentData({ ...editStudentData, insurance_agent: e.target.value })}
+                              placeholder="e.g. VFS & Insurance"
+                              style={{ width: '100%', padding: '5px 7px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
+                            />
+                            <datalist id="popup-insurance-list">
+                              {KNOWN_INSURANCE_AGENTS.map((a) => (
+                                <option key={a} value={a} />
+                              ))}
+                            </datalist>
+                          </div>
+                          <div>
+                            <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Currency</label>
+                            <select
+                              value={editStudentData.insurance_currency || 'INR'}
+                              onChange={(e) => setEditStudentData({ ...editStudentData, insurance_currency: e.target.value })}
+                              style={{ width: '100%', padding: '5px 7px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
+                            >
+                              {SUPPORTED_CURRENCIES.map((c) => (
+                                <option key={c.code} value={c.code}>{c.label}</option>
+                              ))}
+                            </select>
+                          </div>
                         </div>
-                        <div>
-                          <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Committed (₹)</label>
-                          <input
-                            type="number"
-                            value={editStudentData.insurance_committed || ''}
-                            onChange={(e) => setEditStudentData({ ...editStudentData, insurance_committed: e.target.value })}
-                            placeholder="0"
-                            style={{ width: '100%', padding: '5px 7px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
-                          />
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                          <div>
+                            <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>
+                              Committed ({getCurrencySymbol(editStudentData.insurance_currency || 'INR')})
+                            </label>
+                            <input
+                              type="number"
+                              value={editStudentData.insurance_committed || ''}
+                              onChange={(e) => setEditStudentData({ ...editStudentData, insurance_committed: e.target.value })}
+                              placeholder="0"
+                              style={{ width: '100%', padding: '5px 7px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
+                            />
+                          </div>
+                          <div>
+                            <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>
+                              Paid ({getCurrencySymbol(editStudentData.insurance_currency || 'INR')})
+                            </label>
+                            <input
+                              type="number"
+                              value={editStudentData.insurance_paid || ''}
+                              onChange={(e) => setEditStudentData({ ...editStudentData, insurance_paid: e.target.value })}
+                              placeholder="0"
+                              style={{ width: '100%', padding: '5px 7px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
+                            />
+                          </div>
                         </div>
-                        <div>
-                          <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Paid (₹)</label>
-                          <input
-                            type="number"
-                            value={editStudentData.insurance_paid || ''}
-                            onChange={(e) => setEditStudentData({ ...editStudentData, insurance_paid: e.target.value })}
-                            placeholder="0"
-                            style={{ width: '100%', padding: '5px 7px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
-                          />
+                        <div style={{ marginTop: '2px', fontSize: '10px' }}>
+                          {(!editStudentData.insurance_currency || editStudentData.insurance_currency === 'INR') ? (
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer', color: '#A7F3D0' }}>
+                              <input
+                                type="checkbox"
+                                checked={Boolean(editStudentData.insurance_has_gst)}
+                                onChange={(e) => setEditStudentData({ ...editStudentData, insurance_has_gst: e.target.checked })}
+                                style={{ accentColor: '#10B981', cursor: 'pointer' }}
+                              />
+                              <span>18% GST Applicable (Insurance)</span>
+                            </label>
+                          ) : (
+                            <span style={{ color: '#34D399', fontSize: '10px', fontWeight: 600 }}>
+                              ✓ 0% GST (Foreign Exempt)
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1111,23 +1239,41 @@ export default function StudentPopupModal({
                           }}>
                             {Math.max(0, Number(editStudentData.uni_commission_committed || editStudentData.commission || 0) - (Number(editStudentData.uni_commission_received) || 0)) === 0
                               ? '✓ Fully Received'
-                              : `Receivable Due: ₹${Math.max(0, Number(editStudentData.uni_commission_committed || editStudentData.commission || 0) - (Number(editStudentData.uni_commission_received) || 0)).toLocaleString('en-IN')}`}
+                              : `Receivable Due: ${getCurrencySymbol(editStudentData.uni_commission_currency || 'EUR')}${Math.max(0, Number(editStudentData.uni_commission_committed || editStudentData.commission || 0) - (Number(editStudentData.uni_commission_received) || 0)).toLocaleString()}`}
                           </span>
                         )}
                       </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-                        <div>
-                          <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Commission Expected (₹)</label>
-                          <input
-                            type="number"
-                            value={editStudentData.uni_commission_committed !== undefined && editStudentData.uni_commission_committed !== '' ? editStudentData.uni_commission_committed : (editStudentData.commission || '')}
-                            onChange={(e) => setEditStudentData({ ...editStudentData, uni_commission_committed: e.target.value, commission: e.target.value })}
-                            placeholder="0"
-                            style={{ width: '100%', padding: '5px 7px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
-                          />
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.6fr', gap: '6px' }}>
+                          <div>
+                            <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Currency</label>
+                            <select
+                              value={editStudentData.uni_commission_currency || 'EUR'}
+                              onChange={(e) => setEditStudentData({ ...editStudentData, uni_commission_currency: e.target.value })}
+                              style={{ width: '100%', padding: '5px 7px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
+                            >
+                              {SUPPORTED_CURRENCIES.map((c) => (
+                                <option key={c.code} value={c.code}>{c.label}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>
+                              Expected ({getCurrencySymbol(editStudentData.uni_commission_currency || 'EUR')})
+                            </label>
+                            <input
+                              type="number"
+                              value={editStudentData.uni_commission_committed !== undefined && editStudentData.uni_commission_committed !== '' ? editStudentData.uni_commission_committed : (editStudentData.commission || '')}
+                              onChange={(e) => setEditStudentData({ ...editStudentData, uni_commission_committed: e.target.value, commission: e.target.value })}
+                              placeholder="0"
+                              style={{ width: '100%', padding: '5px 7px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
+                            />
+                          </div>
                         </div>
                         <div>
-                          <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Commission Received (₹)</label>
+                          <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>
+                            Received ({getCurrencySymbol(editStudentData.uni_commission_currency || 'EUR')})
+                          </label>
                           <input
                             type="number"
                             value={editStudentData.uni_commission_received || ''}
@@ -1446,13 +1592,13 @@ export default function StudentPopupModal({
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div>
                           <div style={{ color: '#fff', fontWeight: 600 }}>{agentMeta.b2b_agent_name}</div>
-                          <div style={{ color: '#8E9BB5', fontSize: '10px' }}>B2B Sub-Agent</div>
+                          <div style={{ color: '#8E9BB5', fontSize: '10px' }}>B2B Sub-Agent ({agentMeta.b2b_currency || 'INR'})</div>
                         </div>
                         <div style={{ textAlign: 'right' }}>
-                          <span style={{ color: '#00E5A0', fontWeight: 700 }}>₹{Number(agentMeta.b2b_paid || 0).toLocaleString('en-IN')}</span>
+                          <span style={{ color: '#00E5A0', fontWeight: 700 }}>{formatPartnerMoney(agentMeta.b2b_paid || 0, agentMeta.b2b_currency || 'INR')}</span>
                           {Math.max(0, Number(agentMeta.b2b_committed || 0) - Number(agentMeta.b2b_paid || 0)) > 0 && (
                             <div style={{ color: '#FFB020', fontSize: '10.5px', fontWeight: 600 }}>
-                              Due: ₹{Math.max(0, Number(agentMeta.b2b_committed || 0) - Number(agentMeta.b2b_paid || 0)).toLocaleString('en-IN')}
+                              Due: {formatPartnerMoney(Math.max(0, Number(agentMeta.b2b_committed || 0) - Number(agentMeta.b2b_paid || 0)), agentMeta.b2b_currency || 'INR')}
                             </div>
                           )}
                         </div>
@@ -1463,13 +1609,13 @@ export default function StudentPopupModal({
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: agentMeta.b2b_agent_name ? '1px solid rgba(148, 163, 225, 0.08)' : 'none', paddingTop: agentMeta.b2b_agent_name ? '7px' : '0' }}>
                         <div>
                           <div style={{ color: '#fff', fontWeight: 600 }}>{agentMeta.apostille_agent}</div>
-                          <div style={{ color: '#8E9BB5', fontSize: '10px' }}>Apostille Partner</div>
+                          <div style={{ color: '#8E9BB5', fontSize: '10px' }}>Apostille Partner ({agentMeta.apostille_currency || 'INR'})</div>
                         </div>
                         <div style={{ textAlign: 'right' }}>
-                          <span style={{ color: '#00E5A0', fontWeight: 700 }}>₹{Number(agentMeta.apostille_paid || 0).toLocaleString('en-IN')}</span>
+                          <span style={{ color: '#00E5A0', fontWeight: 700 }}>{formatPartnerMoney(agentMeta.apostille_paid || 0, agentMeta.apostille_currency || 'INR')}</span>
                           {Math.max(0, Number(agentMeta.apostille_committed || 0) - Number(agentMeta.apostille_paid || 0)) > 0 && (
                             <div style={{ color: '#FFB020', fontSize: '10.5px', fontWeight: 600 }}>
-                              Due: ₹{Math.max(0, Number(agentMeta.apostille_committed || 0) - Number(agentMeta.apostille_paid || 0)).toLocaleString('en-IN')}
+                              Due: {formatPartnerMoney(Math.max(0, Number(agentMeta.apostille_committed || 0) - Number(agentMeta.apostille_paid || 0)), agentMeta.apostille_currency || 'INR')}
                             </div>
                           )}
                         </div>
@@ -1480,13 +1626,13 @@ export default function StudentPopupModal({
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(148, 163, 225, 0.08)', paddingTop: '7px' }}>
                         <div>
                           <div style={{ color: '#fff', fontWeight: 600 }}>{agentMeta.insurance_agent}</div>
-                          <div style={{ color: '#8E9BB5', fontSize: '10px' }}>Insurance / VFS Partner</div>
+                          <div style={{ color: '#8E9BB5', fontSize: '10px' }}>Insurance / VFS Partner ({agentMeta.insurance_currency || 'INR'})</div>
                         </div>
                         <div style={{ textAlign: 'right' }}>
-                          <span style={{ color: '#00E5A0', fontWeight: 700 }}>₹{Number(agentMeta.insurance_paid || 0).toLocaleString('en-IN')}</span>
+                          <span style={{ color: '#00E5A0', fontWeight: 700 }}>{formatPartnerMoney(agentMeta.insurance_paid || 0, agentMeta.insurance_currency || 'INR')}</span>
                           {Math.max(0, Number(agentMeta.insurance_committed || 0) - Number(agentMeta.insurance_paid || 0)) > 0 && (
                             <div style={{ color: '#FFB020', fontSize: '10.5px', fontWeight: 600 }}>
-                              Due: ₹{Math.max(0, Number(agentMeta.insurance_committed || 0) - Number(agentMeta.insurance_paid || 0)).toLocaleString('en-IN')}
+                              Due: {formatPartnerMoney(Math.max(0, Number(agentMeta.insurance_committed || 0) - Number(agentMeta.insurance_paid || 0)), agentMeta.insurance_currency || 'INR')}
                             </div>
                           )}
                         </div>
@@ -1500,10 +1646,10 @@ export default function StudentPopupModal({
                           <div style={{ color: '#38BDF8', fontSize: '10px', fontWeight: 700 }}>🏛️ University Commission (Receivable)</div>
                         </div>
                         <div style={{ textAlign: 'right' }}>
-                          <span style={{ color: '#00E5A0', fontWeight: 700 }}>₹{Number(agentMeta.uni_commission_received || 0).toLocaleString('en-IN')}</span>
+                          <span style={{ color: '#00E5A0', fontWeight: 700 }}>{formatPartnerMoney(agentMeta.uni_commission_received || 0, agentMeta.uni_commission_currency || 'EUR')}</span>
                           {Math.max(0, Number(agentMeta.uni_commission_committed || selectedStudent.commission || 0) - Number(agentMeta.uni_commission_received || 0)) > 0 ? (
                             <div style={{ color: '#38BDF8', fontSize: '10.5px', fontWeight: 600 }}>
-                              Due: ₹{Math.max(0, Number(agentMeta.uni_commission_committed || selectedStudent.commission || 0) - Number(agentMeta.uni_commission_received || 0)).toLocaleString('en-IN')}
+                              Due: {formatPartnerMoney(Math.max(0, Number(agentMeta.uni_commission_committed || selectedStudent.commission || 0) - Number(agentMeta.uni_commission_received || 0)), agentMeta.uni_commission_currency || 'EUR')}
                             </div>
                           ) : (
                             <div style={{ color: '#00E5A0', fontSize: '10px', fontWeight: 700 }}>✓ Settled</div>

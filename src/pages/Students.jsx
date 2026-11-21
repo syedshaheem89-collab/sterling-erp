@@ -14,6 +14,9 @@ import {
   KNOWN_B2B_PARTNERS,
   KNOWN_APOSTILLE_AGENTS,
   KNOWN_INSURANCE_AGENTS,
+  SUPPORTED_CURRENCIES,
+  getCurrencySymbol,
+  formatPartnerMoney,
 } from '../utils/studentAgentHelper';
 
 const COUNTRY_FLAGS = {
@@ -865,14 +868,21 @@ export default function Students({ setCurrentPage, initialFilter } = {}) {
       b2b_agent_name: agentMeta.b2b_agent_name || '',
       b2b_committed: agentMeta.b2b_committed || '',
       b2b_paid: agentMeta.b2b_paid || '',
+      b2b_currency: agentMeta.b2b_currency || 'INR',
+      b2b_has_gst: agentMeta.b2b_has_gst !== undefined ? agentMeta.b2b_has_gst : true,
       apostille_agent: agentMeta.apostille_agent || '',
       apostille_committed: agentMeta.apostille_committed || '',
       apostille_paid: agentMeta.apostille_paid || '',
+      apostille_currency: agentMeta.apostille_currency || 'INR',
+      apostille_has_gst: agentMeta.apostille_has_gst !== undefined ? agentMeta.apostille_has_gst : false,
       insurance_agent: agentMeta.insurance_agent || '',
       insurance_committed: agentMeta.insurance_committed || '',
       insurance_paid: agentMeta.insurance_paid || '',
+      insurance_currency: agentMeta.insurance_currency || 'INR',
+      insurance_has_gst: agentMeta.insurance_has_gst !== undefined ? agentMeta.insurance_has_gst : false,
       uni_commission_committed: agentMeta.uni_commission_committed || student.commission || '',
       uni_commission_received: agentMeta.uni_commission_received || '',
+      uni_commission_currency: agentMeta.uni_commission_currency || student.currency || 'EUR',
     });
     setIsEditingDetails(startInEdit);
     setDetailTab(initialTab);
@@ -896,14 +906,21 @@ export default function Students({ setCurrentPage, initialFilter } = {}) {
         b2b_agent_name: editFormData.b2b_agent_name || '',
         b2b_committed: Number(editFormData.b2b_committed || 0),
         b2b_paid: Number(editFormData.b2b_paid || 0),
+        b2b_currency: editFormData.b2b_currency || 'INR',
+        b2b_has_gst: editFormData.b2b_currency === 'INR' ? (editFormData.b2b_has_gst !== undefined ? Boolean(editFormData.b2b_has_gst) : true) : false,
         apostille_agent: editFormData.apostille_agent || '',
         apostille_committed: Number(editFormData.apostille_committed || 0),
         apostille_paid: Number(editFormData.apostille_paid || 0),
+        apostille_currency: editFormData.apostille_currency || 'INR',
+        apostille_has_gst: editFormData.apostille_currency === 'INR' ? Boolean(editFormData.apostille_has_gst) : false,
         insurance_agent: editFormData.insurance_agent || '',
         insurance_committed: Number(editFormData.insurance_committed || 0),
         insurance_paid: Number(editFormData.insurance_paid || 0),
+        insurance_currency: editFormData.insurance_currency || 'INR',
+        insurance_has_gst: editFormData.insurance_currency === 'INR' ? Boolean(editFormData.insurance_has_gst) : false,
         uni_commission_committed: commExpected,
         uni_commission_received: commReceived,
+        uni_commission_currency: editFormData.uni_commission_currency || 'EUR',
         uni_commission_remaining: Math.max(0, commExpected - commReceived),
       };
 
@@ -2217,14 +2234,21 @@ function AddStudentModal({
     b2b_agent_name: '',
     b2b_committed: '',
     b2b_paid: '',
+    b2b_currency: 'INR',
+    b2b_has_gst: true,
     apostille_agent: '',
     apostille_committed: '',
     apostille_paid: '',
+    apostille_currency: 'INR',
+    apostille_has_gst: false,
     insurance_agent: '',
     insurance_committed: '',
     insurance_paid: '',
+    insurance_currency: 'INR',
+    insurance_has_gst: false,
     uni_commission_committed: '',
     uni_commission_received: '',
+    uni_commission_currency: 'EUR',
     // Optional first payment
     hasFirstPayment: false,
     firstPaymentBank: '',
@@ -2275,14 +2299,21 @@ function AddStudentModal({
         b2b_agent_name: formData.b2b_agent_name || '',
         b2b_committed: Number(formData.b2b_committed || 0),
         b2b_paid: Number(formData.b2b_paid || 0),
+        b2b_currency: formData.b2b_currency || 'INR',
+        b2b_has_gst: formData.b2b_currency === 'INR' ? (formData.b2b_has_gst !== undefined ? Boolean(formData.b2b_has_gst) : true) : false,
         apostille_agent: formData.apostille_agent || '',
         apostille_committed: Number(formData.apostille_committed || 0),
         apostille_paid: Number(formData.apostille_paid || 0),
+        apostille_currency: formData.apostille_currency || 'INR',
+        apostille_has_gst: formData.apostille_currency === 'INR' ? Boolean(formData.apostille_has_gst) : false,
         insurance_agent: formData.insurance_agent || '',
         insurance_committed: Number(formData.insurance_committed || 0),
         insurance_paid: Number(formData.insurance_paid || 0),
+        insurance_currency: formData.insurance_currency || 'INR',
+        insurance_has_gst: formData.insurance_currency === 'INR' ? Boolean(formData.insurance_has_gst) : false,
         uni_commission_committed: commExpected,
         uni_commission_received: commReceived,
+        uni_commission_currency: formData.uni_commission_currency || 'EUR',
         uni_commission_remaining: Math.max(0, commExpected - commReceived),
       };
 
@@ -2880,47 +2911,73 @@ function AddStudentModal({
               </div>
 
               {/* 3 Dedicated External Partner Cards */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px' }}>
                 {/* 1. B2B Sub-Agent / Referral */}
                 <div style={{ background: 'rgba(99, 102, 241, 0.08)', border: '1px solid rgba(99, 102, 241, 0.28)', borderRadius: '10px', padding: '12px' }}>
-                  <div style={{ fontSize: '12px', fontWeight: 700, color: '#C7D2FE', marginBottom: '8px', display: 'flex', justifyContent: 'space-between' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: '#C7D2FE', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span>🤝 B2B Sub-Agent / Partner</span>
                     {Number(formData.b2b_committed) > 0 && (
                       <span style={{ fontSize: '11px', color: '#FCD34D' }}>
-                        Due: ₹{Math.max(0, Number(formData.b2b_committed) - (Number(formData.b2b_paid) || 0)).toLocaleString('en-IN')}
+                        Due: {getCurrencySymbol(formData.b2b_currency || 'INR')}{Math.max(0, Number(formData.b2b_committed) - (Number(formData.b2b_paid) || 0)).toLocaleString()}
                       </span>
                     )}
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <div>
-                      <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>Agent Name</label>
-                      <input
-                        type="text"
-                        list="b2b-partners-datalist"
-                        name="b2b_agent_name"
-                        placeholder="Select or type agent name"
-                        value={formData.b2b_agent_name}
-                        onChange={handleChange}
-                        style={{
-                          width: '100%',
-                          padding: '7px 10px',
-                          background: 'var(--bg3)',
-                          border: '1px solid var(--border)',
-                          borderRadius: '6px',
-                          color: '#fff',
-                          fontSize: '12px',
-                          outline: 'none',
-                        }}
-                      />
-                      <datalist id="b2b-partners-datalist">
-                        {KNOWN_B2B_PARTNERS.map((p) => (
-                          <option key={p} value={p} />
-                        ))}
-                      </datalist>
+                    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '8px' }}>
+                      <div>
+                        <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>Agent Name</label>
+                        <input
+                          type="text"
+                          list="b2b-partners-datalist"
+                          name="b2b_agent_name"
+                          placeholder="Select or type agent name"
+                          value={formData.b2b_agent_name}
+                          onChange={handleChange}
+                          style={{
+                            width: '100%',
+                            padding: '7px 10px',
+                            background: 'var(--bg3)',
+                            border: '1px solid var(--border)',
+                            borderRadius: '6px',
+                            color: '#fff',
+                            fontSize: '12px',
+                            outline: 'none',
+                          }}
+                        />
+                        <datalist id="b2b-partners-datalist">
+                          {KNOWN_B2B_PARTNERS.map((p) => (
+                            <option key={p} value={p} />
+                          ))}
+                        </datalist>
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>Currency</label>
+                        <select
+                          name="b2b_currency"
+                          value={formData.b2b_currency || 'INR'}
+                          onChange={handleChange}
+                          style={{
+                            width: '100%',
+                            padding: '7px 8px',
+                            background: 'var(--bg3)',
+                            border: '1px solid var(--border)',
+                            borderRadius: '6px',
+                            color: '#fff',
+                            fontSize: '12px',
+                            outline: 'none',
+                          }}
+                        >
+                          {SUPPORTED_CURRENCIES.map((c) => (
+                            <option key={c.code} value={c.code}>{c.label}</option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                       <div>
-                        <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>Committed (₹)</label>
+                        <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>
+                          Committed ({getCurrencySymbol(formData.b2b_currency || 'INR')})
+                        </label>
                         <input
                           type="number"
                           min="0"
@@ -2941,7 +2998,9 @@ function AddStudentModal({
                         />
                       </div>
                       <div>
-                        <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>Paid (₹)</label>
+                        <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>
+                          Paid ({getCurrencySymbol(formData.b2b_currency || 'INR')})
+                        </label>
                         <input
                           type="number"
                           min="0"
@@ -2962,49 +3021,93 @@ function AddStudentModal({
                         />
                       </div>
                     </div>
+                    <div style={{ marginTop: '2px', fontSize: '11px' }}>
+                      {(!formData.b2b_currency || formData.b2b_currency === 'INR') ? (
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: '#C7D2FE' }}>
+                          <input
+                            type="checkbox"
+                            name="b2b_has_gst"
+                            checked={formData.b2b_has_gst !== false}
+                            onChange={(e) => setFormData((prev) => ({ ...prev, b2b_has_gst: e.target.checked }))}
+                            style={{ accentColor: '#6366F1', cursor: 'pointer' }}
+                          />
+                          <span>18% GST Applicable (Indian Sub-Agent)</span>
+                        </label>
+                      ) : (
+                        <span style={{ color: '#34D399', fontSize: '10.5px', fontWeight: 600 }}>
+                          ✓ 0% GST (Foreign Export Remittance Exempt)
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 
                 {/* 2. Apostille Partner (General Expense) */}
                 <div style={{ background: 'rgba(139, 92, 246, 0.08)', border: '1px solid rgba(139, 92, 246, 0.28)', borderRadius: '10px', padding: '12px' }}>
-                  <div style={{ fontSize: '12px', fontWeight: 700, color: '#DDD6FE', marginBottom: '8px', display: 'flex', justifyContent: 'space-between' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: '#DDD6FE', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span>📑 Apostille (General Expense)</span>
                     {Number(formData.apostille_committed) > 0 && (
                       <span style={{ fontSize: '11px', color: '#FCD34D' }}>
-                        Due: ₹{Math.max(0, Number(formData.apostille_committed) - (Number(formData.apostille_paid) || 0)).toLocaleString('en-IN')}
+                        Due: {getCurrencySymbol(formData.apostille_currency || 'INR')}{Math.max(0, Number(formData.apostille_committed) - (Number(formData.apostille_paid) || 0)).toLocaleString()}
                       </span>
                     )}
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <div>
-                      <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>Apostille Agent</label>
-                      <input
-                        type="text"
-                        list="apostille-partners-datalist"
-                        name="apostille_agent"
-                        placeholder="e.g. Comfort Travel"
-                        value={formData.apostille_agent}
-                        onChange={handleChange}
-                        style={{
-                          width: '100%',
-                          padding: '7px 10px',
-                          background: 'var(--bg3)',
-                          border: '1px solid var(--border)',
-                          borderRadius: '6px',
-                          color: '#fff',
-                          fontSize: '12px',
-                          outline: 'none',
-                        }}
-                      />
-                      <datalist id="apostille-partners-datalist">
-                        {KNOWN_APOSTILLE_AGENTS.map((p) => (
-                          <option key={p} value={p} />
-                        ))}
-                      </datalist>
+                    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '8px' }}>
+                      <div>
+                        <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>Apostille Agent</label>
+                        <input
+                          type="text"
+                          list="apostille-partners-datalist"
+                          name="apostille_agent"
+                          placeholder="e.g. Comfort Travel"
+                          value={formData.apostille_agent}
+                          onChange={handleChange}
+                          style={{
+                            width: '100%',
+                            padding: '7px 10px',
+                            background: 'var(--bg3)',
+                            border: '1px solid var(--border)',
+                            borderRadius: '6px',
+                            color: '#fff',
+                            fontSize: '12px',
+                            outline: 'none',
+                          }}
+                        />
+                        <datalist id="apostille-partners-datalist">
+                          {KNOWN_APOSTILLE_AGENTS.map((p) => (
+                            <option key={p} value={p} />
+                          ))}
+                        </datalist>
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>Currency</label>
+                        <select
+                          name="apostille_currency"
+                          value={formData.apostille_currency || 'INR'}
+                          onChange={handleChange}
+                          style={{
+                            width: '100%',
+                            padding: '7px 8px',
+                            background: 'var(--bg3)',
+                            border: '1px solid var(--border)',
+                            borderRadius: '6px',
+                            color: '#fff',
+                            fontSize: '12px',
+                            outline: 'none',
+                          }}
+                        >
+                          {SUPPORTED_CURRENCIES.map((c) => (
+                            <option key={c.code} value={c.code}>{c.label}</option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                       <div>
-                        <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>Committed (₹)</label>
+                        <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>
+                          Committed ({getCurrencySymbol(formData.apostille_currency || 'INR')})
+                        </label>
                         <input
                           type="number"
                           min="0"
@@ -3025,7 +3128,9 @@ function AddStudentModal({
                         />
                       </div>
                       <div>
-                        <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>Paid (₹)</label>
+                        <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>
+                          Paid ({getCurrencySymbol(formData.apostille_currency || 'INR')})
+                        </label>
                         <input
                           type="number"
                           min="0"
@@ -3046,49 +3151,93 @@ function AddStudentModal({
                         />
                       </div>
                     </div>
+                    <div style={{ marginTop: '2px', fontSize: '11px' }}>
+                      {(!formData.apostille_currency || formData.apostille_currency === 'INR') ? (
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: '#DDD6FE' }}>
+                          <input
+                            type="checkbox"
+                            name="apostille_has_gst"
+                            checked={Boolean(formData.apostille_has_gst)}
+                            onChange={(e) => setFormData((prev) => ({ ...prev, apostille_has_gst: e.target.checked }))}
+                            style={{ accentColor: '#8B5CF6', cursor: 'pointer' }}
+                          />
+                          <span>18% GST Applicable (Apostille)</span>
+                        </label>
+                      ) : (
+                        <span style={{ color: '#34D399', fontSize: '10.5px', fontWeight: 600 }}>
+                          ✓ 0% GST (Foreign Exempt)
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 
                 {/* 3. Insurance & VFS Partner */}
                 <div style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.28)', borderRadius: '10px', padding: '12px' }}>
-                  <div style={{ fontSize: '12px', fontWeight: 700, color: '#A7F3D0', marginBottom: '8px', display: 'flex', justifyContent: 'space-between' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: '#A7F3D0', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span>🛡️ Insurance &amp; VFS Partner</span>
                     {Number(formData.insurance_committed) > 0 && (
                       <span style={{ fontSize: '11px', color: '#FCD34D' }}>
-                        Due: ₹{Math.max(0, Number(formData.insurance_committed) - (Number(formData.insurance_paid) || 0)).toLocaleString('en-IN')}
+                        Due: {getCurrencySymbol(formData.insurance_currency || 'INR')}{Math.max(0, Number(formData.insurance_committed) - (Number(formData.insurance_paid) || 0)).toLocaleString()}
                       </span>
                     )}
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <div>
-                      <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>Insurance Partner</label>
-                      <input
-                        type="text"
-                        list="insurance-partners-datalist"
-                        name="insurance_agent"
-                        placeholder="e.g. VFS & Insurance"
-                        value={formData.insurance_agent}
-                        onChange={handleChange}
-                        style={{
-                          width: '100%',
-                          padding: '7px 10px',
-                          background: 'var(--bg3)',
-                          border: '1px solid var(--border)',
-                          borderRadius: '6px',
-                          color: '#fff',
-                          fontSize: '12px',
-                          outline: 'none',
-                        }}
-                      />
-                      <datalist id="insurance-partners-datalist">
-                        {KNOWN_INSURANCE_AGENTS.map((p) => (
-                          <option key={p} value={p} />
-                        ))}
-                      </datalist>
+                    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '8px' }}>
+                      <div>
+                        <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>Insurance Partner</label>
+                        <input
+                          type="text"
+                          list="insurance-partners-datalist"
+                          name="insurance_agent"
+                          placeholder="e.g. VFS & Insurance"
+                          value={formData.insurance_agent}
+                          onChange={handleChange}
+                          style={{
+                            width: '100%',
+                            padding: '7px 10px',
+                            background: 'var(--bg3)',
+                            border: '1px solid var(--border)',
+                            borderRadius: '6px',
+                            color: '#fff',
+                            fontSize: '12px',
+                            outline: 'none',
+                          }}
+                        />
+                        <datalist id="insurance-partners-datalist">
+                          {KNOWN_INSURANCE_AGENTS.map((p) => (
+                            <option key={p} value={p} />
+                          ))}
+                        </datalist>
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>Currency</label>
+                        <select
+                          name="insurance_currency"
+                          value={formData.insurance_currency || 'INR'}
+                          onChange={handleChange}
+                          style={{
+                            width: '100%',
+                            padding: '7px 8px',
+                            background: 'var(--bg3)',
+                            border: '1px solid var(--border)',
+                            borderRadius: '6px',
+                            color: '#fff',
+                            fontSize: '12px',
+                            outline: 'none',
+                          }}
+                        >
+                          {SUPPORTED_CURRENCIES.map((c) => (
+                            <option key={c.code} value={c.code}>{c.label}</option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                       <div>
-                        <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>Committed (₹)</label>
+                        <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>
+                          Committed ({getCurrencySymbol(formData.insurance_currency || 'INR')})
+                        </label>
                         <input
                           type="number"
                           min="0"
@@ -3109,7 +3258,9 @@ function AddStudentModal({
                         />
                       </div>
                       <div>
-                        <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>Paid (₹)</label>
+                        <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>
+                          Paid ({getCurrencySymbol(formData.insurance_currency || 'INR')})
+                        </label>
                         <input
                           type="number"
                           min="0"
@@ -3130,27 +3281,71 @@ function AddStudentModal({
                         />
                       </div>
                     </div>
-                  </div>
-
-                  {/* 4. University Commission Receivable */}
-                  <div style={{ background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.28)', borderRadius: '10px', padding: '12px' }}>
-                    <div style={{ fontSize: '12px', fontWeight: 700, color: '#BAE6FD', marginBottom: '8px', display: 'flex', justifyContent: 'space-between' }}>
-                      <span>🏛️ University Commission (Receivable)</span>
-                      {Number(formData.uni_commission_committed || formData.commission) > 0 && (
-                        <span style={{
-                          fontSize: '11px',
-                          fontWeight: 700,
-                          color: Math.max(0, Number(formData.uni_commission_committed || formData.commission || 0) - (Number(formData.uni_commission_received) || 0)) === 0 ? '#10B981' : '#FCD34D'
-                        }}>
-                          {Math.max(0, Number(formData.uni_commission_committed || formData.commission || 0) - (Number(formData.uni_commission_received) || 0)) === 0
-                            ? '✓ Fully Received'
-                            : `Receivable Due: ₹${Math.max(0, Number(formData.uni_commission_committed || formData.commission || 0) - (Number(formData.uni_commission_received) || 0)).toLocaleString('en-IN')}`}
+                    <div style={{ marginTop: '2px', fontSize: '11px' }}>
+                      {(!formData.insurance_currency || formData.insurance_currency === 'INR') ? (
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: '#A7F3D0' }}>
+                          <input
+                            type="checkbox"
+                            name="insurance_has_gst"
+                            checked={Boolean(formData.insurance_has_gst)}
+                            onChange={(e) => setFormData((prev) => ({ ...prev, insurance_has_gst: e.target.checked }))}
+                            style={{ accentColor: '#10B981', cursor: 'pointer' }}
+                          />
+                          <span>18% GST Applicable (Insurance)</span>
+                        </label>
+                      ) : (
+                        <span style={{ color: '#34D399', fontSize: '10.5px', fontWeight: 600 }}>
+                          ✓ 0% GST (Foreign Exempt)
                         </span>
                       )}
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  </div>
+                </div>
+
+                {/* 4. University Commission Receivable */}
+                <div style={{ background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.28)', borderRadius: '10px', padding: '12px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: '#BAE6FD', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>🏛️ University Commission (Receivable)</span>
+                    {Number(formData.uni_commission_committed || formData.commission) > 0 && (
+                      <span style={{
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        color: Math.max(0, Number(formData.uni_commission_committed || formData.commission || 0) - (Number(formData.uni_commission_received) || 0)) === 0 ? '#10B981' : '#FCD34D'
+                      }}>
+                        {Math.max(0, Number(formData.uni_commission_committed || formData.commission || 0) - (Number(formData.uni_commission_received) || 0)) === 0
+                          ? '✓ Fully Received'
+                          : `Receivable Due: ${getCurrencySymbol(formData.uni_commission_currency || 'EUR')}${Math.max(0, Number(formData.uni_commission_committed || formData.commission || 0) - (Number(formData.uni_commission_received) || 0)).toLocaleString()}`}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 2fr', gap: '8px' }}>
                       <div>
-                        <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>Commission Expected (₹)</label>
+                        <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>Currency</label>
+                        <select
+                          name="uni_commission_currency"
+                          value={formData.uni_commission_currency || 'EUR'}
+                          onChange={handleChange}
+                          style={{
+                            width: '100%',
+                            padding: '7px 8px',
+                            background: 'var(--bg3)',
+                            border: '1px solid var(--border)',
+                            borderRadius: '6px',
+                            color: '#fff',
+                            fontSize: '12px',
+                            outline: 'none',
+                          }}
+                        >
+                          {SUPPORTED_CURRENCIES.map((c) => (
+                            <option key={c.code} value={c.code}>{c.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>
+                          Expected ({getCurrencySymbol(formData.uni_commission_currency || 'EUR')})
+                        </label>
                         <input
                           type="number"
                           min="0"
@@ -3173,27 +3368,29 @@ function AddStudentModal({
                           }}
                         />
                       </div>
-                      <div>
-                        <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>Commission Received (₹)</label>
-                        <input
-                          type="number"
-                          min="0"
-                          name="uni_commission_received"
-                          placeholder="0"
-                          value={formData.uni_commission_received}
-                          onChange={handleChange}
-                          style={{
-                            width: '100%',
-                            padding: '7px 10px',
-                            background: 'var(--bg3)',
-                            border: '1px solid var(--border)',
-                            borderRadius: '6px',
-                            color: '#fff',
-                            fontSize: '12px',
-                            outline: 'none',
-                          }}
-                        />
-                      </div>
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>
+                        Received ({getCurrencySymbol(formData.uni_commission_currency || 'EUR')})
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        name="uni_commission_received"
+                        placeholder="0"
+                        value={formData.uni_commission_received}
+                        onChange={handleChange}
+                        style={{
+                          width: '100%',
+                          padding: '7px 10px',
+                          background: 'var(--bg3)',
+                          border: '1px solid var(--border)',
+                          borderRadius: '6px',
+                          color: '#fff',
+                          fontSize: '12px',
+                          outline: 'none',
+                        }}
+                      />
                     </div>
                   </div>
                 </div>
@@ -3629,17 +3826,17 @@ function StudentDetailModal({
                     <DetailItem label="Collected So Far" value={formatINR(student.collected)} highlight="var(--green)" />
                     <DetailItem
                       label="B2B Sub-Agent"
-                      value={agentMeta.b2b_agent_name ? `${agentMeta.b2b_agent_name} (${agentMeta.b2b_remaining > 0 ? `₹${agentMeta.b2b_remaining.toLocaleString('en-IN')} Due` : '✓ Paid'})` : '—'}
+                      value={agentMeta.b2b_agent_name ? `${agentMeta.b2b_agent_name} (${agentMeta.b2b_remaining > 0 ? `${formatPartnerMoney(agentMeta.b2b_remaining, agentMeta.b2b_currency)} Due` : '✓ Paid'})` : '—'}
                       highlight={agentMeta.b2b_remaining > 0 ? 'var(--amber)' : undefined}
                     />
                     <DetailItem
                       label="Apostille Partner"
-                      value={agentMeta.apostille_agent ? `${agentMeta.apostille_agent} (${agentMeta.apostille_remaining > 0 ? `₹${agentMeta.apostille_remaining.toLocaleString('en-IN')} Due` : '✓ Paid'})` : '—'}
+                      value={agentMeta.apostille_agent ? `${agentMeta.apostille_agent} (${agentMeta.apostille_remaining > 0 ? `${formatPartnerMoney(agentMeta.apostille_remaining, agentMeta.apostille_currency)} Due` : '✓ Paid'})` : '—'}
                       highlight={agentMeta.apostille_remaining > 0 ? 'var(--amber)' : undefined}
                     />
                     <DetailItem
                       label="Insurance / VFS"
-                      value={agentMeta.insurance_agent ? `${agentMeta.insurance_agent} (${agentMeta.insurance_remaining > 0 ? `₹${agentMeta.insurance_remaining.toLocaleString('en-IN')} Due` : '✓ Paid'})` : '—'}
+                      value={agentMeta.insurance_agent ? `${agentMeta.insurance_agent} (${agentMeta.insurance_remaining > 0 ? `${formatPartnerMoney(agentMeta.insurance_remaining, agentMeta.insurance_currency)} Due` : '✓ Paid'})` : '—'}
                       highlight={agentMeta.insurance_remaining > 0 ? 'var(--amber)' : undefined}
                     />
                   </div>
@@ -3759,33 +3956,50 @@ function StudentDetailModal({
                       </span>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '12px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px' }}>
                       {/* B2B Sub-Agent */}
                       <div style={{ background: 'rgba(99, 102, 241, 0.08)', border: '1px solid rgba(99, 102, 241, 0.28)', borderRadius: '10px', padding: '12px' }}>
-                        <div style={{ fontSize: '12px', fontWeight: 700, color: '#C7D2FE', marginBottom: '8px', display: 'flex', justifyContent: 'space-between' }}>
+                        <div style={{ fontSize: '12px', fontWeight: 700, color: '#C7D2FE', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <span>🤝 B2B Sub-Agent / Partner</span>
                           {Number(editFormData.b2b_committed) > 0 && (
                             <span style={{ fontSize: '11px', color: '#FCD34D' }}>
-                              Due: ₹{Math.max(0, Number(editFormData.b2b_committed) - (Number(editFormData.b2b_paid) || 0)).toLocaleString('en-IN')}
+                              Due: {getCurrencySymbol(editFormData.b2b_currency || 'INR')}{Math.max(0, Number(editFormData.b2b_committed) - (Number(editFormData.b2b_paid) || 0)).toLocaleString()}
                             </span>
                           )}
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                          <div>
-                            <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>Agent Name</label>
-                            <input
-                              type="text"
-                              list="b2b-partners-datalist"
-                              name="b2b_agent_name"
-                              placeholder="Select or type agent"
-                              value={editFormData.b2b_agent_name || ''}
-                              onChange={handleInputChange}
-                              style={{ width: '100%', padding: '7px 10px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '6px', color: '#fff', fontSize: '12px', outline: 'none' }}
-                            />
+                          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '8px' }}>
+                            <div>
+                              <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>Agent Name</label>
+                              <input
+                                type="text"
+                                list="b2b-partners-datalist"
+                                name="b2b_agent_name"
+                                placeholder="Select or type agent"
+                                value={editFormData.b2b_agent_name || ''}
+                                onChange={handleInputChange}
+                                style={{ width: '100%', padding: '7px 10px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '6px', color: '#fff', fontSize: '12px', outline: 'none' }}
+                              />
+                            </div>
+                            <div>
+                              <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>Currency</label>
+                              <select
+                                name="b2b_currency"
+                                value={editFormData.b2b_currency || 'INR'}
+                                onChange={handleInputChange}
+                                style={{ width: '100%', padding: '7px 8px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '6px', color: '#fff', fontSize: '12px', outline: 'none' }}
+                              >
+                                {SUPPORTED_CURRENCIES.map((c) => (
+                                  <option key={c.code} value={c.code}>{c.label}</option>
+                                ))}
+                              </select>
+                            </div>
                           </div>
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                             <div>
-                              <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>Committed (₹)</label>
+                              <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>
+                                Committed ({getCurrencySymbol(editFormData.b2b_currency || 'INR')})
+                              </label>
                               <input
                                 type="number"
                                 min="0"
@@ -3797,7 +4011,9 @@ function StudentDetailModal({
                               />
                             </div>
                             <div>
-                              <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>Paid (₹)</label>
+                              <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>
+                                Paid ({getCurrencySymbol(editFormData.b2b_currency || 'INR')})
+                              </label>
                               <input
                                 type="number"
                                 min="0"
@@ -3809,35 +4025,70 @@ function StudentDetailModal({
                               />
                             </div>
                           </div>
+                          <div style={{ marginTop: '2px', fontSize: '11px' }}>
+                            {(!editFormData.b2b_currency || editFormData.b2b_currency === 'INR') ? (
+                              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: '#C7D2FE' }}>
+                                <input
+                                  type="checkbox"
+                                  name="b2b_has_gst"
+                                  checked={editFormData.b2b_has_gst !== false}
+                                  onChange={(e) => setEditFormData((prev) => ({ ...prev, b2b_has_gst: e.target.checked }))}
+                                  style={{ accentColor: '#6366F1', cursor: 'pointer' }}
+                                />
+                                <span>18% GST Applicable (Indian Sub-Agent)</span>
+                              </label>
+                            ) : (
+                              <span style={{ color: '#34D399', fontSize: '10.5px', fontWeight: 600 }}>
+                                ✓ 0% GST (Foreign Export Remittance Exempt)
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
 
                       {/* Apostille (General Expense) */}
                       <div style={{ background: 'rgba(139, 92, 246, 0.08)', border: '1px solid rgba(139, 92, 246, 0.28)', borderRadius: '10px', padding: '12px' }}>
-                        <div style={{ fontSize: '12px', fontWeight: 700, color: '#DDD6FE', marginBottom: '8px', display: 'flex', justifyContent: 'space-between' }}>
+                        <div style={{ fontSize: '12px', fontWeight: 700, color: '#DDD6FE', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <span>📑 Apostille (General Expense)</span>
                           {Number(editFormData.apostille_committed) > 0 && (
                             <span style={{ fontSize: '11px', color: '#FCD34D' }}>
-                              Due: ₹{Math.max(0, Number(editFormData.apostille_committed) - (Number(editFormData.apostille_paid) || 0)).toLocaleString('en-IN')}
+                              Due: {getCurrencySymbol(editFormData.apostille_currency || 'INR')}{Math.max(0, Number(editFormData.apostille_committed) - (Number(editFormData.apostille_paid) || 0)).toLocaleString()}
                             </span>
                           )}
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                          <div>
-                            <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>Apostille Agent</label>
-                            <input
-                              type="text"
-                              list="apostille-partners-datalist"
-                              name="apostille_agent"
-                              placeholder="e.g. Comfort Travel"
-                              value={editFormData.apostille_agent || ''}
-                              onChange={handleInputChange}
-                              style={{ width: '100%', padding: '7px 10px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '6px', color: '#fff', fontSize: '12px', outline: 'none' }}
-                            />
+                          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '8px' }}>
+                            <div>
+                              <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>Apostille Agent</label>
+                              <input
+                                type="text"
+                                list="apostille-partners-datalist"
+                                name="apostille_agent"
+                                placeholder="e.g. Comfort Travel"
+                                value={editFormData.apostille_agent || ''}
+                                onChange={handleInputChange}
+                                style={{ width: '100%', padding: '7px 10px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '6px', color: '#fff', fontSize: '12px', outline: 'none' }}
+                              />
+                            </div>
+                            <div>
+                              <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>Currency</label>
+                              <select
+                                name="apostille_currency"
+                                value={editFormData.apostille_currency || 'INR'}
+                                onChange={handleInputChange}
+                                style={{ width: '100%', padding: '7px 8px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '6px', color: '#fff', fontSize: '12px', outline: 'none' }}
+                              >
+                                {SUPPORTED_CURRENCIES.map((c) => (
+                                  <option key={c.code} value={c.code}>{c.label}</option>
+                                ))}
+                              </select>
+                            </div>
                           </div>
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                             <div>
-                              <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>Committed (₹)</label>
+                              <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>
+                                Committed ({getCurrencySymbol(editFormData.apostille_currency || 'INR')})
+                              </label>
                               <input
                                 type="number"
                                 min="0"
@@ -3849,7 +4100,9 @@ function StudentDetailModal({
                               />
                             </div>
                             <div>
-                              <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>Paid (₹)</label>
+                              <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>
+                                Paid ({getCurrencySymbol(editFormData.apostille_currency || 'INR')})
+                              </label>
                               <input
                                 type="number"
                                 min="0"
@@ -3861,35 +4114,70 @@ function StudentDetailModal({
                               />
                             </div>
                           </div>
+                          <div style={{ marginTop: '2px', fontSize: '11px' }}>
+                            {(!editFormData.apostille_currency || editFormData.apostille_currency === 'INR') ? (
+                              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: '#DDD6FE' }}>
+                                <input
+                                  type="checkbox"
+                                  name="apostille_has_gst"
+                                  checked={Boolean(editFormData.apostille_has_gst)}
+                                  onChange={(e) => setEditFormData((prev) => ({ ...prev, apostille_has_gst: e.target.checked }))}
+                                  style={{ accentColor: '#8B5CF6', cursor: 'pointer' }}
+                                />
+                                <span>18% GST Applicable (Apostille)</span>
+                              </label>
+                            ) : (
+                              <span style={{ color: '#34D399', fontSize: '10.5px', fontWeight: 600 }}>
+                                ✓ 0% GST (Foreign Exempt)
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
 
                       {/* Insurance / VFS */}
                       <div style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.28)', borderRadius: '10px', padding: '12px' }}>
-                        <div style={{ fontSize: '12px', fontWeight: 700, color: '#A7F3D0', marginBottom: '8px', display: 'flex', justifyContent: 'space-between' }}>
+                        <div style={{ fontSize: '12px', fontWeight: 700, color: '#A7F3D0', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <span>🛡️ Insurance &amp; VFS Partner</span>
                           {Number(editFormData.insurance_committed) > 0 && (
                             <span style={{ fontSize: '11px', color: '#FCD34D' }}>
-                              Due: ₹{Math.max(0, Number(editFormData.insurance_committed) - (Number(editFormData.insurance_paid) || 0)).toLocaleString('en-IN')}
+                              Due: {getCurrencySymbol(editFormData.insurance_currency || 'INR')}{Math.max(0, Number(editFormData.insurance_committed) - (Number(editFormData.insurance_paid) || 0)).toLocaleString()}
                             </span>
                           )}
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                          <div>
-                            <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>Insurance Partner</label>
-                            <input
-                              type="text"
-                              list="insurance-partners-datalist"
-                              name="insurance_agent"
-                              placeholder="e.g. VFS & Insurance"
-                              value={editFormData.insurance_agent || ''}
-                              onChange={handleInputChange}
-                              style={{ width: '100%', padding: '7px 10px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '6px', color: '#fff', fontSize: '12px', outline: 'none' }}
-                            />
+                          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '8px' }}>
+                            <div>
+                              <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>Insurance Partner</label>
+                              <input
+                                type="text"
+                                list="insurance-partners-datalist"
+                                name="insurance_agent"
+                                placeholder="e.g. VFS & Insurance"
+                                value={editFormData.insurance_agent || ''}
+                                onChange={handleInputChange}
+                                style={{ width: '100%', padding: '7px 10px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '6px', color: '#fff', fontSize: '12px', outline: 'none' }}
+                              />
+                            </div>
+                            <div>
+                              <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>Currency</label>
+                              <select
+                                name="insurance_currency"
+                                value={editFormData.insurance_currency || 'INR'}
+                                onChange={handleInputChange}
+                                style={{ width: '100%', padding: '7px 8px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '6px', color: '#fff', fontSize: '12px', outline: 'none' }}
+                              >
+                                {SUPPORTED_CURRENCIES.map((c) => (
+                                  <option key={c.code} value={c.code}>{c.label}</option>
+                                ))}
+                              </select>
+                            </div>
                           </div>
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                             <div>
-                              <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>Committed (₹)</label>
+                              <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>
+                                Committed ({getCurrencySymbol(editFormData.insurance_currency || 'INR')})
+                              </label>
                               <input
                                 type="number"
                                 min="0"
@@ -3901,7 +4189,9 @@ function StudentDetailModal({
                               />
                             </div>
                             <div>
-                              <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>Paid (₹)</label>
+                              <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>
+                                Paid ({getCurrencySymbol(editFormData.insurance_currency || 'INR')})
+                              </label>
                               <input
                                 type="number"
                                 min="0"
@@ -3913,12 +4203,30 @@ function StudentDetailModal({
                               />
                             </div>
                           </div>
+                          <div style={{ marginTop: '2px', fontSize: '11px' }}>
+                            {(!editFormData.insurance_currency || editFormData.insurance_currency === 'INR') ? (
+                              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: '#A7F3D0' }}>
+                                <input
+                                  type="checkbox"
+                                  name="insurance_has_gst"
+                                  checked={Boolean(editFormData.insurance_has_gst)}
+                                  onChange={(e) => setEditFormData((prev) => ({ ...prev, insurance_has_gst: e.target.checked }))}
+                                  style={{ accentColor: '#10B981', cursor: 'pointer' }}
+                                />
+                                <span>18% GST Applicable (Insurance)</span>
+                              </label>
+                            ) : (
+                              <span style={{ color: '#34D399', fontSize: '10.5px', fontWeight: 600 }}>
+                                ✓ 0% GST (Foreign Exempt)
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
 
                       {/* 4. University Commission Receivable */}
                       <div style={{ background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.28)', borderRadius: '10px', padding: '12px' }}>
-                        <div style={{ fontSize: '12px', fontWeight: 700, color: '#BAE6FD', marginBottom: '8px', display: 'flex', justifyContent: 'space-between' }}>
+                        <div style={{ fontSize: '12px', fontWeight: 700, color: '#BAE6FD', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <span>🏛️ University Commission (Receivable)</span>
                           {Number(editFormData.uni_commission_committed !== undefined && editFormData.uni_commission_committed !== '' ? editFormData.uni_commission_committed : editFormData.commission) > 0 && (
                             <span style={{
@@ -3928,28 +4236,47 @@ function StudentDetailModal({
                             }}>
                               {Math.max(0, Number(editFormData.uni_commission_committed || editFormData.commission || 0) - (Number(editFormData.uni_commission_received) || 0)) === 0
                                 ? '✓ Fully Received'
-                                : `Receivable Due: ₹${Math.max(0, Number(editFormData.uni_commission_committed || editFormData.commission || 0) - (Number(editFormData.uni_commission_received) || 0)).toLocaleString('en-IN')}`}
+                                : `Receivable Due: ${getCurrencySymbol(editFormData.uni_commission_currency || 'EUR')}${Math.max(0, Number(editFormData.uni_commission_committed || editFormData.commission || 0) - (Number(editFormData.uni_commission_received) || 0)).toLocaleString()}`}
                             </span>
                           )}
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                          <div>
-                            <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>Commission Expected (₹)</label>
-                            <input
-                              type="number"
-                              min="0"
-                              name="uni_commission_committed"
-                              placeholder="0"
-                              value={editFormData.uni_commission_committed !== undefined ? editFormData.uni_commission_committed : (editFormData.commission || '')}
-                              onChange={(e) => {
-                                handleInputChange(e);
-                                setEditFormData((prev) => ({ ...prev, commission: e.target.value }));
-                              }}
-                              style={{ width: '100%', padding: '7px 10px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '6px', color: '#fff', fontSize: '12px', outline: 'none' }}
-                            />
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 2fr', gap: '8px' }}>
+                            <div>
+                              <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>Currency</label>
+                              <select
+                                name="uni_commission_currency"
+                                value={editFormData.uni_commission_currency || 'EUR'}
+                                onChange={handleInputChange}
+                                style={{ width: '100%', padding: '7px 8px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '6px', color: '#fff', fontSize: '12px', outline: 'none' }}
+                              >
+                                {SUPPORTED_CURRENCIES.map((c) => (
+                                  <option key={c.code} value={c.code}>{c.label}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <div>
+                              <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>
+                                Expected ({getCurrencySymbol(editFormData.uni_commission_currency || 'EUR')})
+                              </label>
+                              <input
+                                type="number"
+                                min="0"
+                                name="uni_commission_committed"
+                                placeholder="0"
+                                value={editFormData.uni_commission_committed !== undefined ? editFormData.uni_commission_committed : (editFormData.commission || '')}
+                                onChange={(e) => {
+                                  handleInputChange(e);
+                                  setEditFormData((prev) => ({ ...prev, commission: e.target.value }));
+                                }}
+                                style={{ width: '100%', padding: '7px 10px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '6px', color: '#fff', fontSize: '12px', outline: 'none' }}
+                              />
+                            </div>
                           </div>
                           <div>
-                            <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>Commission Received (₹)</label>
+                            <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>
+                              Received ({getCurrencySymbol(editFormData.uni_commission_currency || 'EUR')})
+                            </label>
                             <input
                               type="number"
                               min="0"
