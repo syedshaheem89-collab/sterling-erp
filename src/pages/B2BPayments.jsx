@@ -2774,7 +2774,7 @@ export default function B2BPayments({ setCurrentPage }) {
                       <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                         <button
                           className="btn-table-action"
-                          title={isCompleted ? "Download Official Payment Remittance Receipt (with PAID Seal)" : "Generate Payment Requisition Slip (for Director Approval)"}
+                          title={isCompleted ? "Download Official Payment Remittance Receipt (with PAID Seal)" : "Generate Payment Requisition Slip (for Accounts Clearance)"}
                           onClick={() => {
                             setDocModalPayment(payment);
                             setDocModalMode('b2b_receipt');
@@ -4689,6 +4689,11 @@ export default function B2BPayments({ setCurrentPage }) {
         initialMode={docModalMode}
         b2bPaymentData={docModalPayment}
         companyBanks={companyBanks}
+        onPaymentSettled={(settledPayment) => {
+          setPayments((prev) =>
+            prev.map((p) => (p.id === settledPayment.id ? { ...p, ...settledPayment } : p))
+          );
+        }}
       />
     </div>
   );

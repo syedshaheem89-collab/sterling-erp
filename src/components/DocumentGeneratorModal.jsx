@@ -74,15 +74,24 @@ export default function DocumentGeneratorModal({
   studentData = null,
   b2bPaymentData = null,
   companyBanks = STERLING_COMPANY_BANKS_DEFAULT,
+  onPaymentSettled = null,
 }) {
   const [mode, setMode] = useState(initialMode);
   const [studentDocType, setStudentDocType] = useState('invoice'); // 'invoice' | 'receipt'
   const [includeLetterheadBg, setIncludeLetterheadBg] = useState(true);
   const [showPaidSeal, setShowPaidSeal] = useState(false);
-  const [showEditDrawer, setShowEditDrawer] = useState(true);
+  const [showEditDrawer, setShowEditDrawer] = useState(false);
   const [erpStudentsList, setErpStudentsList] = useState([]);
   const [selectedStudentId, setSelectedStudentId] = useState('');
   const [studentSearchQuery, setStudentSearchQuery] = useState('');
+  const [showSettleInlineModal, setShowSettleInlineModal] = useState(false);
+  const [inlineSettlementData, setInlineSettlementData] = useState({
+    paying_bank_id: '',
+    settled_at: new Date().toISOString().split('T')[0],
+    payment_mode: 'Bank Transfer (IMPS / NEFT)',
+    utr_number: '',
+    notes: '',
+  });
   const printContainerRef = useRef(null);
 
   // --- 1. STUDENT DUBAI INVOICE / RECEIPT STATE (WIO Bank Abu Dhabi Template) ---
@@ -213,6 +222,7 @@ export default function DocumentGeneratorModal({
   // Handle B2B payment incoming prop
   useEffect(() => {
     if (b2bPaymentData) {
+      setShowEditDrawer(false);
       const isCompleted = b2bPaymentData.status === 'completed';
       const todayStr = new Date().toLocaleDateString('en-GB').replace(/\//g, '.');
       const settledStr = b2bPaymentData.settled_at 
@@ -247,6 +257,14 @@ export default function DocumentGeneratorModal({
         (b) => b.id === b2bPaymentData.paying_bank_id || b.bank_name.toLowerCase().includes((b2bPaymentData.payment_mode || '').toLowerCase())
       ) || companyBanks[0];
 
+      setInlineSettlementData({
+        paying_bank_id: matchedPayingBank.id,
+        settled_at: new Date().toISOString().split('T')[0],
+        payment_mode: b2bPaymentData.payment_mode || 'Bank Transfer (IMPS / NEFT)',
+        utr_number: b2bPaymentData.utr_number || '',
+        notes: '',
+      });
+
       setB2BReceipt({
         receiptNumber: `${prefix}-${new Date().getFullYear()}-${cleanRef}`,
         voucherDate: todayStr,
@@ -275,6 +293,129 @@ export default function DocumentGeneratorModal({
       setShowPaidSeal(isCompleted);
     }
   }, [b2bPaymentData, companyBanks]);
+
+  // Handle Mark as Paid settlement from inside Document Modal
+  const handleConfirmInlineSettlement = (e) => {
+    if (e) e.preventDefault();
+    if (!inlineSettlementData.utr_number.trim()) {
+      toast.error('Please enter the Bank UTR / Transaction Reference number');
+      return;
+    }
+
+    const chosenBank = companyBanks.find((b) => b.id === inlineSettlementData.paying_bank_id) || companyBanks[0];
+    const dateFormatted = inlineSettlementData.settled_at 
+      ? new Date(inlineSettlementData.settled_at).toLocaleDateString('en-GB').replace(/\//g, '.')
+      : new Date().toLocaleDateString('en-GB').replace(/\//g, '.');
+    const utr = inlineSettlementData.utr_number.trim();
+    const updatedDebitAcc = `${chosenBank.bank_name} A/C: ${chosenBank.account_number} (${chosenBank.branch})`;
+    const updatedReceiptNumber = b2bReceipt.receiptNumber.replace(/^REQ-/, 'REC-');
+
+    setB2BReceipt((prev) => ({
+      ...prev,
+      status: 'PAID',
+      receiptNumber: updatedReceiptNumber,
+      settledDate: dateFormatted,
+      paymentMode: inlineSettlementData.payment_mode,
+      utrNumber: utr,
+      selectedPayingBankId: chosenBank.id,
+      debitAccount: updatedDebitAcc,
+      remarks: inlineSettlementData.notes || 'Full payment settled and confirmed through electronic fund transfer.',
+    }));
+    setShowPaidSeal(true);
+    setShowSettleInlineModal(false);
+
+    // Persist to localStorage 'sterling_b2b_payments'
+    if (b2bPaymentData?.id) {
+      try {
+        const saved = localStorage.getItem('sterling_b2b_payments');
+        if (saved) {
+          const all = JSON.parse(saved);
+          const next = all.map((p) =>
+            p.id === b2bPaymentData.id
+              ? {
+                  ...p,
+                  status: 'completed',
+                  settled_at: inlineSettlementData.settled_at,
+                  payment_mode: inlineSettlementData.payment_mode,
+                  paying_bank_id: chosenBank.id,
+                  paying_bank_name: chosenBank.bank_name,
+                  debit_account: updatedDebitAcc,
+                  utr_number: utr,
+                  notes: inlineSettlementData.notes || p.notes,
+                }
+              : p
+          );
+          localStorage.setItem('sterling_b2b_payments', JSON.stringify(next));
+        }
+      } catch (err) {
+        console.error('Failed to sync payment settlement to localStorage', err);
+      }
+    }
+
+    if (onPaymentSettled) {
+      onPaymentSettled({
+        id: b2bPaymentData?.id,
+        status: 'completed',
+        settled_at: inlineSettlementData.settled_at,
+        payment_mode: inlineSettlementData.payment_mode,
+        paying_bank_id: chosenBank.id,
+        paying_bank_name: chosenBank.bank_name,
+        debit_account: updatedDebitAcc,
+        utr_number: utr,
+      });
+    }
+
+    toast.success('Payment marked as Settled! Official Paid Receipt generated.');
+  };
+
+  // Revert back to Pending Requisition
+  const handleRevertToPending = () => {
+    if (!window.confirm('Are you sure you want to revert this payment to Pending Requisition?')) return;
+
+    const revertedReceiptNumber = b2bReceipt.receiptNumber.replace(/^REC-/, 'REQ-');
+    setB2BReceipt((prev) => ({
+      ...prev,
+      status: 'PENDING_APPROVAL',
+      receiptNumber: revertedReceiptNumber,
+      settledDate: 'Pending Clearance',
+      utrNumber: 'Pending Bank Transfer',
+      remarks: 'Payment voucher submitted for Accounts verification & payout.',
+    }));
+    setShowPaidSeal(false);
+
+    if (b2bPaymentData?.id) {
+      try {
+        const saved = localStorage.getItem('sterling_b2b_payments');
+        if (saved) {
+          const all = JSON.parse(saved);
+          const next = all.map((p) =>
+            p.id === b2bPaymentData.id
+              ? {
+                  ...p,
+                  status: 'pending',
+                  settled_at: null,
+                  utr_number: '',
+                }
+              : p
+          );
+          localStorage.setItem('sterling_b2b_payments', JSON.stringify(next));
+        }
+      } catch (err) {
+        console.error('Failed to revert payment settlement in localStorage', err);
+      }
+    }
+
+    if (onPaymentSettled) {
+      onPaymentSettled({
+        id: b2bPaymentData?.id,
+        status: 'pending',
+        settled_at: null,
+        utr_number: '',
+      });
+    }
+
+    toast.success('Reverted payment to Pending Requisition.');
+  };
 
   if (!isOpen) return null;
 
@@ -720,68 +861,152 @@ export default function DocumentGeneratorModal({
             gap: '12px',
           }}
         >
-          {/* Left: Mode Switcher */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontSize: '20px' }}>📄</span>
-            <div style={{ display: 'inline-flex', background: 'rgba(255,255,255,0.06)', borderRadius: '8px', padding: '3px' }}>
-              <button
-                type="button"
-                onClick={() => setMode('dubai_invoice')}
-                style={{
-                  padding: '6px 14px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  fontSize: '12.5px',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  background: mode === 'dubai_invoice' ? '#4F46E5' : 'transparent',
-                  color: mode === 'dubai_invoice' ? '#fff' : '#94A3B8',
-                  transition: 'all 0.15s ease',
-                }}
-              >
-                🎓 Student Invoice &amp; Receipt
-              </button>
-              <button
-                type="button"
-                onClick={() => setMode('b2b_receipt')}
-                style={{
-                  padding: '6px 14px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  fontSize: '12.5px',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  background: mode === 'b2b_receipt' ? (b2bReceipt.status === 'PAID' ? '#059669' : '#D97706') : 'transparent',
-                  color: mode === 'b2b_receipt' ? '#fff' : '#94A3B8',
-                  transition: 'all 0.15s ease',
-                }}
-              >
-                🤝 {b2bReceipt.status === 'PAID' ? 'B2B Remittance Receipt (PAID)' : 'B2B Payment Requisition (Pending)'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setMode('university_commission')}
-                style={{
-                  padding: '6px 14px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  fontSize: '12.5px',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  background: mode === 'university_commission' ? '#2563EB' : 'transparent',
-                  color: mode === 'university_commission' ? '#fff' : '#94A3B8',
-                  transition: 'all 0.15s ease',
-                }}
-              >
-                🏛️ University Commission Claim
-              </button>
+          {/* Left: Mode Switcher or Clean B2B Header */}
+          {b2bPaymentData || mode === 'b2b_receipt' ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{ fontSize: '22px' }}>🤝</span>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontWeight: 800, fontSize: '15px', color: '#fff' }}>
+                    {b2bReceipt.status === 'PAID' ? 'B2B Remittance Receipt' : 'B2B Payment Requisition'}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: '11px',
+                      fontWeight: 800,
+                      padding: '2px 8px',
+                      borderRadius: '12px',
+                      background: b2bReceipt.status === 'PAID' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(245, 158, 11, 0.2)',
+                      color: b2bReceipt.status === 'PAID' ? '#34D399' : '#FBBF24',
+                      border: b2bReceipt.status === 'PAID' ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(245, 158, 11, 0.4)',
+                    }}
+                  >
+                    {b2bReceipt.status === 'PAID' ? '✓ SETTLED & PAID' : '⏳ PENDING CLEARANCE'}
+                  </span>
+                </div>
+                <div style={{ fontSize: '11px', color: '#94A3B8' }}>
+                  {b2bReceipt.partnerName} &bull; {b2bReceipt.receiptNumber}
+                </div>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{ fontSize: '20px' }}>📄</span>
+              <div style={{ display: 'inline-flex', background: 'rgba(255,255,255,0.06)', borderRadius: '8px', padding: '3px' }}>
+                <button
+                  type="button"
+                  onClick={() => setMode('dubai_invoice')}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    fontSize: '12.5px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    background: mode === 'dubai_invoice' ? '#4F46E5' : 'transparent',
+                    color: mode === 'dubai_invoice' ? '#fff' : '#94A3B8',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  🎓 Student Invoice &amp; Receipt
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMode('b2b_receipt')}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    fontSize: '12.5px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    background: mode === 'b2b_receipt' ? (b2bReceipt.status === 'PAID' ? '#059669' : '#D97706') : 'transparent',
+                    color: mode === 'b2b_receipt' ? '#fff' : '#94A3B8',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  🤝 {b2bReceipt.status === 'PAID' ? 'B2B Remittance Receipt (PAID)' : 'B2B Payment Requisition (Pending)'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMode('university_commission')}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    fontSize: '12.5px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    background: mode === 'university_commission' ? '#2563EB' : 'transparent',
+                    color: mode === 'university_commission' ? '#fff' : '#94A3B8',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  🏛️ University Commission Claim
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Right: Actions */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             
-            {/* 1. Letterhead Artwork vs Blank Paper Switcher */}
+            {/* Mark as Paid / Settle Action for B2B Payments */}
+            {mode === 'b2b_receipt' && (
+              b2bReceipt.status !== 'PAID' ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInlineSettlementData({
+                      paying_bank_id: b2bReceipt.selectedPayingBankId || companyBanks[0]?.id || '',
+                      settled_at: new Date().toISOString().split('T')[0],
+                      payment_mode: 'Bank Transfer (IMPS / NEFT)',
+                      utr_number: '',
+                      notes: '',
+                    });
+                    setShowSettleInlineModal(true);
+                  }}
+                  style={{
+                    background: 'linear-gradient(135deg, #059669 0%, #10B981 100%)',
+                    color: '#fff',
+                    border: 'none',
+                    padding: '7px 14px',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    boxShadow: '0 2px 10px rgba(16, 185, 129, 0.4)',
+                  }}
+                  title="Click once accounts pays to record UTR and generate the official PAID receipt"
+                >
+                  <span>💳</span>
+                  <span>Mark as Paid (Enter UTR)</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleRevertToPending}
+                  style={{
+                    background: 'rgba(239, 68, 68, 0.12)',
+                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                    color: '#F87171',
+                    padding: '6px 11px',
+                    borderRadius: '6px',
+                    fontSize: '11.5px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                  title="Revert back to Pending Requisition"
+                >
+                  ↩ Revert to Pending
+                </button>
+              )
+            )}
+
+            {/* Letterhead Artwork vs Blank Paper Switcher */}
             <div style={{ display: 'inline-flex', background: 'rgba(255,255,255,0.06)', borderRadius: '6px', padding: '2px' }}>
               <button
                 type="button"
@@ -798,7 +1023,7 @@ export default function DocumentGeneratorModal({
                   color: includeLetterheadBg ? '#818CF8' : '#94A3B8',
                 }}
               >
-                🎨 Letterhead Artwork
+                🎨 Letterhead
               </button>
               <button
                 type="button"
@@ -815,66 +1040,33 @@ export default function DocumentGeneratorModal({
                   color: !includeLetterheadBg ? '#fff' : '#94A3B8',
                 }}
               >
-                📄 Blank Paper Mode
+                📄 Plain Paper
               </button>
             </div>
 
-            {/* 2. Reset to Blank Template Button */}
-            <button
-              type="button"
-              onClick={() => {
-                if (mode === 'dubai_invoice') handleResetToBlankInvoice();
-                else if (mode === 'b2b_receipt') handleResetToBlankReceipt();
-                else handleResetToBlankUniversityInvoice();
-              }}
-              title="Clear all fields and start fresh with a blank document"
-              style={{
-                background: 'rgba(255,255,255,0.06)',
-                border: '1px solid rgba(255,255,255,0.15)',
-                color: '#CBD5E1',
-                padding: '6px 11px',
-                borderRadius: '6px',
-                fontSize: '12px',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-            >
-              ➕ Blank {mode === 'dubai_invoice' ? 'Student Doc' : mode === 'b2b_receipt' ? 'B2B Voucher' : 'Uni Invoice'}
-            </button>
-
-            {/* 3. Paid Seal Toggle for B2B Receipt */}
-            {mode === 'b2b_receipt' && (
-              <label
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  fontSize: '12px',
-                  color: '#CBD5E1',
-                  cursor: 'pointer',
-                  background: showPaidSeal ? 'rgba(5, 150, 105, 0.15)' : 'rgba(245, 158, 11, 0.15)',
-                  padding: '5px 10px',
-                  borderRadius: '6px',
-                  border: showPaidSeal ? '1px solid rgba(5, 150, 105, 0.3)' : '1px solid rgba(245, 158, 11, 0.3)',
+            {/* Reset to Blank Template Button (Only when in general creator mode, NOT viewing existing B2B payment) */}
+            {!b2bPaymentData && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (mode === 'dubai_invoice') handleResetToBlankInvoice();
+                  else if (mode === 'b2b_receipt') handleResetToBlankReceipt();
+                  else handleResetToBlankUniversityInvoice();
                 }}
-                title="Toggle official green PAID rubber seal stamp (Only when funds have actually cleared)"
+                title="Clear all fields and start fresh with a blank document"
+                style={{
+                  background: 'rgba(255,255,255,0.06)',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  color: '#CBD5E1',
+                  padding: '6px 11px',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
               >
-                <input
-                  type="checkbox"
-                  checked={showPaidSeal}
-                  onChange={(e) => {
-                    const checked = e.target.checked;
-                    setShowPaidSeal(checked);
-                    setB2BReceipt((prev) => ({
-                      ...prev,
-                      status: checked ? 'PAID' : 'PENDING_APPROVAL',
-                    }));
-                  }}
-                />
-                <span style={{ color: showPaidSeal ? '#34D399' : '#F59E0B', fontWeight: 700 }}>
-                  {showPaidSeal ? '★ PAID Seal (ON)' : '⏳ Pending (NO Seal)'}
-                </span>
-              </label>
+                ➕ Blank {mode === 'dubai_invoice' ? 'Student Doc' : mode === 'b2b_receipt' ? 'B2B Voucher' : 'Uni Invoice'}
+              </button>
             )}
 
             {/* 4. Toggle Edit Form */}
@@ -2464,6 +2656,210 @@ export default function DocumentGeneratorModal({
             </div>
           </div>
         </div>
+
+        {/* INLINE SETTLEMENT / MARK AS PAID MODAL */}
+        {showSettleInlineModal && (
+          <div
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(11, 15, 28, 0.85)',
+              backdropFilter: 'blur(5px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 99999,
+            }}
+            onClick={() => setShowSettleInlineModal(false)}
+          >
+            <div
+              style={{
+                background: '#131B2E',
+                border: '1px solid rgba(148, 163, 225, 0.3)',
+                borderRadius: '12px',
+                width: '480px',
+                maxWidth: '92vw',
+                padding: '24px',
+                color: '#fff',
+                boxShadow: '0 25px 60px rgba(0,0,0,0.7)',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h3 style={{ margin: 0, fontSize: '17px', fontWeight: 800, color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>💳</span>
+                  <span>Record Payment &amp; Mark as Paid</span>
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setShowSettleInlineModal(false)}
+                  style={{ background: 'none', border: 'none', color: '#94A3B8', fontSize: '18px', cursor: 'pointer' }}
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Amount & Beneficiary Summary Card */}
+              <div
+                style={{
+                  background: 'rgba(16, 185, 129, 0.1)',
+                  border: '1px solid rgba(16, 185, 129, 0.25)',
+                  borderRadius: '8px',
+                  padding: '12px 14px',
+                  marginBottom: '16px',
+                }}
+              >
+                <div style={{ color: '#94A3B8', fontSize: '11px', textTransform: 'uppercase', fontWeight: 700 }}>
+                  Total Net Disbursed Amount:
+                </div>
+                <div style={{ fontSize: '22px', fontWeight: 900, color: '#34D399', margin: '3px 0' }}>
+                  ₹{Number(b2bReceipt.totalDisbursed).toLocaleString('en-IN')} {b2bReceipt.currency}
+                </div>
+                <div style={{ color: '#E2E8F0', fontSize: '12px' }}>
+                  Beneficiary: <strong>{b2bReceipt.partnerName}</strong> ({b2bReceipt.studentNames || 'General'})
+                </div>
+              </div>
+
+              <form onSubmit={handleConfirmInlineSettlement}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', fontSize: '12.5px' }}>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: 700, color: '#CBD5E1' }}>
+                      Paid From Sterling Bank (Our Bank) *
+                    </label>
+                    <select
+                      value={inlineSettlementData.paying_bank_id}
+                      onChange={(e) => setInlineSettlementData({ ...inlineSettlementData, paying_bank_id: e.target.value })}
+                      style={{
+                        width: '100%',
+                        padding: '9px 12px',
+                        borderRadius: '6px',
+                        background: '#0B0F1C',
+                        border: '1px solid #2B3A5A',
+                        color: '#fff',
+                        fontSize: '13px',
+                        fontWeight: 600,
+                      }}
+                    >
+                      {companyBanks.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          🏦 {b.bank_name} &bull; {b.account_number} ({b.branch})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: 700, color: '#CBD5E1' }}>
+                      Bank UTR / Transaction Reference # *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. UTR49201948201 or IMPS / NEFT Ref"
+                      value={inlineSettlementData.utr_number}
+                      onChange={(e) => setInlineSettlementData({ ...inlineSettlementData, utr_number: e.target.value })}
+                      style={{
+                        width: '100%',
+                        padding: '9px 12px',
+                        borderRadius: '6px',
+                        background: '#0B0F1C',
+                        border: '1px solid #2B3A5A',
+                        color: '#fff',
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        fontFamily: 'monospace',
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '5px', fontWeight: 700, color: '#CBD5E1' }}>
+                        Payment Date
+                      </label>
+                      <input
+                        type="date"
+                        required
+                        value={inlineSettlementData.settled_at}
+                        onChange={(e) => setInlineSettlementData({ ...inlineSettlementData, settled_at: e.target.value })}
+                        style={{
+                          width: '100%',
+                          padding: '9px 12px',
+                          borderRadius: '6px',
+                          background: '#0B0F1C',
+                          border: '1px solid #2B3A5A',
+                          color: '#fff',
+                          fontSize: '13px',
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '5px', fontWeight: 700, color: '#CBD5E1' }}>
+                        Transfer Mode
+                      </label>
+                      <select
+                        value={inlineSettlementData.payment_mode}
+                        onChange={(e) => setInlineSettlementData({ ...inlineSettlementData, payment_mode: e.target.value })}
+                        style={{
+                          width: '100%',
+                          padding: '9px 12px',
+                          borderRadius: '6px',
+                          background: '#0B0F1C',
+                          border: '1px solid #2B3A5A',
+                          color: '#fff',
+                          fontSize: '13px',
+                        }}
+                      >
+                        <option value="Bank Transfer (IMPS / NEFT)">Bank Transfer (IMPS / NEFT)</option>
+                        <option value="UPI / GPay">UPI / GPay</option>
+                        <option value="Forex Wire / Wise">Forex Wire / Wise</option>
+                        <option value="Direct Transfer">Direct Transfer</option>
+                        <option value="Cash">Cash</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '22px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowSettleInlineModal(false)}
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: '6px',
+                      background: 'transparent',
+                      border: '1px solid #475569',
+                      color: '#94A3B8',
+                      fontSize: '13px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    style={{
+                      padding: '8px 18px',
+                      borderRadius: '6px',
+                      background: '#10B981',
+                      border: 'none',
+                      color: '#fff',
+                      fontSize: '13px',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      boxShadow: '0 4px 12px rgba(16, 185, 129, 0.4)',
+                    }}
+                  >
+                    ✓ Confirm &amp; Generate Paid Receipt
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
