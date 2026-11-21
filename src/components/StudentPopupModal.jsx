@@ -76,6 +76,8 @@ export default function StudentPopupModal({
       insurance_agent: meta.insurance_agent || '',
       insurance_committed: meta.insurance_committed || '',
       insurance_paid: meta.insurance_paid || '',
+      uni_commission_committed: meta.uni_commission_committed || selectedStudent.commission || '',
+      uni_commission_received: meta.uni_commission_received || '',
       notes: selectedStudent.notes || '',
     });
     setIsEditingStudent(true);
@@ -89,6 +91,11 @@ export default function StudentPopupModal({
       const otherExpense = Number(editStudentData.apostille_paid || editStudentData.apostille_committed || 0) +
                            Number(editStudentData.insurance_paid || editStudentData.insurance_committed || 0);
 
+      const commExpected = Number(editStudentData.uni_commission_committed !== undefined && editStudentData.uni_commission_committed !== ''
+        ? editStudentData.uni_commission_committed
+        : (editStudentData.commission || 0));
+      const commReceived = Number(editStudentData.uni_commission_received || 0);
+
       const agentMeta = {
         b2b_agent_name: editStudentData.b2b_agent_name || '',
         b2b_committed: Number(editStudentData.b2b_committed || 0),
@@ -99,6 +106,9 @@ export default function StudentPopupModal({
         insurance_agent: editStudentData.insurance_agent || '',
         insurance_committed: Number(editStudentData.insurance_committed || 0),
         insurance_paid: Number(editStudentData.insurance_paid || 0),
+        uni_commission_committed: commExpected,
+        uni_commission_received: commReceived,
+        uni_commission_remaining: Math.max(0, commExpected - commReceived),
       };
 
       const finalNotes = saveStudentAgentMeta(
@@ -117,7 +127,7 @@ export default function StudentPopupModal({
         team_lead: editStudentData.team_lead || null,
         counselor_name: editStudentData.counselor_name || null,
         committed: Number(editStudentData.committed || 0),
-        commission: Number(editStudentData.commission || 0),
+        commission: commExpected,
         b2b_charge: b2bCharge,
         other_expense: otherExpense,
         notes: finalNotes,
@@ -1040,7 +1050,7 @@ export default function StudentPopupModal({
                     </div>
 
                     {/* 3. Insurance Partner */}
-                    <div style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.28)', borderRadius: '8px', padding: '10px' }}>
+                    <div style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.28)', borderRadius: '8px', padding: '10px', marginBottom: '8px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                         <span style={{ fontSize: '11px', fontWeight: 700, color: '#A7F3D0' }}>🛡️ Insurance / VFS Partner</span>
                         {Number(editStudentData.insurance_committed) > 0 && (
@@ -1082,6 +1092,46 @@ export default function StudentPopupModal({
                             type="number"
                             value={editStudentData.insurance_paid || ''}
                             onChange={(e) => setEditStudentData({ ...editStudentData, insurance_paid: e.target.value })}
+                            placeholder="0"
+                            style={{ width: '100%', padding: '5px 7px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 4. University Commission Receivable */}
+                    <div style={{ background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.28)', borderRadius: '8px', padding: '10px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <span style={{ fontSize: '11px', fontWeight: 700, color: '#BAE6FD' }}>🏛️ University Commission (Receivable)</span>
+                        {Number(editStudentData.uni_commission_committed !== undefined && editStudentData.uni_commission_committed !== '' ? editStudentData.uni_commission_committed : editStudentData.commission) > 0 && (
+                          <span style={{
+                            fontSize: '10.5px',
+                            fontWeight: 700,
+                            color: Math.max(0, Number(editStudentData.uni_commission_committed || editStudentData.commission || 0) - (Number(editStudentData.uni_commission_received) || 0)) === 0 ? '#10B981' : '#FCD34D'
+                          }}>
+                            {Math.max(0, Number(editStudentData.uni_commission_committed || editStudentData.commission || 0) - (Number(editStudentData.uni_commission_received) || 0)) === 0
+                              ? '✓ Fully Received'
+                              : `Receivable Due: ₹${Math.max(0, Number(editStudentData.uni_commission_committed || editStudentData.commission || 0) - (Number(editStudentData.uni_commission_received) || 0)).toLocaleString('en-IN')}`}
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                        <div>
+                          <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Commission Expected (₹)</label>
+                          <input
+                            type="number"
+                            value={editStudentData.uni_commission_committed !== undefined && editStudentData.uni_commission_committed !== '' ? editStudentData.uni_commission_committed : (editStudentData.commission || '')}
+                            onChange={(e) => setEditStudentData({ ...editStudentData, uni_commission_committed: e.target.value, commission: e.target.value })}
+                            placeholder="0"
+                            style={{ width: '100%', padding: '5px 7px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '10px', color: '#8E9BB5', display: 'block', marginBottom: '2px' }}>Commission Received (₹)</label>
+                          <input
+                            type="number"
+                            value={editStudentData.uni_commission_received || ''}
+                            onChange={(e) => setEditStudentData({ ...editStudentData, uni_commission_received: e.target.value })}
                             placeholder="0"
                             style={{ width: '100%', padding: '5px 7px', fontSize: '11px', borderRadius: '4px', border: '1px solid #475569', background: '#0F172A', color: '#fff' }}
                           />
@@ -1373,11 +1423,11 @@ export default function StudentPopupModal({
                 </div>
               </div>
 
-              {/* Partner Dues & Vendors (B2B, Apostille, Insurance) */}
-              {(agentMeta.b2b_agent_name || agentMeta.apostille_agent || agentMeta.insurance_agent) && (
+              {/* Partner Dues & Vendors (B2B, Apostille, Insurance, Uni Commission) */}
+              {(agentMeta.b2b_agent_name || agentMeta.apostille_agent || agentMeta.insurance_agent || Number(agentMeta.uni_commission_committed || selectedStudent.commission || 0) > 0 || Number(agentMeta.uni_commission_received || 0) > 0) && (
                 <div>
                   <div style={{ fontSize: '12px', fontWeight: 800, color: '#fff', marginBottom: '8px' }}>
-                    Partner Dues &amp; Vendors
+                    Partner Dues &amp; Institutional Commission
                   </div>
 
                   <div
@@ -1438,6 +1488,25 @@ export default function StudentPopupModal({
                             <div style={{ color: '#FFB020', fontSize: '10.5px', fontWeight: 600 }}>
                               Due: ₹{Math.max(0, Number(agentMeta.insurance_committed || 0) - Number(agentMeta.insurance_paid || 0)).toLocaleString('en-IN')}
                             </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {(Number(agentMeta.uni_commission_committed || selectedStudent.commission || 0) > 0 || Number(agentMeta.uni_commission_received || 0) > 0) && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(148, 163, 225, 0.08)', paddingTop: '7px' }}>
+                        <div>
+                          <div style={{ color: '#fff', fontWeight: 600 }}>{selectedStudent.university || 'Partner University'}</div>
+                          <div style={{ color: '#38BDF8', fontSize: '10px', fontWeight: 700 }}>🏛️ University Commission (Receivable)</div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <span style={{ color: '#00E5A0', fontWeight: 700 }}>₹{Number(agentMeta.uni_commission_received || 0).toLocaleString('en-IN')}</span>
+                          {Math.max(0, Number(agentMeta.uni_commission_committed || selectedStudent.commission || 0) - Number(agentMeta.uni_commission_received || 0)) > 0 ? (
+                            <div style={{ color: '#38BDF8', fontSize: '10.5px', fontWeight: 600 }}>
+                              Due: ₹{Math.max(0, Number(agentMeta.uni_commission_committed || selectedStudent.commission || 0) - Number(agentMeta.uni_commission_received || 0)).toLocaleString('en-IN')}
+                            </div>
+                          ) : (
+                            <div style={{ color: '#00E5A0', fontSize: '10px', fontWeight: 700 }}>✓ Settled</div>
                           )}
                         </div>
                       </div>

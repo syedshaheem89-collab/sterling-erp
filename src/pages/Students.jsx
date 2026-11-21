@@ -871,6 +871,8 @@ export default function Students({ setCurrentPage, initialFilter } = {}) {
       insurance_agent: agentMeta.insurance_agent || '',
       insurance_committed: agentMeta.insurance_committed || '',
       insurance_paid: agentMeta.insurance_paid || '',
+      uni_commission_committed: agentMeta.uni_commission_committed || student.commission || '',
+      uni_commission_received: agentMeta.uni_commission_received || '',
     });
     setIsEditingDetails(startInEdit);
     setDetailTab(initialTab);
@@ -885,6 +887,11 @@ export default function Students({ setCurrentPage, initialFilter } = {}) {
       const otherExpense = Number(editFormData.apostille_paid || editFormData.apostille_committed || 0) +
                            Number(editFormData.insurance_paid || editFormData.insurance_committed || 0);
 
+      const commExpected = Number(editFormData.uni_commission_committed !== undefined && editFormData.uni_commission_committed !== ''
+        ? editFormData.uni_commission_committed
+        : (editFormData.commission || 0));
+      const commReceived = Number(editFormData.uni_commission_received || 0);
+
       const agentMeta = {
         b2b_agent_name: editFormData.b2b_agent_name || '',
         b2b_committed: Number(editFormData.b2b_committed || 0),
@@ -895,6 +902,9 @@ export default function Students({ setCurrentPage, initialFilter } = {}) {
         insurance_agent: editFormData.insurance_agent || '',
         insurance_committed: Number(editFormData.insurance_committed || 0),
         insurance_paid: Number(editFormData.insurance_paid || 0),
+        uni_commission_committed: commExpected,
+        uni_commission_received: commReceived,
+        uni_commission_remaining: Math.max(0, commExpected - commReceived),
       };
 
       const finalNotes = saveStudentAgentMeta(
@@ -917,7 +927,7 @@ export default function Students({ setCurrentPage, initialFilter } = {}) {
         pay_stage: editFormData.pay_stage,
         committed: Number(editFormData.committed || 0),
         b2b_charge: b2bCharge,
-        commission: Number(editFormData.commission || 0),
+        commission: commExpected,
         incentive_student: Number(editFormData.incentive_student || 0),
         incentive_company: Number(editFormData.incentive_company || 0),
         refund: Number(editFormData.refund || 0),
@@ -2213,6 +2223,8 @@ function AddStudentModal({
     insurance_agent: '',
     insurance_committed: '',
     insurance_paid: '',
+    uni_commission_committed: '',
+    uni_commission_received: '',
     // Optional first payment
     hasFirstPayment: false,
     firstPaymentBank: '',
@@ -2254,6 +2266,11 @@ function AddStudentModal({
       const otherExpense = Number(formData.apostille_paid || formData.apostille_committed || 0) +
                            Number(formData.insurance_paid || formData.insurance_committed || 0);
 
+      const commExpected = Number(formData.uni_commission_committed !== undefined && formData.uni_commission_committed !== ''
+        ? formData.uni_commission_committed
+        : (formData.commission || 0));
+      const commReceived = Number(formData.uni_commission_received || 0);
+
       const agentMeta = {
         b2b_agent_name: formData.b2b_agent_name || '',
         b2b_committed: Number(formData.b2b_committed || 0),
@@ -2264,6 +2281,9 @@ function AddStudentModal({
         insurance_agent: formData.insurance_agent || '',
         insurance_committed: Number(formData.insurance_committed || 0),
         insurance_paid: Number(formData.insurance_paid || 0),
+        uni_commission_committed: commExpected,
+        uni_commission_received: commReceived,
+        uni_commission_remaining: Math.max(0, commExpected - commReceived),
       };
 
       const finalNotes = saveStudentAgentMeta(null, formData.name, agentMeta, formData.notes);
@@ -2285,7 +2305,7 @@ function AddStudentModal({
         pay_stage: formData.pay_stage,
         committed: Number(formData.committed || 0),
         b2b_charge: b2bCharge,
-        commission: Number(formData.commission || 0),
+        commission: commExpected,
         incentive_student: Number(formData.incentive_student || 0),
         incentive_company: Number(formData.incentive_company || 0),
         refund: Number(formData.refund || 0),
@@ -3111,6 +3131,71 @@ function AddStudentModal({
                       </div>
                     </div>
                   </div>
+
+                  {/* 4. University Commission Receivable */}
+                  <div style={{ background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.28)', borderRadius: '10px', padding: '12px' }}>
+                    <div style={{ fontSize: '12px', fontWeight: 700, color: '#BAE6FD', marginBottom: '8px', display: 'flex', justifyContent: 'space-between' }}>
+                      <span>🏛️ University Commission (Receivable)</span>
+                      {Number(formData.uni_commission_committed || formData.commission) > 0 && (
+                        <span style={{
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          color: Math.max(0, Number(formData.uni_commission_committed || formData.commission || 0) - (Number(formData.uni_commission_received) || 0)) === 0 ? '#10B981' : '#FCD34D'
+                        }}>
+                          {Math.max(0, Number(formData.uni_commission_committed || formData.commission || 0) - (Number(formData.uni_commission_received) || 0)) === 0
+                            ? '✓ Fully Received'
+                            : `Receivable Due: ₹${Math.max(0, Number(formData.uni_commission_committed || formData.commission || 0) - (Number(formData.uni_commission_received) || 0)).toLocaleString('en-IN')}`}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                      <div>
+                        <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>Commission Expected (₹)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          name="uni_commission_committed"
+                          placeholder="0"
+                          value={formData.uni_commission_committed}
+                          onChange={(e) => {
+                            handleChange(e);
+                            setFormData((prev) => ({ ...prev, commission: e.target.value }));
+                          }}
+                          style={{
+                            width: '100%',
+                            padding: '7px 10px',
+                            background: 'var(--bg3)',
+                            border: '1px solid var(--border)',
+                            borderRadius: '6px',
+                            color: '#fff',
+                            fontSize: '12px',
+                            outline: 'none',
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>Commission Received (₹)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          name="uni_commission_received"
+                          placeholder="0"
+                          value={formData.uni_commission_received}
+                          onChange={handleChange}
+                          style={{
+                            width: '100%',
+                            padding: '7px 10px',
+                            background: 'var(--bg3)',
+                            border: '1px solid var(--border)',
+                            borderRadius: '6px',
+                            color: '#fff',
+                            fontSize: '12px',
+                            outline: 'none',
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -3827,6 +3912,53 @@ function StudentDetailModal({
                                 style={{ width: '100%', padding: '7px 10px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '6px', color: '#fff', fontSize: '12px', outline: 'none' }}
                               />
                             </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 4. University Commission Receivable */}
+                      <div style={{ background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.28)', borderRadius: '10px', padding: '12px' }}>
+                        <div style={{ fontSize: '12px', fontWeight: 700, color: '#BAE6FD', marginBottom: '8px', display: 'flex', justifyContent: 'space-between' }}>
+                          <span>🏛️ University Commission (Receivable)</span>
+                          {Number(editFormData.uni_commission_committed !== undefined && editFormData.uni_commission_committed !== '' ? editFormData.uni_commission_committed : editFormData.commission) > 0 && (
+                            <span style={{
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              color: Math.max(0, Number(editFormData.uni_commission_committed || editFormData.commission || 0) - (Number(editFormData.uni_commission_received) || 0)) === 0 ? '#10B981' : '#FCD34D'
+                            }}>
+                              {Math.max(0, Number(editFormData.uni_commission_committed || editFormData.commission || 0) - (Number(editFormData.uni_commission_received) || 0)) === 0
+                                ? '✓ Fully Received'
+                                : `Receivable Due: ₹${Math.max(0, Number(editFormData.uni_commission_committed || editFormData.commission || 0) - (Number(editFormData.uni_commission_received) || 0)).toLocaleString('en-IN')}`}
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                          <div>
+                            <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>Commission Expected (₹)</label>
+                            <input
+                              type="number"
+                              min="0"
+                              name="uni_commission_committed"
+                              placeholder="0"
+                              value={editFormData.uni_commission_committed !== undefined ? editFormData.uni_commission_committed : (editFormData.commission || '')}
+                              onChange={(e) => {
+                                handleInputChange(e);
+                                setEditFormData((prev) => ({ ...prev, commission: e.target.value }));
+                              }}
+                              style={{ width: '100%', padding: '7px 10px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '6px', color: '#fff', fontSize: '12px', outline: 'none' }}
+                            />
+                          </div>
+                          <div>
+                            <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>Commission Received (₹)</label>
+                            <input
+                              type="number"
+                              min="0"
+                              name="uni_commission_received"
+                              placeholder="0"
+                              value={editFormData.uni_commission_received || ''}
+                              onChange={handleInputChange}
+                              style={{ width: '100%', padding: '7px 10px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '6px', color: '#fff', fontSize: '12px', outline: 'none' }}
+                            />
                           </div>
                         </div>
                       </div>

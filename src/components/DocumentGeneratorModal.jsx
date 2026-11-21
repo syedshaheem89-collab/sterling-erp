@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
 import { supabase } from '../supabase';
-import { parseTransferAccountDetails, numberToWordsINR } from '../utils/studentAgentHelper';
+import { parseTransferAccountDetails, numberToWordsINR, getStudentAgentMeta, saveStudentAgentMeta } from '../utils/studentAgentHelper';
 
 /**
  * DocumentGeneratorModal
@@ -478,10 +478,14 @@ export default function DocumentGeneratorModal({
     }));
 
     // Also auto-populate University Commission Claim Invoice for this student
+    const meta = getStudentAgentMeta(stu);
     const uniFee = Number(stu.tuition_fee || stu.tuition || 5400);
     const commRate = 15;
-    const commAmt = Math.round((uniFee * commRate) / 100);
+    const existingComm = Number(meta.uni_commission_committed || stu.commission || 0);
+    const commAmt = existingComm > 0 ? existingComm : Math.round((uniFee * commRate) / 100);
     const uniName = stu.university || stu.college || (stu.country === 'Malta' ? 'MCAST - Malta College of Arts, Science & Technology' : 'Partner European University');
+    const isAlreadyReceived = Number(meta.uni_commission_received || 0) >= commAmt && commAmt > 0;
+
     setUniversityInvoice((prev) => ({
       ...prev,
       invoiceNumber: `INV-UNI-${new Date().getFullYear()}-${String(stu.id || Math.floor(100 + Math.random() * 900)).padStart(3, '0')}`,
@@ -494,9 +498,51 @@ export default function DocumentGeneratorModal({
       commissionPercent: commRate,
       commissionAmount: commAmt,
       currency: feeCurr,
+      isReceived: isAlreadyReceived,
+      receivedAmount: Number(meta.uni_commission_received || 0),
     }));
 
     toast.success(`Loaded details for ${stu.name}`);
+  };
+
+  // Mark university commission as received and connect directly to student application
+  const handleMarkCommissionReceived = async () => {
+    if (!selectedStudentId) {
+      toast.error('Please pick a student to link this commission claim to');
+      return;
+    }
+    const matched = erpStudentsList.find((s) => String(s.id) === String(selectedStudentId));
+    const sName = matched?.name || universityInvoice.studentName || 'Student';
+    const amountToReceive = Number(universityInvoice.commissionAmount || 0);
+
+    try {
+      const meta = getStudentAgentMeta(matched || { id: selectedStudentId, name: sName });
+      meta.uni_commission_committed = Math.max(Number(meta.uni_commission_committed || 0), amountToReceive);
+      meta.uni_commission_received = amountToReceive;
+      meta.uni_commission_remaining = Math.max(0, meta.uni_commission_committed - meta.uni_commission_received);
+
+      const finalNotes = saveStudentAgentMeta(selectedStudentId, sName, meta, matched?.notes || '');
+
+      await supabase
+        .from('students')
+        .update({
+          commission: amountToReceive,
+          notes: finalNotes,
+        })
+        .eq('id', selectedStudentId);
+
+      setUniversityInvoice((prev) => ({
+        ...prev,
+        isReceived: true,
+        receivedAmount: amountToReceive,
+      }));
+
+      toast.success(`✓ Commission of ${universityInvoice.currency} ${amountToReceive.toLocaleString('en-IN')} marked as received for ${sName}!`);
+      if (onPaymentSettled) onPaymentSettled();
+    } catch (e) {
+      console.error('Error marking university commission received', e);
+      toast.error('Could not update commission status');
+    }
   };
 
   // Reset to a 100% Blank Invoice for manual billing
@@ -1186,7 +1232,7 @@ export default function DocumentGeneratorModal({
               </div>
 
               {/* MODE 1: STUDENT DUBAI INVOICE / RECEIPT CONTROLS */}
-              {mode === 'dubai_invoice' ? (
+              {mode === 'dubai_invoice' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   
                   {/* Select Student from ERP Dropdown */}
@@ -1406,8 +1452,10 @@ export default function DocumentGeneratorModal({
                     />
                   </div>
                 </div>
-              ) : (
-                /* MODE 2: B2B REMITTANCE RECEIPT EDIT FORM */
+              )}
+
+              {/* MODE 2: B2B REMITTANCE RECEIPT EDIT FORM */}
+              {mode === 'b2b_receipt' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   
                   {/* SELECT WHICH OF STERLING'S 4+ BANKS PAID THE MONEY */}
@@ -1586,6 +1634,89 @@ export default function DocumentGeneratorModal({
                       University Commission Claim
                     </span>
                     <span style={{ fontSize: '11px', color: '#94A3B8' }}>Billed to Partner University</span>
+                  </div>
+
+                  {/* Pick Existing Student from ERP */}
+                  <div style={{ background: 'rgba(59, 130, 246, 0.08)', border: '1px solid rgba(59, 130, 246, 0.25)', borderRadius: '6px', padding: '10px' }}>
+                    <label style={{ display: 'block', color: '#93C5FD', fontSize: '11px', marginBottom: '4px', fontWeight: 700 }}>
+                      ⚡ Pick Existing Student from ERP:
+                    </label>
+                    <select
+                      value={selectedStudentId}
+                      onChange={(e) => {
+                        const sId = e.target.value;
+                        setSelectedStudentId(sId);
+                        if (sId) {
+                          const match = erpStudentsList.find((s) => String(s.id) === String(sId));
+                          if (match) applyStudentToInvoice(match);
+                        }
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '7px 10px',
+                        borderRadius: '4px',
+                        background: '#0B1120',
+                        border: '1px solid #3B82F6',
+                        color: '#60A5FA',
+                        fontWeight: 600,
+                        fontSize: '12px',
+                        outline: 'none',
+                        marginBottom: '8px',
+                      }}
+                    >
+                      <option value="">-- Choose Student to Auto-fill &amp; Link --</option>
+                      {erpStudentsList.map((stu) => (
+                        <option key={stu.id} value={stu.id}>
+                          {stu.name} {stu.country ? `(${stu.country})` : ''} - {stu.university || 'Uni'}
+                        </option>
+                      ))}
+                    </select>
+
+                    {/* Student Commission Link Status & Direct Mark Received Action */}
+                    {selectedStudentId && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px' }}>
+                          <span style={{ color: '#94A3B8' }}>Commission Status:</span>
+                          {universityInvoice.isReceived ? (
+                            <span style={{ color: '#10B981', fontWeight: 800 }}>✓ Fully Received</span>
+                          ) : (
+                            <span style={{ color: '#F59E0B', fontWeight: 800 }}>
+                              ⏳ Due: {universityInvoice.currency} {Number(universityInvoice.commissionAmount).toLocaleString('en-IN')}
+                            </span>
+                          )}
+                        </div>
+
+                        {!universityInvoice.isReceived ? (
+                          <button
+                            type="button"
+                            onClick={handleMarkCommissionReceived}
+                            style={{
+                              width: '100%',
+                              padding: '7px 10px',
+                              borderRadius: '6px',
+                              background: 'linear-gradient(135deg, #10B981, #059669)',
+                              border: 'none',
+                              color: '#fff',
+                              fontSize: '11.5px',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '6px',
+                              boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)',
+                            }}
+                          >
+                            <span>💳</span>
+                            <span>Mark Commission as Received</span>
+                          </button>
+                        ) : (
+                          <div style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.3)', color: '#34D399', padding: '5px 8px', borderRadius: '4px', fontSize: '10.5px', textAlign: 'center', fontWeight: 700 }}>
+                            ✓ Connected to Student Application &amp; Settled
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   <div>
@@ -2496,19 +2627,63 @@ export default function DocumentGeneratorModal({
                 {/* ======================================================== */}
                 {mode === 'university_commission' && (
                   <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between', position: 'relative' }}>
+                    
+                    {/* COMMISSION RECEIVED RUBBER STAMP SEAL */}
+                    {universityInvoice.isReceived && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: '35%',
+                          right: '10%',
+                          transform: 'rotate(-16deg)',
+                          border: '4px dashed #059669',
+                          color: '#059669',
+                          padding: '10px 22px',
+                          borderRadius: '8px',
+                          fontSize: '18px',
+                          fontWeight: 900,
+                          letterSpacing: '1.5px',
+                          pointerEvents: 'none',
+                          opacity: 0.88,
+                          textAlign: 'center',
+                          textTransform: 'uppercase',
+                          zIndex: 10,
+                          boxShadow: '0 0 0 2px rgba(5, 150, 105, 0.15)',
+                        }}
+                      >
+                        ★ COMMISSION RECEIVED ★
+                        <div style={{ fontSize: '10.5px', fontWeight: 800, marginTop: '2px', letterSpacing: '1px' }}>
+                          SETTLED TO STERLING
+                        </div>
+                      </div>
+                    )}
+
                     <div>
-                      {/* Top Entity & Title */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
+                      {/* Top Entity & Title (Hides duplicate company name when letterhead is active) */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '18px' }}>
                         <div>
-                          <div style={{ fontWeight: 900, fontSize: '16px', color: '#000000' }}>
-                            Sterling Study Abroad &amp; Overseas Consultancy LLC
-                          </div>
-                          <div style={{ fontSize: '11px', color: '#000000', fontWeight: 700 }}>
-                            Global University Partnerships &amp; Recruitment Division
-                          </div>
-                          <div style={{ fontSize: '10px', color: '#000000', marginTop: '2px' }}>
-                            Etihad Airways Centre 5th Floor, Abu Dhabi, UAE &bull; Hi-Lite Business Park, Calicut
-                          </div>
+                          {!includeLetterheadBg ? (
+                            <>
+                              <div style={{ fontWeight: 900, fontSize: '16px', color: '#000000' }}>
+                                Sterling Study Abroad &amp; Overseas Consultancy LLC
+                              </div>
+                              <div style={{ fontSize: '11px', color: '#000000', fontWeight: 700 }}>
+                                Global University Partnerships &amp; Recruitment Division
+                              </div>
+                              <div style={{ fontSize: '10px', color: '#000000', marginTop: '2px' }}>
+                                Etihad Airways Centre 5th Floor, Abu Dhabi, UAE &bull; Hi-Lite Business Park, Calicut
+                              </div>
+                            </>
+                          ) : (
+                            <div>
+                              <div style={{ fontSize: '12px', color: '#000000', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                Global University Partnerships &amp; Recruitment Division
+                              </div>
+                              <div style={{ fontSize: '10px', color: '#475569', fontWeight: 600 }}>
+                                International Admissions &amp; Enrolment Agency Desk
+                              </div>
+                            </div>
+                          )}
                         </div>
 
                         <div style={{ textAlign: 'right' }}>

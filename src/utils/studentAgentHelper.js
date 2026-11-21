@@ -39,6 +39,9 @@ const DEFAULT_META = {
   insurance_agent: '',
   insurance_committed: 0,
   insurance_paid: 0,
+  uni_commission_committed: 0,
+  uni_commission_received: 0,
+  uni_commission_currency: 'INR',
 };
 
 /**
@@ -82,11 +85,14 @@ export function getStudentAgentMeta(student) {
   meta.apostille_paid = Number(meta.apostille_paid || 0);
   meta.insurance_committed = Number(meta.insurance_committed || 0);
   meta.insurance_paid = Number(meta.insurance_paid || 0);
+  meta.uni_commission_committed = Number(meta.uni_commission_committed || (student && student.commission ? student.commission : 0));
+  meta.uni_commission_received = Number(meta.uni_commission_received || (student && student.commission_received ? student.commission_received : 0));
 
   // Compute remaining dues
   meta.b2b_remaining = Math.max(0, meta.b2b_committed - meta.b2b_paid);
   meta.apostille_remaining = Math.max(0, meta.apostille_committed - meta.apostille_paid);
   meta.insurance_remaining = Math.max(0, meta.insurance_committed - meta.insurance_paid);
+  meta.uni_commission_remaining = Math.max(0, meta.uni_commission_committed - meta.uni_commission_received);
   meta.total_external_dues = meta.b2b_remaining + meta.apostille_remaining + meta.insurance_remaining;
 
   return meta;
@@ -106,6 +112,9 @@ export function saveStudentAgentMeta(studentId, studentName, meta, existingNotes
     insurance_agent: meta.insurance_agent?.trim() || '',
     insurance_committed: Number(meta.insurance_committed || 0),
     insurance_paid: Number(meta.insurance_paid || 0),
+    uni_commission_committed: Number(meta.uni_commission_committed || 0),
+    uni_commission_received: Number(meta.uni_commission_received || 0),
+    uni_commission_currency: meta.uni_commission_currency || 'INR',
   };
 
   // 1. Save to localStorage
