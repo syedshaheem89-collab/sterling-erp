@@ -883,9 +883,9 @@ export default function Students({ setCurrentPage, initialFilter } = {}) {
   const handleSaveStudentDetails = async () => {
     if (!currentStudent?.id) return;
     try {
-      const b2bCharge = Number(editFormData.b2b_paid || editFormData.b2b_committed || 0);
-      const otherExpense = Number(editFormData.apostille_paid || editFormData.apostille_committed || 0) +
-                           Number(editFormData.insurance_paid || editFormData.insurance_committed || 0);
+      const b2bCharge = Math.max(Number(editFormData.b2b_committed || 0), Number(editFormData.b2b_paid || 0));
+      const otherExpense = Math.max(Number(editFormData.apostille_committed || 0), Number(editFormData.apostille_paid || 0)) +
+                           Math.max(Number(editFormData.insurance_committed || 0), Number(editFormData.insurance_paid || 0));
 
       const commExpected = Number(editFormData.uni_commission_committed !== undefined && editFormData.uni_commission_committed !== ''
         ? editFormData.uni_commission_committed
@@ -2262,9 +2262,9 @@ function AddStudentModal({
     try {
       const activeCompany = companyId || 'a1b2c3d4-0000-0000-0000-000000000001';
 
-      const b2bCharge = Number(formData.b2b_paid || formData.b2b_committed || 0);
-      const otherExpense = Number(formData.apostille_paid || formData.apostille_committed || 0) +
-                           Number(formData.insurance_paid || formData.insurance_committed || 0);
+      const b2bCharge = Math.max(Number(formData.b2b_committed || 0), Number(formData.b2b_paid || 0));
+      const otherExpense = Math.max(Number(formData.apostille_committed || 0), Number(formData.apostille_paid || 0)) +
+                           Math.max(Number(formData.insurance_committed || 0), Number(formData.insurance_paid || 0));
 
       const commExpected = Number(formData.uni_commission_committed !== undefined && formData.uni_commission_committed !== ''
         ? formData.uni_commission_committed

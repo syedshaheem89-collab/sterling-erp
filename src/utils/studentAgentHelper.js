@@ -4,6 +4,8 @@
  * and Insurance partners to student applications.
  */
 
+import { supabase } from '../supabase';
+
 export const KNOWN_B2B_PARTNERS = [
   'Consult Fox',
   'Future Factory',
@@ -444,4 +446,91 @@ export function numberToWordsINR(num) {
 export function getCleanNotes(notes) {
   if (!notes || typeof notes !== 'string') return '';
   return notes.replace(/<!--AGENT_META:\{.*?\}-->/g, '').trim();
+}
+
+/**
+ * Update the student's partner meta when a B2B payment is settled.
+ * Reflects in the student's profile (Paid: ₹..., Due: ₹0 / ✓ Settled) and recalculates profit.
+ */
+export async function updateStudentFromB2BSettlement(payment, utrNumber = '', payingBankName = '') {
+  if (!payment) return;
+
+  try {
+    const studentName = payment.student_names || '';
+    const studentId = payment.student_id || null;
+    const cat = (payment.category || '').toLowerCase();
+    const amountPaid = Number(payment.base_amount || payment.amount || 0);
+
+    // 1. Find the student in supabase or fallback
+    let targetStudent = null;
+
+    if (studentId) {
+      try {
+        const { data } = await supabase.from('students').select('*').eq('id', studentId).maybeSingle();
+        if (data) targetStudent = data;
+      } catch (e) {}
+    }
+
+    if (!targetStudent && studentName) {
+      try {
+        const { data } = await supabase.from('students').select('*').ilike('name', `%${studentName.trim()}%`).limit(1);
+        if (data && data.length > 0) targetStudent = data[0];
+      } catch (e) {}
+    }
+
+    const effectiveId = targetStudent?.id || studentId;
+    const effectiveName = targetStudent?.name || studentName;
+
+    if (!effectiveId && !effectiveName) return;
+
+    // 2. Fetch current meta
+    const meta = getStudentAgentMeta(targetStudent || { id: effectiveId, name: effectiveName });
+
+    // 3. Update the corresponding partner's paid amount
+    if (cat.includes('sub-agent') || cat.includes('commission') || cat.includes('b2b')) {
+      meta.b2b_paid = Math.max(Number(meta.b2b_paid || 0), amountPaid);
+      if (meta.b2b_committed <= 0) meta.b2b_committed = amountPaid;
+      meta.b2b_remaining = Math.max(0, meta.b2b_committed - meta.b2b_paid);
+    } else if (cat.includes('apostille')) {
+      meta.apostille_paid = Math.max(Number(meta.apostille_paid || 0), amountPaid);
+      if (meta.apostille_committed <= 0) meta.apostille_committed = amountPaid;
+      meta.apostille_remaining = Math.max(0, meta.apostille_committed - meta.apostille_paid);
+    } else if (cat.includes('insurance') || cat.includes('vfs')) {
+      meta.insurance_paid = Math.max(Number(meta.insurance_paid || 0), amountPaid);
+      if (meta.insurance_committed <= 0) meta.insurance_committed = amountPaid;
+      meta.insurance_remaining = Math.max(0, meta.insurance_committed - meta.insurance_paid);
+    }
+
+    meta.total_external_dues = (meta.b2b_remaining || 0) + (meta.apostille_remaining || 0) + (meta.insurance_remaining || 0);
+
+    // 4. Save to localStorage & notes
+    const finalNotes = saveStudentAgentMeta(
+      effectiveId,
+      effectiveName,
+      meta,
+      targetStudent?.notes || ''
+    );
+
+    // 5. Update supabase students record
+    if (effectiveId) {
+      const b2bCharge = Math.max(Number(meta.b2b_committed || 0), Number(meta.b2b_paid || 0));
+      const otherExpense = Math.max(Number(meta.apostille_committed || 0), Number(meta.apostille_paid || 0)) +
+                           Math.max(Number(meta.insurance_committed || 0), Number(meta.insurance_paid || 0));
+
+      await supabase
+        .from('students')
+        .update({
+          b2b_charge: b2bCharge,
+          other_expense: otherExpense,
+          notes: finalNotes,
+        })
+        .eq('id', effectiveId);
+    }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('storage'));
+    }
+  } catch (err) {
+    console.error('Error updating student from B2B settlement:', err);
+  }
 }

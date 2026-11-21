@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
 import { supabase } from '../supabase';
-import { parseTransferAccountDetails, numberToWordsINR, getStudentAgentMeta, saveStudentAgentMeta } from '../utils/studentAgentHelper';
+import { parseTransferAccountDetails, numberToWordsINR, getStudentAgentMeta, saveStudentAgentMeta, updateStudentFromB2BSettlement } from '../utils/studentAgentHelper';
 
 /**
  * DocumentGeneratorModal
@@ -389,6 +389,11 @@ export default function DocumentGeneratorModal({
       });
     }
 
+    // Synchronize settlement back to student application (updates B2B Paid and recalculates net profit)
+    if (b2bPaymentData) {
+      updateStudentFromB2BSettlement(b2bPaymentData, utr, chosenBank.bank_name);
+    }
+
     toast.success('Payment marked as Settled! Official Paid Receipt generated.');
   };
 
@@ -770,18 +775,34 @@ export default function DocumentGeneratorModal({
             }
             .a4-sheet {
               width: 210mm;
-              min-height: 297mm;
               height: 297mm;
+              max-height: 297mm;
               position: relative;
-              padding: ${includeLetterheadBg ? '8mm 14mm 14mm 14mm' : '16mm 14mm 14mm 14mm'};
               background-color: #ffffff !important;
               overflow: hidden;
+              page-break-after: avoid;
+              page-break-inside: avoid;
             }
-            .a4-sheet img {
-              max-width: 100% !important;
-              height: auto !important;
+            .print-letterhead-bg {
+              position: absolute !important;
+              top: 0 !important;
+              left: 0 !important;
+              width: 210mm !important;
+              height: 297mm !important;
+              object-fit: fill !important;
+              z-index: 0 !important;
               display: block !important;
-              margin-bottom: 14px !important;
+            }
+            .print-content-inner {
+              position: relative !important;
+              z-index: 1 !important;
+              width: 100% !important;
+              height: 100% !important;
+              padding: ${includeLetterheadBg ? '38mm 12mm 12mm 12mm' : '14mm 12mm 12mm 12mm'} !important;
+              display: flex !important;
+              flex-direction: column !important;
+              justify-content: space-between !important;
+              box-sizing: border-box !important;
             }
             table {
               border-collapse: collapse !important;
@@ -790,33 +811,33 @@ export default function DocumentGeneratorModal({
             }
             th {
               border: 1.5px solid #000000 !important;
-              padding: 6px 10px !important;
-              font-size: 11.5px !important;
+              padding: 5px 8px !important;
+              font-size: 11px !important;
               font-weight: 800 !important;
               color: #000000 !important;
               background-color: #f1f5f9 !important;
             }
             td {
               border: 1.5px solid #000000 !important;
-              padding: 6px 10px !important;
-              font-size: 11.5px !important;
+              padding: 5px 8px !important;
+              font-size: 11px !important;
               color: #000000 !important;
               background-color: #ffffff !important;
             }
             .rubber-stamp {
               position: absolute;
-              bottom: 45mm;
-              right: 25mm;
-              border: 3.5px dashed #047857 !important;
+              top: 10mm;
+              right: 10mm;
+              border: 2.5px dashed #047857 !important;
               color: #047857 !important;
-              padding: 10px 16px;
-              border-radius: 12px;
+              padding: 6px 12px;
+              border-radius: 8px;
               text-align: center;
               font-family: 'Plus Jakarta Sans', sans-serif;
               font-weight: 900;
               transform: rotate(-6deg);
               background: rgba(240, 253, 244, 0.95) !important;
-              box-shadow: 0 0 0 4px rgba(4, 120, 87, 0.2);
+              box-shadow: 0 0 0 3px rgba(4, 120, 87, 0.2);
               z-index: 50;
             }
             .rubber-stamp * {
@@ -826,7 +847,10 @@ export default function DocumentGeneratorModal({
         </head>
         <body>
           <div class="a4-sheet">
-            ${printArea.innerHTML}
+            ${includeLetterheadBg ? '<img src="/sterling-letterhead.jpg" class="print-letterhead-bg" alt="Sterling Letterhead" />' : ''}
+            <div class="print-content-inner">
+              ${printArea.innerHTML}
+            </div>
           </div>
           <script>
             window.onload = function() {
@@ -1909,24 +1933,42 @@ export default function DocumentGeneratorModal({
                 fontFamily: "'Inter', sans-serif",
                 fontSize: '12px',
                 lineHeight: 1.45,
-                padding: includeLetterheadBg ? '22px 42px 45px 42px' : '36px 42px 45px 42px',
+                overflow: 'hidden',
               }}
             >
+              {/* Absolute background letterhead stationery: 100% fidelity, ZERO text displacement */}
+              {includeLetterheadBg && (
+                <img
+                  src="/sterling-letterhead.jpg"
+                  alt="Sterling Study Abroad Letterhead"
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'fill',
+                    zIndex: 0,
+                    pointerEvents: 'none',
+                  }}
+                />
+              )}
+
               {/* PRINT CONTENT REF */}
-              <div ref={printContainerRef} style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
-                {/* Physical in-flow letterhead image: 100% PDF/print reliability and zero text collisions */}
-                {includeLetterheadBg && (
-                  <img
-                    src="/sterling-letterhead.jpg"
-                    alt="Sterling Study Abroad"
-                    style={{
-                      width: '100%',
-                      height: 'auto',
-                      display: 'block',
-                      marginBottom: '16px',
-                    }}
-                  />
-                )}
+              <div
+                ref={printContainerRef}
+                style={{
+                  position: 'relative',
+                  zIndex: 1,
+                  width: '100%',
+                  minHeight: '1123px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  padding: includeLetterheadBg ? '150px 42px 42px 42px' : '36px 42px 42px 42px',
+                  boxSizing: 'border-box',
+                }}
+              >
                 
                 {/* ======================================================== */}
                 {/* 1. DUBAI STUDENT INVOICE & OFFICIAL RECEIPT */}
@@ -2513,34 +2555,34 @@ export default function DocumentGeneratorModal({
                         className="rubber-stamp"
                         style={{
                           position: 'absolute',
-                          bottom: '65px',
-                          right: '25px',
-                          border: '3.5px dashed #047857',
+                          top: '10px',
+                          right: '15px',
+                          border: '3px dashed #047857',
                           color: '#047857',
-                          padding: '12px 18px',
-                          borderRadius: '12px',
+                          padding: '8px 16px',
+                          borderRadius: '8px',
                           textAlign: 'center',
                           fontWeight: 900,
-                          transform: 'rotate(-6deg)',
+                          transform: 'rotate(-5deg)',
                           background: 'rgba(240, 253, 244, 0.95)',
-                          boxShadow: '0 0 0 4px rgba(4, 120, 87, 0.2)',
+                          boxShadow: '0 0 0 3px rgba(4, 120, 87, 0.2)',
                           zIndex: 20,
                           pointerEvents: 'none',
                         }}
                       >
-                        <div style={{ fontSize: '10px', letterSpacing: '1px', textTransform: 'uppercase', opacity: 0.9, color: '#047857' }}>
+                        <div style={{ fontSize: '9px', letterSpacing: '1px', textTransform: 'uppercase', opacity: 0.9, color: '#047857' }}>
                           STERLING OVERSEAS
                         </div>
-                        <div style={{ fontSize: '20px', fontWeight: 900, letterSpacing: '1.5px', margin: '2px 0', color: '#047857' }}>
+                        <div style={{ fontSize: '17px', fontWeight: 900, letterSpacing: '1px', margin: '1px 0', color: '#047857' }}>
                           ★ PAID ★
                         </div>
-                        <div style={{ fontSize: '10.5px', fontWeight: 800, color: '#047857' }}>
+                        <div style={{ fontSize: '9.5px', fontWeight: 800, color: '#047857' }}>
                           DATE: {b2bReceipt.settledDate}
                         </div>
-                        <div style={{ fontSize: '9.5px', fontWeight: 700, letterSpacing: '0.4px', marginTop: '2px', color: '#047857' }}>
+                        <div style={{ fontSize: '8.5px', fontWeight: 700, letterSpacing: '0.4px', marginTop: '1px', color: '#047857' }}>
                           UTR: {b2bReceipt.utrNumber}
                         </div>
-                        <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '3px', opacity: 0.85, color: '#047857' }}>
+                        <div style={{ fontSize: '8px', textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '2px', opacity: 0.85, color: '#047857' }}>
                           VERIFIED REMITTANCE
                         </div>
                       </div>
@@ -2552,28 +2594,28 @@ export default function DocumentGeneratorModal({
                         className="rubber-stamp"
                         style={{
                           position: 'absolute',
-                          bottom: '85px',
-                          right: '25px',
-                          border: '3px dashed #D97706',
+                          top: '10px',
+                          right: '15px',
+                          border: '2.5px dashed #D97706',
                           color: '#D97706',
-                          padding: '10px 16px',
-                          borderRadius: '10px',
+                          padding: '8px 14px',
+                          borderRadius: '8px',
                           textAlign: 'center',
                           fontWeight: 900,
                           transform: 'rotate(-5deg)',
                           background: 'rgba(254, 243, 199, 0.95)',
-                          boxShadow: '0 0 0 4px rgba(217, 119, 6, 0.2)',
+                          boxShadow: '0 0 0 3px rgba(217, 119, 6, 0.15)',
                           zIndex: 20,
                           pointerEvents: 'none',
                         }}
                       >
-                        <div style={{ fontSize: '9px', letterSpacing: '1px', textTransform: 'uppercase', color: '#D97706' }}>
+                        <div style={{ fontSize: '8.5px', letterSpacing: '1px', textTransform: 'uppercase', color: '#D97706' }}>
                           STERLING ERP
                         </div>
-                        <div style={{ fontSize: '15px', fontWeight: 900, margin: '2px 0', color: '#D97706' }}>
+                        <div style={{ fontSize: '14px', fontWeight: 900, margin: '1px 0', color: '#D97706' }}>
                           ⏳ PENDING CLEARANCE
                         </div>
-                        <div style={{ fontSize: '9.5px', fontWeight: 800, color: '#D97706' }}>
+                        <div style={{ fontSize: '9px', fontWeight: 800, color: '#D97706' }}>
                           Awaiting Accounts Clearance
                         </div>
                       </div>

@@ -87,9 +87,9 @@ export default function StudentPopupModal({
     if (!selectedStudent?.id) return;
     setIsSavingStudent(true);
     try {
-      const b2bCharge = Number(editStudentData.b2b_paid || editStudentData.b2b_committed || 0);
-      const otherExpense = Number(editStudentData.apostille_paid || editStudentData.apostille_committed || 0) +
-                           Number(editStudentData.insurance_paid || editStudentData.insurance_committed || 0);
+      const b2bCharge = Math.max(Number(editStudentData.b2b_committed || 0), Number(editStudentData.b2b_paid || 0));
+      const otherExpense = Math.max(Number(editStudentData.apostille_committed || 0), Number(editStudentData.apostille_paid || 0)) +
+                           Math.max(Number(editStudentData.insurance_committed || 0), Number(editStudentData.insurance_paid || 0));
 
       const commExpected = Number(editStudentData.uni_commission_committed !== undefined && editStudentData.uni_commission_committed !== ''
         ? editStudentData.uni_commission_committed

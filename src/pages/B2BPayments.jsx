@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import DocumentGeneratorModal, { STERLING_COMPANY_BANKS_DEFAULT } from '../components/DocumentGeneratorModal';
 import B2BInvoiceViewerModal from '../components/B2BInvoiceViewerModal';
-import { getStudentAgentMeta, syncAllStudentsToB2BPayments } from '../utils/studentAgentHelper';
+import { getStudentAgentMeta, syncAllStudentsToB2BPayments, updateStudentFromB2BSettlement } from '../utils/studentAgentHelper';
 
 /**
  * INITIAL_PARTNER_ACCOUNTS
@@ -1175,6 +1175,10 @@ export default function B2BPayments({ setCurrentPage }) {
 
     const fin = calculateFinancials(settlingPayment);
     toast.success(`Settled ${formatMoney(fin.totalAmount, settlingPayment.currency)} from ${chosenBank.bank_name} to ${settlingPayment.partner_name}!`);
+
+    // Synchronize settlement back to the student application (updates B2B Paid and recalculates net profit)
+    updateStudentFromB2BSettlement(settlingPayment, settlementData.utr_number.trim(), chosenBank.bank_name);
+
     setSettlingPayment(null);
   };
 
@@ -4777,11 +4781,17 @@ export default function B2BPayments({ setCurrentPage }) {
                   -webkit-print-color-adjust: exact !important;
                   print-color-adjust: exact !important;
                 }
+                #accounts-disbursement-printable .print-letterhead-wrapper {
+                  width: 100% !important;
+                  height: 28mm !important;
+                  overflow: hidden !important;
+                  margin-bottom: 3mm !important;
+                  display: block !important;
+                }
                 #accounts-disbursement-printable img.print-letterhead {
                   width: 100% !important;
                   height: auto !important;
                   display: block !important;
-                  margin-bottom: 12px !important;
                   visibility: visible !important;
                 }
               }
@@ -4804,19 +4814,28 @@ export default function B2BPayments({ setCurrentPage }) {
                   lineHeight: '1.4',
                 }}
               >
-                {/* Physical in-flow letterhead image: guarantees 100% PDF/print capture and zero text collisions */}
-                <img
-                  src="/sterling-letterhead.jpg"
-                  alt="Sterling Study Abroad"
-                  className="print-letterhead"
+                {/* Physical letterhead top header banner: 100% PDF/print capture with zero extra vertical gap */}
+                <div
+                  className="print-letterhead-wrapper"
                   style={{
                     width: '100%',
-                    height: 'auto',
-                    display: 'block',
-                    marginBottom: '16px',
+                    height: '110px',
+                    overflow: 'hidden',
+                    marginBottom: '14px',
                     borderRadius: '4px',
                   }}
-                />
+                >
+                  <img
+                    src="/sterling-letterhead.jpg"
+                    alt="Sterling Study Abroad"
+                    className="print-letterhead"
+                    style={{
+                      width: '100%',
+                      height: 'auto',
+                      display: 'block',
+                    }}
+                  />
+                </div>
 
                 {/* Header (Company name removed as it is already on the letterhead banner) */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #000000', paddingBottom: '10px', marginBottom: '14px' }}>
