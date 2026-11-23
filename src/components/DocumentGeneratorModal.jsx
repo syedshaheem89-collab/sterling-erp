@@ -1807,8 +1807,8 @@ export default function DocumentGeneratorModal({
                               : '5th Floor, Hi-lite Business Park, Calicut, Kerala, India - 673014',
                             bankDetails: {
                               accountHolder: chosen.account_holder || (isForeign ? 'Sterling Overseas Consultancy LLC' : 'Sterling Study Abroad'),
-                              businessId: isForeign ? (chosen.ifsc || '') : '',
-                              licenseNumber: '',
+                              businessId: prev.bankDetails?.businessId || (isForeign ? (chosen.ifsc || '') : ''),
+                              licenseNumber: prev.bankDetails?.licenseNumber || '',
                               bankName: chosen.bank_name || 'Bank',
                               address: chosen.branch || '',
                               accountNumber: chosen.account_number || '',
@@ -2710,16 +2710,22 @@ export default function DocumentGeneratorModal({
                               </div>
                               <div style={{ fontSize: '11px', color: '#475569', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                                 {studentInvoice.bankDetails?.isDomestic
-                                  ? (studentInvoice.bankDetails?.licenseNumber?.trim() ? `Higher Education & Visa Advisory • ${studentInvoice.bankDetails.licenseNumber}` : 'Higher Education & Visa Advisory')
-                                  : (studentInvoice.companyName === 'Sterling Study Abroad'
-                                      ? 'International Admissions & Higher Education'
-                                      : (studentInvoice.bankDetails?.licenseNumber?.trim() ? `International Admissions & Higher Education • ${studentInvoice.bankDetails.licenseNumber}` : 'International Admissions & Higher Education'))}
+                                  ? 'Higher Education & Visa Advisory'
+                                  : 'International Admissions & Higher Education'}
+                                {studentInvoice.bankDetails?.licenseNumber?.trim()
+                                  ? ` • Trade License: ${studentInvoice.bankDetails.licenseNumber}`
+                                  : ''}
                               </div>
                               {studentInvoice.companyAddress && (
                                 <div style={{ fontSize: '10px', color: '#334155', fontWeight: 600, marginTop: '2px', maxWidth: '380px' }}>
                                   {studentInvoice.companyAddress}
                                 </div>
                               )}
+                              {studentInvoice.bankDetails?.businessId?.trim() ? (
+                                <div style={{ fontSize: '10px', color: '#475569', fontWeight: 600 }}>
+                                  Tax / Reg ID: {studentInvoice.bankDetails.businessId}
+                                </div>
+                              ) : null}
                             </>
                           ) : (
                             <div>
@@ -2736,9 +2742,12 @@ export default function DocumentGeneratorModal({
                                   {studentInvoice.companyAddress}
                                 </div>
                               )}
-                              {studentInvoice.bankDetails?.businessId?.trim() ? (
-                                <div style={{ fontSize: '10px', color: '#64748B', fontWeight: 600 }}>
-                                  Tax / Reg ID: {studentInvoice.bankDetails.businessId}
+                              {(studentInvoice.bankDetails?.businessId?.trim() || studentInvoice.bankDetails?.licenseNumber?.trim()) ? (
+                                <div style={{ fontSize: '10px', color: '#475569', fontWeight: 600 }}>
+                                  {[
+                                    studentInvoice.bankDetails?.businessId?.trim() ? `Tax / Reg ID: ${studentInvoice.bankDetails.businessId}` : '',
+                                    studentInvoice.bankDetails?.licenseNumber?.trim() ? `Trade License #: ${studentInvoice.bankDetails.licenseNumber}` : '',
+                                  ].filter(Boolean).join(' • ')}
                                 </div>
                               ) : null}
                             </div>
@@ -2904,6 +2913,12 @@ export default function DocumentGeneratorModal({
                               <tr>
                                 <td style={{ border: '1.5px solid #000000', padding: '5px 10px', fontWeight: 800, color: '#000000' }}>Tax / Reg Identification:</td>
                                 <td style={{ border: '1.5px solid #000000', padding: '5px 10px', fontWeight: 700, color: '#000000' }}>{studentInvoice.bankDetails.businessId}</td>
+                              </tr>
+                            ) : null}
+                            {studentInvoice.bankDetails?.licenseNumber?.trim() ? (
+                              <tr>
+                                <td style={{ border: '1.5px solid #000000', padding: '5px 10px', fontWeight: 800, color: '#000000' }}>Trade License #:</td>
+                                <td style={{ border: '1.5px solid #000000', padding: '5px 10px', fontWeight: 700, color: '#000000' }}>{studentInvoice.bankDetails.licenseNumber}</td>
                               </tr>
                             ) : null}
                             <tr>
