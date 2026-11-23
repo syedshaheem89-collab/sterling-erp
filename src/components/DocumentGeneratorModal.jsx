@@ -1543,21 +1543,41 @@ export default function DocumentGeneratorModal({
           </div>
         </div>
 
+        <style>{`
+          .docgen-workspace {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+          }
+          .docgen-drawer {
+            width: 380px;
+            background: var(--bg1, #080A12);
+            border-right: 1px solid rgba(148, 163, 225, 0.15);
+            padding: 16px;
+            overflow-y: auto;
+            font-size: 12.5px;
+            flex-shrink: 0;
+          }
+          @media (max-width: 768px) {
+            .docgen-workspace {
+              flex-direction: column;
+              overflow-y: auto;
+              -webkit-overflow-scrolling: touch;
+            }
+            .docgen-drawer {
+              width: 100% !important;
+              border-right: none !important;
+              border-bottom: 1px solid rgba(148, 163, 225, 0.2) !important;
+              overflow-y: visible !important;
+            }
+          }
+        `}</style>
         {/* WORKSPACE AREA: EDIT DRAWER (LEFT) + A4 CANVAS PREVIEW (RIGHT) */}
-        <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+        <div className="docgen-workspace">
           
           {/* EDIT FORM DRAWER (LEFT) */}
           {showEditDrawer && (
-            <div
-              style={{
-                width: '380px',
-                background: 'var(--bg1, #080A12)',
-                borderRight: '1px solid rgba(148, 163, 225, 0.15)',
-                padding: '16px',
-                overflowY: 'auto',
-                fontSize: '12.5px',
-              }}
-            >
+            <div className="docgen-drawer">
               {/* Header inside drawer */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
                 <h4 style={{ margin: 0, fontSize: '14px', color: '#fff', fontWeight: 700 }}>

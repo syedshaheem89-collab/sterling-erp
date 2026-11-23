@@ -2566,9 +2566,46 @@ export default function B2BPayments({ setCurrentPage }) {
           .simple-table {
             display: block;
             overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
           }
           .manager-layout {
             grid-template-columns: 1fr;
+          }
+        }
+
+        @media (max-width: 768px) {
+          .simple-kpi-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+          }
+          .simple-kpi-card {
+            padding: 11px 12px;
+          }
+          .simple-kpi-val {
+            font-size: 16px;
+          }
+          .header-action-buttons {
+            width: 100%;
+          }
+          .header-action-buttons button {
+            flex: 1 1 calc(50% - 6px);
+            justify-content: center;
+            font-size: 12px;
+            padding: 8px 10px;
+          }
+          .b2b-modal-overlay {
+            align-items: flex-end !important;
+            padding: 0 !important;
+          }
+          .b2b-modal-card {
+            width: 100% !important;
+            max-width: 100% !important;
+            max-height: 92dvh !important;
+            border-radius: 20px 20px 0 0 !important;
+            padding-bottom: env(safe-area-inset-bottom) !important;
+          }
+          .form-row {
+            grid-template-columns: 1fr !important;
           }
         }
       `}</style>

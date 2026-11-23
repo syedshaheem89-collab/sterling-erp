@@ -1649,3 +1649,55 @@ tbody tr:last-child td {
     padding: 32px 24px;
   }
 }
+
+/* --------------------------------------------------------------------------
+   19. iOS & ANDROID MOBILE APP POLISH (PWA & TOUCH UX)
+   -------------------------------------------------------------------------- */
+html, body, #root {
+  max-width: 100vw;
+  overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+@media (max-width: 768px) {
+  /* Prevent iOS Safari auto-zoom when tapping inputs */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
+  /* Smooth momentum scrolling for horizontal tables */
+  .table-wrap,
+  .simple-table-wrapper,
+  [style*="overflowX: 'auto'"],
+  [style*="overflow-x: auto"] {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Compact 2x2 app-style KPI cards on mobile */
+  .kpi-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+  }
+
+  /* Native Bottom-Sheet style modals on mobile */
+  .modal-overlay {
+    align-items: flex-end !important;
+    padding: 0 !important;
+  }
+  .modal {
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: 20px 20px 0 0 !important;
+    max-height: 92dvh !important;
+    padding-bottom: env(safe-area-inset-bottom) !important;
+  }
+}
+
+@media (max-width: 390px) {
+  .kpi-grid {
+    grid-template-columns: 1fr !important;
+  }
+}

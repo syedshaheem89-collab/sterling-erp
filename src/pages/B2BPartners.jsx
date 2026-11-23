@@ -872,7 +872,7 @@ export default function B2BPartners() {
             {/* Modal Body */}
             <div style={{ padding: '18px 22px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '14px' }}>
               {/* 4 Mini Summary Cards */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))', gap: '10px' }}>
                 <div style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '10px', padding: '10px 14px' }}>
                   <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase' }}>Students</div>
                   <div style={{ fontSize: '18px', fontWeight: 800, color: 'var(--text)', marginTop: '3px' }}>{selectedPartner.studentCount}</div>

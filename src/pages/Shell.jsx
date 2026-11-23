@@ -678,7 +678,72 @@ export default function Shell() {
 
         @media (max-width: 768px) {
           .shell-content-container {
-            padding: 18px 14px;
+            padding: 14px 12px calc(84px + env(safe-area-inset-bottom)) 12px;
+          }
+          .shell-topbar {
+            padding-top: env(safe-area-inset-top);
+            height: calc(56px + env(safe-area-inset-top));
+          }
+          .topbar-desc {
+            display: none !important;
+          }
+        }
+
+        /* Mobile App Bottom Tab Bar (YouTube / Swiggy style) */
+        .mobile-bottom-nav {
+          display: none;
+        }
+
+        @media (max-width: 991px) {
+          .mobile-bottom-nav {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 950;
+            background: var(--glass-strong, rgba(17, 22, 40, 0.94));
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-top: 1px solid var(--border-strong, rgba(148, 163, 225, 0.2));
+            padding: 6px 4px calc(6px + env(safe-area-inset-bottom)) 4px;
+            box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.35);
+          }
+
+          .mobile-bottom-tab {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 2px;
+            padding: 4px 2px;
+            border-radius: 10px;
+            color: var(--muted, #A8B2C7);
+            font-size: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            border: none;
+            background: transparent;
+          }
+
+          .mobile-bottom-tab .tab-ico {
+            font-size: 18px;
+            line-height: 1.1;
+            padding: 2px 10px;
+            border-radius: 999px;
+            transition: background 0.15s ease;
+          }
+
+          .mobile-bottom-tab.active {
+            color: var(--text, #EDEFFA);
+            font-weight: 800;
+          }
+
+          .mobile-bottom-tab.active .tab-ico {
+            background: rgba(124, 111, 255, 0.24);
+            box-shadow: 0 0 12px rgba(124, 111, 255, 0.25);
           }
         }
       `}</style>
@@ -852,6 +917,80 @@ export default function Shell() {
           {renderContent()}
         </main>
       </div>
+
+      {/* Native Mobile App Bottom Navigation (YouTube / Swiggy style) */}
+      <nav className="mobile-bottom-nav" aria-label="Mobile Bottom Navigation">
+        <button
+          type="button"
+          className={`mobile-bottom-tab ${currentPage === 'overview' ? 'active' : ''}`}
+          onClick={() => {
+            setCurrentPage('overview');
+            setMobileSidebarOpen(false);
+          }}
+        >
+          <span className="tab-ico">📊</span>
+          <span>Home</span>
+        </button>
+
+        <button
+          type="button"
+          className={`mobile-bottom-tab ${currentPage === 'students' ? 'active' : ''}`}
+          onClick={() => {
+            setCurrentPage('students');
+            setMobileSidebarOpen(false);
+          }}
+        >
+          <span className="tab-ico">👥</span>
+          <span>Students</span>
+        </button>
+
+        <button
+          type="button"
+          className={`mobile-bottom-tab ${currentPage === 'b2b-payments' ? 'active' : ''}`}
+          onClick={() => {
+            setCurrentPage('b2b-payments');
+            setMobileSidebarOpen(false);
+          }}
+        >
+          <span className="tab-ico">💳</span>
+          <span>Billing</span>
+        </button>
+
+        {currentLevel >= 2 ? (
+          <button
+            type="button"
+            className={`mobile-bottom-tab ${currentPage === 'b2b-partners' ? 'active' : ''}`}
+            onClick={() => {
+              setCurrentPage('b2b-partners');
+              setMobileSidebarOpen(false);
+            }}
+          >
+            <span className="tab-ico">🤝</span>
+            <span>Partners</span>
+          </button>
+        ) : (
+          <button
+            type="button"
+            className={`mobile-bottom-tab ${currentPage === 'course-finder' ? 'active' : ''}`}
+            onClick={() => {
+              setCurrentPage('course-finder');
+              setMobileSidebarOpen(false);
+            }}
+          >
+            <span className="tab-ico">🎓</span>
+            <span>Courses</span>
+          </button>
+        )}
+
+        <button
+          type="button"
+          className={`mobile-bottom-tab ${mobileSidebarOpen ? 'active' : ''}`}
+          onClick={() => setMobileSidebarOpen(true)}
+        >
+          <span className="tab-ico">☰</span>
+          <span>More</span>
+        </button>
+      </nav>
     </div>
   );
 }
