@@ -2,6 +2,27 @@ import React, { useState, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
 import { supabase } from '../supabase';
 import { parseTransferAccountDetails, numberToWordsINR, getStudentAgentMeta, saveStudentAgentMeta, updateStudentFromB2BSettlement, convertToINR } from '../utils/studentAgentHelper';
+import { saveB2BCloudState, resolveActiveCompanyId } from '../utils/cloudSyncHelper';
+
+const DEFAULT_COMPANY_ADDRESS_PRESETS = {
+  uaeAddress: 'Sharjah Media City, Sharjah, UAE',
+  indiaAddress: '5th Floor, Hi-lite Business Park, Calicut, Kerala, India - 673014',
+  defaultLicenseNumber: '',
+  defaultTaxId: '',
+};
+
+const loadCompanyAddressPresets = () => {
+  try {
+    const saved = localStorage.getItem('sterling_invoice_company_presets');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed && typeof parsed === 'object') {
+        return { ...DEFAULT_COMPANY_ADDRESS_PRESETS, ...parsed };
+      }
+    }
+  } catch {}
+  return { ...DEFAULT_COMPANY_ADDRESS_PRESETS };
+};
 
 /**
  * DocumentGeneratorModal
@@ -86,6 +107,7 @@ export default function DocumentGeneratorModal({
   const [activeUniSearchIdx, setActiveUniSearchIdx] = useState(null);
   const [studentSearchQuery, setStudentSearchQuery] = useState('');
   const [showSettleInlineModal, setShowSettleInlineModal] = useState(false);
+  const [companyAddressPresets, setCompanyAddressPresets] = useState(loadCompanyAddressPresets);
   const [inlineSettlementData, setInlineSettlementData] = useState({
     paying_bank_id: '',
     settled_at: new Date().toISOString().split('T')[0],
@@ -122,7 +144,7 @@ export default function DocumentGeneratorModal({
   // --- 1. STUDENT DUBAI INVOICE / RECEIPT STATE (WIO Bank Abu Dhabi Template) ---
   const [studentInvoice, setStudentInvoice] = useState({
     companyName: 'Sterling Study Abroad',
-    companyAddress: 'Etihad Airways Centre 5th Floor, Abu Dhabi, United Arab Emirates',
+    companyAddress: companyAddressPresets.uaeAddress,
     docHeading: 'INVOICE', // 'INVOICE' | 'PROFORMA INVOICE' | 'TAX INVOICE' | 'FEE PAYMENT ADVICE'
     applyGst: false,
     gstRate: 18,
@@ -157,8 +179,8 @@ export default function DocumentGeneratorModal({
     selectedBankId: 'comp-bank-wio-1',
     bankDetails: {
       accountHolder: 'Sterling Overseas Consultancy LLC',
-      businessId: '', // Blank by default (user can add real TRN/Tax ID if needed)
-      licenseNumber: '',
+      businessId: companyAddressPresets.defaultTaxId || '', // Blank by default (user can add real TRN/Tax ID if needed)
+      licenseNumber: companyAddressPresets.defaultLicenseNumber || '',
       bankName: 'WIO BANK PJSC',
       address: 'Etihad Airways Centre 5th Floor, Abu Dhabi, UAE',
       accountNumber: '0860000009569370024',
@@ -226,10 +248,11 @@ export default function DocumentGeneratorModal({
       },
     ],
     selectedBankId: 'comp-bank-wio-1',
-    companyAddress: 'Etihad Airways Centre 5th Floor, Abu Dhabi, United Arab Emirates',
+    companyAddress: companyAddressPresets.uaeAddress,
     bankDetails: {
       accountHolder: 'Sterling Overseas Consultancy LLC',
       businessId: 'WIOBAEADXXX',
+      licenseNumber: companyAddressPresets.defaultLicenseNumber || '',
       bankName: 'WIO BANK PJSC',
       address: 'Etihad Airways Centre 5th Floor, Abu Dhabi, UAE',
       accountNumber: '0860000009569370024',
@@ -261,6 +284,43 @@ export default function DocumentGeneratorModal({
     }
     loadStudents();
   }, []);
+
+  // Reload company address presets whenever cloud sync finishes
+  useEffect(() => {
+    const syncPresets = () => setCompanyAddressPresets(loadCompanyAddressPresets());
+    window.addEventListener('sterling_b2b_payments_updated', syncPresets);
+    return () => window.removeEventListener('sterling_b2b_payments_updated', syncPresets);
+  }, []);
+
+  const handleSaveAddressPreset = async (isDomestic, addressVal, licenseVal, taxVal) => {
+    const trimmed = String(addressVal || '').trim();
+    if (!trimmed) {
+      toast.error('Please enter an address before saving preset');
+      return;
+    }
+    const nextPresets = {
+      ...companyAddressPresets,
+      ...(isDomestic ? { indiaAddress: trimmed } : { uaeAddress: trimmed }),
+      ...(licenseVal !== undefined ? { defaultLicenseNumber: String(licenseVal || '').trim() } : {}),
+      ...(taxVal !== undefined ? { defaultTaxId: String(taxVal || '').trim() } : {}),
+    };
+    setCompanyAddressPresets(nextPresets);
+    try {
+      localStorage.setItem('sterling_invoice_company_presets', JSON.stringify(nextPresets));
+      const cId = await resolveActiveCompanyId();
+      if (cId) {
+        await saveB2BCloudState(cId, { invoice_company_presets: nextPresets });
+      }
+      toast.success(
+        isDomestic
+          ? '✓ India Address preset saved & synced to cloud for all invoices!'
+          : '✓ UAE / Dubai Address preset saved & synced to cloud for all invoices!'
+      );
+    } catch (err) {
+      console.warn('Preset save warning:', err);
+      toast.success('Address preset saved locally');
+    }
+  };
 
   // Update mode when props change
   useEffect(() => {
@@ -668,7 +728,7 @@ export default function DocumentGeneratorModal({
     setSelectedStudentId('');
     setStudentInvoice({
       companyName: 'Sterling Study Abroad',
-      companyAddress: 'Etihad Airways Centre 5th Floor, Abu Dhabi, United Arab Emirates',
+      companyAddress: companyAddressPresets.uaeAddress,
       docHeading: 'INVOICE',
       applyGst: false,
       gstRate: 18,
@@ -703,8 +763,8 @@ export default function DocumentGeneratorModal({
       selectedBankId: 'comp-bank-wio-1',
       bankDetails: {
         accountHolder: 'Sterling Overseas Consultancy LLC',
-        businessId: '',
-        licenseNumber: '',
+        businessId: companyAddressPresets.defaultTaxId || '',
+        licenseNumber: companyAddressPresets.defaultLicenseNumber || '',
         bankName: 'WIO BANK PJSC',
         address: 'Etihad Airways Centre 5th Floor, Abu Dhabi, UAE',
         accountNumber: '0860000009569370024',
@@ -783,10 +843,11 @@ export default function DocumentGeneratorModal({
         },
       ],
       selectedBankId: 'comp-bank-wio-1',
-      companyAddress: 'Etihad Airways Centre 5th Floor, Abu Dhabi, United Arab Emirates',
+      companyAddress: companyAddressPresets.uaeAddress,
       bankDetails: {
         accountHolder: 'Sterling Overseas Consultancy LLC',
         businessId: 'WIOBAEADXXX',
+        licenseNumber: companyAddressPresets.defaultLicenseNumber || '',
         bankName: 'WIO BANK PJSC',
         address: 'Etihad Airways Centre 5th Floor, Abu Dhabi, UAE',
         accountNumber: '0860000009569370024',
@@ -1646,15 +1707,74 @@ export default function DocumentGeneratorModal({
 
                   <div>
                     <label style={{ display: 'block', color: '#94A3B8', marginBottom: '3px' }}>
-                      Company Foreign Address <span style={{ color: '#38BDF8', fontSize: '11px' }}>(Required for Forex Wire)</span>
+                      Company Address <span style={{ color: '#38BDF8', fontSize: '11px' }}>(UAE / India Preset)</span>
                     </label>
                     <input
                       type="text"
                       value={studentInvoice.companyAddress || ''}
                       onChange={(e) => setStudentInvoice({ ...studentInvoice, companyAddress: e.target.value })}
-                      placeholder="e.g. Etihad Airways Centre 5th Floor, Abu Dhabi, United Arab Emirates"
+                      placeholder="e.g. Sharjah Media City, Sharjah, UAE"
                       style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff', fontSize: '12px' }}
                     />
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginTop: '5px' }}>
+                      <button
+                        type="button"
+                        onClick={() => setStudentInvoice((prev) => ({ ...prev, companyAddress: companyAddressPresets.uaeAddress }))}
+                        style={{
+                          padding: '3px 7px',
+                          borderRadius: '4px',
+                          fontSize: '10.5px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          background: studentInvoice.companyAddress === companyAddressPresets.uaeAddress ? 'rgba(56, 189, 248, 0.2)' : '#0B0F1C',
+                          border: studentInvoice.companyAddress === companyAddressPresets.uaeAddress ? '1px solid #38BDF8' : '1px solid #2B3A5A',
+                          color: studentInvoice.companyAddress === companyAddressPresets.uaeAddress ? '#38BDF8' : '#CBD5E1',
+                        }}
+                      >
+                        🇦🇪 UAE / Dubai
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setStudentInvoice((prev) => ({ ...prev, companyAddress: companyAddressPresets.indiaAddress }))}
+                        style={{
+                          padding: '3px 7px',
+                          borderRadius: '4px',
+                          fontSize: '10.5px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          background: studentInvoice.companyAddress === companyAddressPresets.indiaAddress ? 'rgba(56, 189, 248, 0.2)' : '#0B0F1C',
+                          border: studentInvoice.companyAddress === companyAddressPresets.indiaAddress ? '1px solid #38BDF8' : '1px solid #2B3A5A',
+                          color: studentInvoice.companyAddress === companyAddressPresets.indiaAddress ? '#38BDF8' : '#CBD5E1',
+                        }}
+                      >
+                        🇮🇳 India
+                      </button>
+                      <button
+                        type="button"
+                        title="Save current address (plus License & Tax ID) as permanent default"
+                        onClick={() =>
+                          handleSaveAddressPreset(
+                            !!studentInvoice.bankDetails?.isDomestic,
+                            studentInvoice.companyAddress,
+                            studentInvoice.bankDetails?.licenseNumber,
+                            studentInvoice.bankDetails?.businessId
+                          )
+                        }
+                        style={{
+                          marginLeft: 'auto',
+                          padding: '3px 8px',
+                          borderRadius: '4px',
+                          fontSize: '10.5px',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          background: 'rgba(16, 185, 129, 0.14)',
+                          border: '1px solid rgba(16, 185, 129, 0.45)',
+                          color: '#34D399',
+                        }}
+                      >
+                        💾 Save Default
+                      </button>
+                    </div>
                   </div>
 
                   <div>
@@ -1803,8 +1923,8 @@ export default function DocumentGeneratorModal({
                             currency: isForeign ? (prev.currency === 'INR' ? (chosen.currency || 'USD') : prev.currency) : 'INR',
                             companyName: prev.companyName || (isForeign ? 'Sterling Overseas Consultancy LLC' : 'Sterling Study Abroad'),
                             companyAddress: isForeign
-                              ? (chosen.branch || 'Etihad Airways Centre 5th Floor, Abu Dhabi, United Arab Emirates')
-                              : '5th Floor, Hi-lite Business Park, Calicut, Kerala, India - 673014',
+                              ? (companyAddressPresets.uaeAddress || chosen.branch || 'Sharjah Media City, Sharjah, UAE')
+                              : (companyAddressPresets.indiaAddress || '5th Floor, Hi-lite Business Park, Calicut, Kerala, India - 673014'),
                             bankDetails: {
                               accountHolder: chosen.account_holder || (isForeign ? 'Sterling Overseas Consultancy LLC' : 'Sterling Study Abroad'),
                               businessId: prev.bankDetails?.businessId || (isForeign ? (chosen.ifsc || '') : ''),
@@ -2564,8 +2684,8 @@ export default function DocumentGeneratorModal({
                           selectedBankId: chosen.id,
                           currency: isForeign ? (prev.currency === 'INR' ? (chosen.currency || 'EUR') : prev.currency) : 'INR',
                           companyAddress: isForeign
-                            ? (chosen.branch || 'Etihad Airways Centre 5th Floor, Abu Dhabi, United Arab Emirates')
-                            : '5th Floor, Hi-lite Business Park, Calicut, Kerala, India - 673014',
+                            ? (companyAddressPresets.uaeAddress || chosen.branch || 'Sharjah Media City, Sharjah, UAE')
+                            : (companyAddressPresets.indiaAddress || '5th Floor, Hi-lite Business Park, Calicut, Kerala, India - 673014'),
                           bankDetails: {
                             accountHolder: chosen.account_holder || (isForeign ? 'Sterling Overseas Consultancy LLC' : 'Sterling Study Abroad'),
                             businessId: isForeign ? (chosen.ifsc || '') : '',
@@ -2601,6 +2721,63 @@ export default function DocumentGeneratorModal({
                       onChange={(e) => setUniversityInvoice({ ...universityInvoice, companyAddress: e.target.value })}
                       style={{ width: '100%', padding: '4px 6px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff', fontSize: '11px', marginBottom: '4px' }}
                     />
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '6px' }}>
+                      <button
+                        type="button"
+                        onClick={() => setUniversityInvoice((prev) => ({ ...prev, companyAddress: companyAddressPresets.uaeAddress }))}
+                        style={{
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          fontSize: '10px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          background: universityInvoice.companyAddress === companyAddressPresets.uaeAddress ? 'rgba(56, 189, 248, 0.2)' : '#0B0F1C',
+                          border: universityInvoice.companyAddress === companyAddressPresets.uaeAddress ? '1px solid #38BDF8' : '1px solid #2B3A5A',
+                          color: universityInvoice.companyAddress === companyAddressPresets.uaeAddress ? '#38BDF8' : '#CBD5E1',
+                        }}
+                      >
+                        🇦🇪 UAE / Dubai
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setUniversityInvoice((prev) => ({ ...prev, companyAddress: companyAddressPresets.indiaAddress }))}
+                        style={{
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          fontSize: '10px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          background: universityInvoice.companyAddress === companyAddressPresets.indiaAddress ? 'rgba(56, 189, 248, 0.2)' : '#0B0F1C',
+                          border: universityInvoice.companyAddress === companyAddressPresets.indiaAddress ? '1px solid #38BDF8' : '1px solid #2B3A5A',
+                          color: universityInvoice.companyAddress === companyAddressPresets.indiaAddress ? '#38BDF8' : '#CBD5E1',
+                        }}
+                      >
+                        🇮🇳 India
+                      </button>
+                      <button
+                        type="button"
+                        title="Save current address as permanent default"
+                        onClick={() =>
+                          handleSaveAddressPreset(
+                            !!universityInvoice.bankDetails?.isDomestic,
+                            universityInvoice.companyAddress
+                          )
+                        }
+                        style={{
+                          marginLeft: 'auto',
+                          padding: '2px 7px',
+                          borderRadius: '4px',
+                          fontSize: '10px',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          background: 'rgba(16, 185, 129, 0.14)',
+                          border: '1px solid rgba(16, 185, 129, 0.45)',
+                          color: '#34D399',
+                        }}
+                      >
+                        💾 Save Default
+                      </button>
+                    </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
                       <input
                         type="text"

@@ -25,6 +25,10 @@ export function hydrateLocalFromCompanySettings(settings) {
       localStorage.setItem('sterling_b2b_deleted_keys', JSON.stringify(settings.b2b_deleted_keys));
       updated = true;
     }
+    if (settings.invoice_company_presets && typeof settings.invoice_company_presets === 'object') {
+      localStorage.setItem('sterling_invoice_company_presets', JSON.stringify(settings.invoice_company_presets));
+      updated = true;
+    }
     if (updated) {
       window.dispatchEvent(new CustomEvent('sterling_b2b_payments_updated'));
     }
