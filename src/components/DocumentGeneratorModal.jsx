@@ -7,7 +7,7 @@ import { saveB2BCloudState, resolveActiveCompanyId } from '../utils/cloudSyncHel
 const DEFAULT_COMPANY_ADDRESS_PRESETS = {
   uaeAddress: 'Sharjah Media City, Sharjah, UAE',
   indiaAddress: '5th Floor, Hi-lite Business Park, Calicut, Kerala, India - 673014',
-  defaultLicenseNumber: '',
+  defaultLicenseNumber: '2644861.01',
   defaultTaxId: '',
 };
 
@@ -319,6 +319,30 @@ export default function DocumentGeneratorModal({
     } catch (err) {
       console.warn('Preset save warning:', err);
       toast.success('Address preset saved locally');
+    }
+  };
+
+  const handleSaveTradeLicensePreset = async (licenseVal) => {
+    const trimmed = String(licenseVal || '').trim();
+    if (!trimmed) {
+      toast.error('Please enter a Trade License # to save');
+      return;
+    }
+    const nextPresets = {
+      ...companyAddressPresets,
+      defaultLicenseNumber: trimmed,
+    };
+    setCompanyAddressPresets(nextPresets);
+    try {
+      localStorage.setItem('sterling_invoice_company_presets', JSON.stringify(nextPresets));
+      const cId = await resolveActiveCompanyId();
+      if (cId) {
+        await saveB2BCloudState(cId, { invoice_company_presets: nextPresets });
+      }
+      toast.success(`✓ Trade License # (${trimmed}) saved & synced to cloud!`);
+    } catch (err) {
+      console.warn('License preset save warning:', err);
+      toast.success(`Trade License # (${trimmed}) saved locally`);
     }
   };
 
@@ -2098,6 +2122,65 @@ export default function DocumentGeneratorModal({
                         style={{ width: '100%', padding: '4px 6px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff', fontSize: '11px' }}
                       />
                     </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '5px', marginTop: '5px' }}>
+                      {companyAddressPresets.defaultLicenseNumber && (
+                        studentInvoice.bankDetails.licenseNumber === companyAddressPresets.defaultLicenseNumber ? (
+                          <button
+                            type="button"
+                            onClick={() => setStudentInvoice((prev) => ({ ...prev, bankDetails: { ...prev.bankDetails, licenseNumber: '' } }))}
+                            style={{
+                              padding: '3px 7px',
+                              borderRadius: '4px',
+                              fontSize: '10.5px',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              background: 'rgba(56, 189, 248, 0.16)',
+                              border: '1px solid #38BDF8',
+                              color: '#38BDF8',
+                            }}
+                          >
+                            ✓ License Applied ({companyAddressPresets.defaultLicenseNumber}) &bull; Clear
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setStudentInvoice((prev) => ({ ...prev, bankDetails: { ...prev.bankDetails, licenseNumber: companyAddressPresets.defaultLicenseNumber } }))}
+                            style={{
+                              padding: '3px 7px',
+                              borderRadius: '4px',
+                              fontSize: '10.5px',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              background: '#0B0F1C',
+                              border: '1px solid #3B82F6',
+                              color: '#93C5FD',
+                            }}
+                          >
+                            + Use Saved License ({companyAddressPresets.defaultLicenseNumber})
+                          </button>
+                        )
+                      )}
+                      {studentInvoice.bankDetails.licenseNumber &&
+                        studentInvoice.bankDetails.licenseNumber.trim() !== companyAddressPresets.defaultLicenseNumber && (
+                          <button
+                            type="button"
+                            onClick={() => handleSaveTradeLicensePreset(studentInvoice.bankDetails.licenseNumber)}
+                            style={{
+                              marginLeft: 'auto',
+                              padding: '3px 8px',
+                              borderRadius: '4px',
+                              fontSize: '10.5px',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              background: 'rgba(16, 185, 129, 0.14)',
+                              border: '1px solid rgba(16, 185, 129, 0.45)',
+                              color: '#34D399',
+                            }}
+                          >
+                            💾 Save License
+                          </button>
+                        )}
+                    </div>
                   </div>
                 </div>
               )}
@@ -2800,6 +2883,72 @@ export default function DocumentGeneratorModal({
                         onChange={(e) => setUniversityInvoice({ ...universityInvoice, bankDetails: { ...universityInvoice.bankDetails, swiftCode: e.target.value } })}
                         style={{ width: '100%', padding: '4px 6px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff', fontSize: '11px' }}
                       />
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Trade License # (Optional - International)"
+                      value={universityInvoice.bankDetails?.licenseNumber || ''}
+                      onChange={(e) => setUniversityInvoice({ ...universityInvoice, bankDetails: { ...universityInvoice.bankDetails, licenseNumber: e.target.value } })}
+                      style={{ width: '100%', padding: '4px 6px', borderRadius: '4px', background: '#131B2E', border: '1px solid #2B3A5A', color: '#fff', fontSize: '11px', marginTop: '4px' }}
+                    />
+                    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
+                      {companyAddressPresets.defaultLicenseNumber && (
+                        universityInvoice.bankDetails?.licenseNumber === companyAddressPresets.defaultLicenseNumber ? (
+                          <button
+                            type="button"
+                            onClick={() => setUniversityInvoice((prev) => ({ ...prev, bankDetails: { ...prev.bankDetails, licenseNumber: '' } }))}
+                            style={{
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              fontSize: '10px',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              background: 'rgba(56, 189, 248, 0.16)',
+                              border: '1px solid #38BDF8',
+                              color: '#38BDF8',
+                            }}
+                          >
+                            ✓ License Applied ({companyAddressPresets.defaultLicenseNumber}) &bull; Clear
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setUniversityInvoice((prev) => ({ ...prev, bankDetails: { ...prev.bankDetails, licenseNumber: companyAddressPresets.defaultLicenseNumber } }))}
+                            style={{
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              fontSize: '10px',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              background: '#0B0F1C',
+                              border: '1px solid #3B82F6',
+                              color: '#93C5FD',
+                            }}
+                          >
+                            + Use Saved License ({companyAddressPresets.defaultLicenseNumber})
+                          </button>
+                        )
+                      )}
+                      {universityInvoice.bankDetails?.licenseNumber &&
+                        universityInvoice.bankDetails.licenseNumber.trim() !== companyAddressPresets.defaultLicenseNumber && (
+                          <button
+                            type="button"
+                            onClick={() => handleSaveTradeLicensePreset(universityInvoice.bankDetails.licenseNumber)}
+                            style={{
+                              marginLeft: 'auto',
+                              padding: '2px 7px',
+                              borderRadius: '4px',
+                              fontSize: '10px',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              background: 'rgba(16, 185, 129, 0.14)',
+                              border: '1px solid rgba(16, 185, 129, 0.45)',
+                              color: '#34D399',
+                            }}
+                          >
+                            💾 Save License
+                          </button>
+                        )}
                     </div>
                   </div>
                 </div>
@@ -3940,6 +4089,9 @@ export default function DocumentGeneratorModal({
                           </div>
                           {universityInvoice.companyAddress && (
                             <div style={{ gridColumn: 'span 2' }}>Beneficiary Address: <strong>{universityInvoice.companyAddress}</strong></div>
+                          )}
+                          {universityInvoice.bankDetails?.licenseNumber && (
+                            <div style={{ gridColumn: 'span 2' }}>Trade License #: <strong>{universityInvoice.bankDetails.licenseNumber}</strong></div>
                           )}
                           <div style={{ gridColumn: 'span 2' }}>Bank Branch Address: {universityInvoice.bankDetails?.address}</div>
                         </div>
