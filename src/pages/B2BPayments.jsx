@@ -6,6 +6,7 @@ import * as XLSX from 'xlsx';
 import DocumentGeneratorModal, { STERLING_COMPANY_BANKS_DEFAULT } from '../components/DocumentGeneratorModal';
 import B2BInvoiceViewerModal from '../components/B2BInvoiceViewerModal';
 import { getStudentAgentMeta, syncAllStudentsToB2BPayments, updateStudentFromB2BSettlement } from '../utils/studentAgentHelper';
+import { fetchCompanySettingsFromCloud, saveB2BCloudState, hydrateLocalFromCompanySettings } from '../utils/cloudSyncHelper';
 
 /**
  * INITIAL_PARTNER_ACCOUNTS
@@ -453,7 +454,10 @@ export const EXPORT_COLUMNS_DEF = [
 ];
 
 export default function B2BPayments({ setCurrentPage }) {
-  const { user } = useAuth();
+  const { user, companyId } = useAuth();
+  const hasLoadedCloudRef = useRef(false);
+  const cloudSaveTimerRef = useRef(null);
+  const [cloudSyncStatus, setCloudSyncStatus] = useState('syncing'); // 'syncing' | 'synced' | 'local'
 
   // Primary Payments State
   const [payments, setPayments] = useState(() => {
@@ -750,6 +754,73 @@ export default function B2BPayments({ setCurrentPage }) {
       console.error('Failed to save to localStorage', e);
     }
   }, [payments]);
+
+  // 1. Load B2B Payments, Partner Accounts & Company Banks from Supabase Cloud on mount
+  useEffect(() => {
+    if (!companyId) return;
+    let isCancelled = false;
+
+    async function syncFromCloud() {
+      setCloudSyncStatus('syncing');
+      const settings = await fetchCompanySettingsFromCloud(companyId);
+      if (isCancelled) return;
+
+      if (settings && (Array.isArray(settings.b2b_payments) || Array.isArray(settings.company_banks) || settings.b2b_partner_accounts)) {
+        // Cloud already has shared company data -> hydrate this laptop/browser!
+        if (Array.isArray(settings.b2b_payments)) {
+          const delKeys = Array.isArray(settings.b2b_deleted_keys) ? settings.b2b_deleted_keys : [];
+          setPayments(settings.b2b_payments.filter((p) => !delKeys.includes(p.id)));
+        }
+        if (settings.b2b_partner_accounts && typeof settings.b2b_partner_accounts === 'object') {
+          setPartnerAccounts(settings.b2b_partner_accounts);
+        }
+        if (Array.isArray(settings.company_banks) && settings.company_banks.length > 0) {
+          setCompanyBanks(settings.company_banks);
+        }
+        hydrateLocalFromCompanySettings(settings);
+        hasLoadedCloudRef.current = true;
+        setCloudSyncStatus('synced');
+      } else {
+        // First time syncing to cloud: upload current laptop's local data so all other laptops receive it
+        const delKeys = JSON.parse(localStorage.getItem('sterling_b2b_deleted_keys') || '[]');
+        const res = await saveB2BCloudState(companyId, {
+          b2b_payments: payments,
+          b2b_partner_accounts: partnerAccounts,
+          company_banks: companyBanks,
+          b2b_deleted_keys: delKeys,
+        });
+        if (!isCancelled) {
+          hasLoadedCloudRef.current = true;
+          setCloudSyncStatus(res.ok ? 'synced' : 'local');
+        }
+      }
+    }
+
+    syncFromCloud();
+    return () => { isCancelled = true; };
+  }, [companyId]);
+
+  // 2. Auto-save any changes to Supabase Cloud so all directors & laptops stay updated
+  useEffect(() => {
+    if (!companyId || !hasLoadedCloudRef.current) return;
+    if (cloudSaveTimerRef.current) clearTimeout(cloudSaveTimerRef.current);
+
+    setCloudSyncStatus('syncing');
+    cloudSaveTimerRef.current = setTimeout(async () => {
+      const delKeys = JSON.parse(localStorage.getItem('sterling_b2b_deleted_keys') || '[]');
+      const res = await saveB2BCloudState(companyId, {
+        b2b_payments: payments,
+        b2b_partner_accounts: partnerAccounts,
+        company_banks: companyBanks,
+        b2b_deleted_keys: delKeys,
+      });
+      setCloudSyncStatus(res.ok ? 'synced' : 'local');
+    }, 500);
+
+    return () => {
+      if (cloudSaveTimerRef.current) clearTimeout(cloudSaveTimerRef.current);
+    };
+  }, [companyId, payments, partnerAccounts, companyBanks]);
 
   // Fetch ERP students on mount for autocomplete & calculations
   useEffect(() => {
@@ -2505,7 +2576,68 @@ export default function B2BPayments({ setCurrentPage }) {
       {/* 1. CLEAN TOP HEADER */}
       <div className="b2b-top-header">
         <div className="header-title-box">
-          <h1>Billing, Payouts &amp; Accounts Reminders</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <h1>Billing, Payouts &amp; Accounts Reminders</h1>
+            <button
+              type="button"
+              onClick={async () => {
+                if (!companyId) return;
+                setCloudSyncStatus('syncing');
+                const delKeys = JSON.parse(localStorage.getItem('sterling_b2b_deleted_keys') || '[]');
+                const res = await saveB2BCloudState(companyId, {
+                  b2b_payments: payments,
+                  b2b_partner_accounts: partnerAccounts,
+                  company_banks: companyBanks,
+                  b2b_deleted_keys: delKeys,
+                });
+                if (res.ok) {
+                  setCloudSyncStatus('synced');
+                  toast.success('☁️ Synced all Billing, Partner & Bank data to Cloud for all devices!');
+                } else {
+                  setCloudSyncStatus('local');
+                  toast.error(`Cloud sync restricted: ${res.error}`);
+                }
+              }}
+              title="Click to sync latest Billing & Bank data with Supabase Cloud for all directors and devices"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                padding: '3px 9px',
+                borderRadius: '999px',
+                fontSize: '11px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                background:
+                  cloudSyncStatus === 'synced'
+                    ? 'rgba(16, 185, 129, 0.14)'
+                    : cloudSyncStatus === 'syncing'
+                    ? 'rgba(59, 130, 246, 0.14)'
+                    : 'rgba(245, 158, 11, 0.14)',
+                border:
+                  cloudSyncStatus === 'synced'
+                    ? '1px solid rgba(16, 185, 129, 0.35)'
+                    : cloudSyncStatus === 'syncing'
+                    ? '1px solid rgba(59, 130, 246, 0.35)'
+                    : '1px solid rgba(245, 158, 11, 0.35)',
+                color:
+                  cloudSyncStatus === 'synced'
+                    ? '#10B981'
+                    : cloudSyncStatus === 'syncing'
+                    ? '#60A5FA'
+                    : '#F59E0B',
+              }}
+            >
+              <span>{cloudSyncStatus === 'synced' ? '☁️' : cloudSyncStatus === 'syncing' ? '↻' : '⚠️'}</span>
+              <span>
+                {cloudSyncStatus === 'synced'
+                  ? 'Cloud Synced (All Devices)'
+                  : cloudSyncStatus === 'syncing'
+                  ? 'Syncing...'
+                  : 'Local Only (Click to Sync)'}
+              </span>
+            </button>
+          </div>
           <p>
             Track invoices, partner payouts, and disbursements across Sterling banks with multi-currency and GST tracking.
           </p>

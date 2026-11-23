@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import supabase from '../supabase';
+import { hydrateLocalFromCompanySettings } from '../utils/cloudSyncHelper';
 
 const AuthContext = createContext(null);
 
@@ -54,6 +55,9 @@ export function AuthProvider({ children }) {
       if (memberData) {
         setCompanyMember(memberData);
         setCompany(memberData.company || null);
+        if (memberData.company?.settings) {
+          hydrateLocalFromCompanySettings(memberData.company.settings);
+        }
       } else {
         // Auto-heal: If user has no company membership yet, assign to Europe Sterling as company_admin / director
         const { data: firstCompany } = await supabase
@@ -65,6 +69,9 @@ export function AuthProvider({ children }) {
 
         if (firstCompany) {
           setCompany(firstCompany);
+          if (firstCompany.settings) {
+            hydrateLocalFromCompanySettings(firstCompany.settings);
+          }
           const fallbackMember = {
             company_id: firstCompany.id,
             user_id: sessionUser.id,

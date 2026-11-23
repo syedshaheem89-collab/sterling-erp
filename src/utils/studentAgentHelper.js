@@ -5,6 +5,7 @@
  */
 
 import { supabase } from '../supabase';
+import { saveB2BCloudState, resolveActiveCompanyId } from './cloudSyncHelper';
 
 export const KNOWN_B2B_PARTNERS = [
   'Consult Fox',
@@ -381,6 +382,9 @@ export function syncStudentPartnerToB2BPayments(studentId, studentName, meta) {
     if (hasChanges) {
       localStorage.setItem('sterling_b2b_payments', JSON.stringify(payments));
       window.dispatchEvent(new CustomEvent('sterling_b2b_payments_updated'));
+      resolveActiveCompanyId().then((cId) => {
+        if (cId) saveB2BCloudState(cId, { b2b_payments: payments });
+      });
     }
   } catch (err) {
     console.error('Failed to sync student partners to B2B payments', err);
