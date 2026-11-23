@@ -1046,10 +1046,11 @@ export default function Students({ setCurrentPage, initialFilter } = {}) {
               fontSize: '24px',
               fontWeight: 800,
               letterSpacing: '-0.02em',
-              color: '#fff',
+              color: 'var(--text)',
               display: 'flex',
               alignItems: 'center',
-              gap: '12px',
+              flexWrap: 'wrap',
+              gap: '10px',
             }}
           >
             Student Management
@@ -1072,7 +1073,7 @@ export default function Students({ setCurrentPage, initialFilter } = {}) {
           </p>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div className="students-action-bar" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
           <button
             type="button"
             className="btn-secondary"
@@ -1164,6 +1165,7 @@ export default function Students({ setCurrentPage, initialFilter } = {}) {
 
       {/* --- KPI SUMMARY ROW --- */}
       <div
+        className="students-kpi-grid"
         style={{
           display: 'grid',
           gridTemplateColumns: canViewFinance
@@ -1177,7 +1179,7 @@ export default function Students({ setCurrentPage, initialFilter } = {}) {
           <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             Total Cohort
           </div>
-          <div style={{ fontSize: '28px', fontWeight: 800, color: '#fff', marginTop: '6px' }}>
+          <div style={{ fontSize: '28px', fontWeight: 800, color: 'var(--text)', marginTop: '6px' }}>
             {kpis.totalCount}
           </div>
           <div style={{ fontSize: '12px', color: 'var(--cyan)', marginTop: '4px' }}>

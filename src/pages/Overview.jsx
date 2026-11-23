@@ -1100,6 +1100,7 @@ export default function Overview({ setCurrentPage, initialView }) {
           ROW 1: 5 INTERACTIVE KPI CARDS (2026 Click-to-Drilldown Experience)
          ========================================================================= */}
       <section
+        className="overview-kpi-grid"
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
@@ -1394,6 +1395,7 @@ export default function Overview({ setCurrentPage, initialView }) {
           ROW 2: LEAD SOURCE — STATUS (Left) & COLLECTION STATUS (Right)
          ========================================================================= */}
       <section
+        className="overview-split-62-38"
         style={{
           display: 'grid',
           gridTemplateColumns: '62% 38%',
@@ -1781,6 +1783,7 @@ export default function Overview({ setCurrentPage, initialView }) {
           ROW 3: INTAKE BREAKDOWN (Left) & PAYMENT STAGES (Right)
          ========================================================================= */}
       <section
+        className="overview-split-50-50"
         style={{
           display: 'grid',
           gridTemplateColumns: '1fr 1fr',
@@ -1868,6 +1871,7 @@ export default function Overview({ setCurrentPage, initialView }) {
           ROW 4: MONTHLY GROWTH TREND (Left), MONTHLY COLLECTIONS (Middle), DAILY TREND (Right)
          ========================================================================= */}
       <section
+        className="overview-split-30-45-25"
         style={{
           display: 'grid',
           gridTemplateColumns: '30% 45% 25%',

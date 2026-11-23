@@ -1694,6 +1694,36 @@ html, body, #root {
     max-height: 92dvh !important;
     padding-bottom: env(safe-area-inset-bottom) !important;
   }
+
+  /* Overview & Students Mobile Grids (Fixes squeezed 5-column KPIs & split charts) */
+  .overview-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+  }
+  .overview-kpi-grid > :last-child {
+    grid-column: span 2;
+  }
+  .overview-split-62-38,
+  .overview-split-50-50,
+  .overview-split-30-45-25 {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  .students-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+  }
+  .students-action-bar {
+    width: 100% !important;
+    gap: 8px !important;
+  }
+  .students-action-bar > button {
+    flex: 1 1 calc(50% - 6px) !important;
+    justify-content: center !important;
+    padding: 9px 10px !important;
+    font-size: 12px !important;
+  }
 }
 
 @media (max-width: 390px) {

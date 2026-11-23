@@ -681,8 +681,16 @@ export default function Shell() {
             padding: 14px 12px calc(84px + env(safe-area-inset-bottom)) 12px;
           }
           .shell-topbar {
+            padding: 0 12px;
             padding-top: env(safe-area-inset-top);
             height: calc(56px + env(safe-area-inset-top));
+          }
+          .topbar-title-area h1 {
+            font-size: 15px !important;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 185px;
           }
           .topbar-desc {
             display: none !important;
