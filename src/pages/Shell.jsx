@@ -4,6 +4,7 @@ import Overview from './Overview';
 import Students from './Students';
 import CourseFinder from './CourseFinder';
 import B2BPayments from './B2BPayments';
+import B2BPartners from './B2BPartners';
 import Ledger from './Ledger';
 import Users from './Users';
 import Admin from './Admin';
@@ -94,6 +95,7 @@ export default function Shell() {
     { id: 'students', label: 'Students', icon: '👥', minLevel: 1 },
     { id: 'course-finder', label: 'Course Finder', icon: '🎓', minLevel: 1 }, // Available to all staff & counselors
     { id: 'b2b-payments', label: 'Billing & Payouts', icon: '💳', minLevel: 1 }, // Microsoft To-Do style Partner Reminders & Disbursements
+    { id: 'b2b-partners', label: 'B2B Partners', icon: '🤝', minLevel: 2 }, // B2B Partner Portfolios & Disbursement Report
     { id: 'country', label: 'Country', icon: '🌍', minLevel: 3 }, // director & above
     { id: 'admissions', label: 'Admissions', icon: '🏆', minLevel: 2 }, // manager & above
     { id: 'finance', label: 'Finance', icon: '💰', minLevel: 3 }, // director & above
@@ -130,6 +132,11 @@ export default function Shell() {
         return {
           title: 'Billing, Payouts & Accounts Reminders',
           description: 'Track invoices, partner payouts, sub-agent commissions, and accounts clearance across Sterling house banks.',
+        };
+      case 'b2b-partners':
+        return {
+          title: 'B2B Partner Portfolios & Disbursement',
+          description: 'Partner-wise committed fees, disbursed payments, remaining liabilities, and student drilldowns.',
         };
       case 'country':
         return {
@@ -208,6 +215,8 @@ export default function Shell() {
         return <CourseFinder setCurrentPage={setCurrentPage} />;
       case 'b2b-payments':
         return <B2BPayments setCurrentPage={setCurrentPage} />;
+      case 'b2b-partners':
+        return <B2BPartners setCurrentPage={setCurrentPage} />;
       case 'ledger':
         return <Ledger setCurrentPage={setCurrentPage} />;
       case 'users':
